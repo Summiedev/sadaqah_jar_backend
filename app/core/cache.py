@@ -1,5 +1,7 @@
 import json
 import logging
+from datetime import date, datetime
+from enum import Enum
 
 import redis
 
@@ -14,6 +16,14 @@ redis_client = redis.Redis.from_url(
 )
 
 
+def _json_default(value):
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    return str(value)
+
+
 def test_redis():
     try:
         redis_client.set("ping", "pong")
@@ -25,7 +35,7 @@ def test_redis():
 def cache_daily_acts(user_id: int, acts: list, ttl=86400):
     key = f"daily_acts:{user_id}"
     try:
-        redis_client.set(key, json.dumps(acts), ex=ttl)
+        redis_client.set(key, json.dumps(acts, default=_json_default), ex=ttl)
     except redis.RedisError as exc:
         logger.warning("Failed to cache daily acts for user %s: %s", user_id, exc)
 
@@ -53,7 +63,7 @@ def get_cached_daily_acts(user_id: int):
 def cache_user_streak(user_id: int, streak_data: dict, ttl=3600):
     key = f"streak:{user_id}"
     try:
-        redis_client.set(key, json.dumps(streak_data), ex=ttl)
+        redis_client.set(key, json.dumps(streak_data, default=_json_default), ex=ttl)
     except redis.RedisError as exc:
         logger.warning("Failed to cache streak for user %s: %s", user_id, exc)
 
