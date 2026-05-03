@@ -39,7 +39,14 @@ def get_cached_daily_acts(user_id: int):
         return None
 
     if acts:
-        return json.loads(acts.decode("utf-8"))
+        try:
+            return json.loads(acts.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            logger.warning("Invalid cached daily acts for user %s: %s", user_id, exc)
+            try:
+                redis_client.delete(key)
+            except redis.RedisError:
+                pass
     return None
 
 
@@ -60,5 +67,12 @@ def get_cached_user_streak(user_id: int):
         return None
 
     if data:
-        return json.loads(data)
+        try:
+            return json.loads(data)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            logger.warning("Invalid streak cache for user %s: %s", user_id, exc)
+            try:
+                redis_client.delete(key)
+            except redis.RedisError:
+                pass
     return None
