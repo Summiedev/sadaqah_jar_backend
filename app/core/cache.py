@@ -1,33 +1,64 @@
-import redis
 import json
+import logging
+
+import redis
 
 from app.core.config import settings
 
-redis_client = redis.Redis.from_url(settings.REDIS_URL)
+logger = logging.getLogger(__name__)
+
+redis_client = redis.Redis.from_url(
+    settings.REDIS_URL,
+    socket_connect_timeout=2,
+    socket_timeout=2,
+)
+
 
 def test_redis():
-    redis_client.set("ping", "pong")
-    print(redis_client.get("ping"))
-    
+    try:
+        redis_client.set("ping", "pong")
+        print(redis_client.get("ping"))
+    except redis.RedisError as exc:
+        logger.warning("Redis ping failed: %s", exc)
+
+
 def cache_daily_acts(user_id: int, acts: list, ttl=86400):
     key = f"daily_acts:{user_id}"
-    redis_client.set(key, json.dumps(acts), ex=ttl)
+    try:
+        redis_client.set(key, json.dumps(acts), ex=ttl)
+    except redis.RedisError as exc:
+        logger.warning("Failed to cache daily acts for user %s: %s", user_id, exc)
+
 
 def get_cached_daily_acts(user_id: int):
     key = f"daily_acts:{user_id}"
-    acts = redis_client.get(key)
+    try:
+        acts = redis_client.get(key)
+    except redis.RedisError as exc:
+        logger.warning("Failed to read cached daily acts for user %s: %s", user_id, exc)
+        return None
+
     if acts:
         return json.loads(acts.decode("utf-8"))
     return None
 
+
 def cache_user_streak(user_id: int, streak_data: dict, ttl=3600):
     key = f"streak:{user_id}"
-    redis_client.set(key, json.dumps(streak_data), ex=ttl)
+    try:
+        redis_client.set(key, json.dumps(streak_data), ex=ttl)
+    except redis.RedisError as exc:
+        logger.warning("Failed to cache streak for user %s: %s", user_id, exc)
 
 
 def get_cached_user_streak(user_id: int):
     key = f"streak:{user_id}"
-    data = redis_client.get(key)
+    try:
+        data = redis_client.get(key)
+    except redis.RedisError as exc:
+        logger.warning("Failed to read streak cache for user %s: %s", user_id, exc)
+        return None
+
     if data:
         return json.loads(data)
     return None
