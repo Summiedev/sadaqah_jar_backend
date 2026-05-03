@@ -1,0 +1,12 @@
+venv/
+alembic/versions/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+build/
+develop-eggs/
+dist/
+.env
