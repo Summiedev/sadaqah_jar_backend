@@ -1,9 +1,8 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, Annotated
 
 from pydantic import ConfigDict, field_validator
-from pydantic_settings import BaseSettings
-
+from pydantic_settings import BaseSettings, NoDecode
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -17,7 +16,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int
-    CORS_ORIGINS: list[str] = []
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = []
 
     # SMTP / email settings (used for verification & password-reset emails)
     SMTP_HOST: str = "localhost"
