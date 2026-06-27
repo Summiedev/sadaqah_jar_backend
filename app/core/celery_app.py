@@ -28,7 +28,7 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=0, minute=0, day_of_week=0),
     },
     "jumua-reminder": {
-    "task": "app.tasks.scheduled_tasks.friday_reminder",
-    "schedule": crontab(hour=6, minute=0, day_of_week=5),
-}
+        "task": "app.tasks.scheduled_tasks.send_friday_reminder",
+        "schedule": crontab(hour=6, minute=0, day_of_week="fri"),
+    },
 }

@@ -25,6 +25,7 @@ rsa==4.9.1
 six==1.17.0
 slowapi==0.1.9
 SQLAlchemy==2.0.45
+hijri-converter==3.0.0
 celery==5.4.0
 starlette==0.50.0
 typing-inspection==0.4.2

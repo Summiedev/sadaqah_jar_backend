@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from jose import JWTError
 from app.core.ws_manager import manager
 from app.core.security import decode_access_token
+from app.api.family import _require_membership
 from app.db.session import SessionLocal
 from sqlalchemy.orm import Session
 from app.models.user import User
@@ -25,20 +26,21 @@ async def jar_ws(websocket: WebSocket, user_id: int, token: str = Query(None)):
         return
 
     db = SessionLocal()
-    user = get_user_from_token(token, db)
-    if user is None or user.id != user_id:
-        await websocket.close(code=4001)
+    try:
+        user = get_user_from_token(token, db)
+        if user is None or user.id != user_id:
+            await websocket.close(code=4001)
+            return
+    finally:
         db.close()
-        return
 
     await manager.connect(user_id, websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect(user_id)
-    finally:
-        db.close()
+        manager.disconnect(user_id, websocket)
+
 
 @router.websocket("/ws/family-jar/{jar_id}")
 async def family_jar_ws(websocket: WebSocket, jar_id: int, token: str = Query(None)):
@@ -47,11 +49,17 @@ async def family_jar_ws(websocket: WebSocket, jar_id: int, token: str = Query(No
         return
 
     db = SessionLocal()
-    user = get_user_from_token(token, db)
-    if user is None:
-        await websocket.close(code=4001)
-        db.close()
+    try:
+        user = get_user_from_token(token, db)
+        if user is None:
+            await websocket.close(code=4001, reason="Invalid token")
+            return
+        _require_membership(jar_id, user.id, db)
+    except Exception:
+        await websocket.close(code=4403, reason="Family membership required")
         return
+    finally:
+        db.close()
 
     await manager.connect_family(jar_id, websocket)
     try:
@@ -59,5 +67,3 @@ async def family_jar_ws(websocket: WebSocket, jar_id: int, token: str = Query(No
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect_family(jar_id, websocket)
-    finally:
-        db.close()

@@ -46,7 +46,7 @@ class DatabaseSeeder:
         for table in tables:
             self.db.query(table).delete()
         self.db.commit()
-        print("✓ Database cleared")
+        print("[OK] Database cleared")
     
     def seed_users(self, count: int = 10) -> list[User]:
         """Create test users with diverse email/username patterns."""
@@ -90,7 +90,7 @@ class DatabaseSeeder:
             users.append(user)
         
         self.db.commit()
-        print(f"✓ Created {created_count} users")
+        print(f"[OK] Created {created_count} users")
         return users
     
     def seed_sadaqah_acts(self) -> list[SadaqahAct]:
@@ -140,7 +140,7 @@ class DatabaseSeeder:
             acts.append(act)
         
         self.db.commit()
-        print(f"✓ Created {len(acts)} sadaqah acts")
+        print(f"[OK] Created {len(acts)} sadaqah acts")
         return acts
     
     def seed_charities(self) -> list[Charity]:
@@ -169,7 +169,7 @@ class DatabaseSeeder:
             charities.append(charity)
         
         self.db.commit()
-        print(f"✓ Created {len(charities)} charities")
+        print(f"[OK] Created {len(charities)} charities")
         return charities
     
     def seed_jars(self, users: list[User]) -> list[Jar]:
@@ -187,7 +187,7 @@ class DatabaseSeeder:
             jars.append(jar)
         
         self.db.commit()
-        print(f"✓ Created {len(jars)} personal jars")
+        print(f"[OK] Created {len(jars)} personal jars")
         return jars
     
     def seed_streaks(self, users: list[User]):
@@ -202,7 +202,7 @@ class DatabaseSeeder:
             self.db.add(streak)
         
         self.db.commit()
-        print(f"✓ Created {len(users)} user streaks")
+        print(f"[OK] Created {len(users)} user streaks")
     
     def seed_sadaqah_logs(self, users: list[User], acts: list[SadaqahAct], days_back: int = 60):
         """Create activity logs simulating 60 days of contributions."""
@@ -244,7 +244,7 @@ class DatabaseSeeder:
                 log_count += 1
         
         self.db.commit()
-        print(f"✓ Created {log_count} sadaqah logs")
+        print(f"[OK] Created {log_count} sadaqah logs")
     
     def seed_family_jars(self, users: list[User]) -> list[FamilyJar]:
         """Create family jars with members and contributions."""
@@ -303,7 +303,7 @@ class DatabaseSeeder:
                 self.db.add(member)
         
         self.db.commit()
-        print(f"✓ Created {len(family_jars)} family jars with members")
+        print(f"[OK] Created {len(family_jars)} family jars with members")
         return family_jars
     
     def seed_family_logs(self, family_jars: list[FamilyJar], acts: list[SadaqahAct], days_back: int = 30):
@@ -340,7 +340,7 @@ class DatabaseSeeder:
                 log_count += 1
         
         self.db.commit()
-        print(f"✓ Created {log_count} family jar logs")
+        print(f"[OK] Created {log_count} family jar logs")
     
     def seed_badges(self, users: list[User]):
         """Award badges to users based on activity levels."""
@@ -369,7 +369,7 @@ class DatabaseSeeder:
                 self.db.add(user_badge)
         
         self.db.commit()
-        print(f"✓ Created {len(badges)} badges and assigned to users")
+        print(f"[OK] Created {len(badges)} badges and assigned to users")
     
     def run(self, clean: bool = False):
         """Execute the full seeding process."""
@@ -377,7 +377,7 @@ class DatabaseSeeder:
             if clean:
                 self.clear_all()
             
-            print("\n🌱 Starting database seeding...\n")
+            print("\n[SEED] Starting database seeding...\n")
             
             users = self.seed_users(count=10)
             acts = self.seed_sadaqah_acts()
@@ -389,8 +389,8 @@ class DatabaseSeeder:
             self.seed_family_logs(family_jars, acts, days_back=30)
             self.seed_badges(users)
             
-            print("\n✅ Database seeding completed successfully!\n")
-            print("📊 Summary:")
+            print("\n[OK] Database seeding completed successfully!\n")
+            print("[DATA] Summary:")
             print(f"   • {len(users)} users (all with password: password123)")
             print(f"   • {len(acts)} sadaqah acts")
             print(f"   • {len(charities)} registered charities")
@@ -399,7 +399,7 @@ class DatabaseSeeder:
             print()
             
         except Exception as e:
-            print(f"\n❌ Seeding failed: {str(e)}")
+            print(f"\n[ERROR] Seeding failed: {str(e)}")
             self.db.rollback()
             sys.exit(1)
         finally:

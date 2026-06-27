@@ -53,35 +53,40 @@ def get_top_weekly(limit: int = 10):
 
 def get_user_rank_global(user_id: int):
     try:
-        rank = redis_client.zrevrank(GLOBAL_KEY, user_id)
+        pipeline = redis_client.pipeline()
+        pipeline.zrevrank(GLOBAL_KEY, user_id)
+        pipeline.zscore(GLOBAL_KEY, user_id)
+        rank, score = pipeline.execute()
     except redis.RedisError as exc:
         logger.warning("Failed to read global rank for user %s: %s", user_id, exc)
         return None
     if rank is None:
         return None
     
-    score = redis_client.zscore(GLOBAL_KEY, user_id)
-    
     return {
         "rank": rank + 1,  # Redis is 0-indexed
-        "score": int(score)
+        "score": int(score or 0)
     }
 
 
-def get_user_rank_ramadan(user_id: int):
+def get_user_rank_ramadan(user_id: int, active: bool = True):
+    if not active:
+        return None
+
     try:
-        rank = redis_client.zrevrank(RAMADAN_KEY, user_id)
+        pipeline = redis_client.pipeline()
+        pipeline.zrevrank(RAMADAN_KEY, user_id)
+        pipeline.zscore(RAMADAN_KEY, user_id)
+        rank, score = pipeline.execute()
     except redis.RedisError as exc:
         logger.warning("Failed to read ramadan rank for user %s: %s", user_id, exc)
         return None
     if rank is None:
         return None
 
-    score = redis_client.zscore(RAMADAN_KEY, user_id)
-
     return {
         "rank": rank + 1,
-        "score": int(score)
+        "score": int(score or 0)
     }
     
 

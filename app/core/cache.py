@@ -86,3 +86,57 @@ def get_cached_user_streak(user_id: int):
             except redis.RedisError:
                 pass
     return None
+
+
+def cache_dashboard_stats(user_id: int, stats: dict, ttl=300):
+    key = f"dashboard:stats:{user_id}"
+    try:
+        redis_client.set(key, json.dumps(stats, default=_json_default), ex=ttl)
+    except redis.RedisError as exc:
+        logger.warning("Failed to cache dashboard stats for user %s: %s", user_id, exc)
+
+
+def get_cached_dashboard_stats(user_id: int):
+    key = f"dashboard:stats:{user_id}"
+    try:
+        data = redis_client.get(key)
+    except redis.RedisError as exc:
+        logger.warning("Failed to read dashboard stats cache for user %s: %s", user_id, exc)
+        return None
+    if data:
+        try:
+            return json.loads(data)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            logger.warning("Invalid dashboard stats cache for user %s: %s", user_id, exc)
+            try:
+                redis_client.delete(key)
+            except redis.RedisError:
+                pass
+    return None
+
+
+def cache_category_analytics(user_id: int, data: list, ttl=300):
+    key = f"dashboard:category:{user_id}"
+    try:
+        redis_client.set(key, json.dumps(data, default=_json_default), ex=ttl)
+    except redis.RedisError as exc:
+        logger.warning("Failed to cache category analytics for user %s: %s", user_id, exc)
+
+
+def get_cached_category_analytics(user_id: int):
+    key = f"dashboard:category:{user_id}"
+    try:
+        data = redis_client.get(key)
+    except redis.RedisError as exc:
+        logger.warning("Failed to read category analytics cache for user %s: %s", user_id, exc)
+        return None
+    if data:
+        try:
+            return json.loads(data)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            logger.warning("Invalid category analytics cache for user %s: %s", user_id, exc)
+            try:
+                redis_client.delete(key)
+            except redis.RedisError:
+                pass
+    return None

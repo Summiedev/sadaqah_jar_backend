@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from pydantic import ConfigDict, field_validator
 from pydantic_settings import BaseSettings
@@ -16,6 +17,17 @@ class Settings(BaseSettings):
     JWT_SECRET: str
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int
+    CORS_ORIGINS: list[str] = []
+
+    # SMTP / email settings (used for verification & password-reset emails)
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    FROM_EMAIL: str = "noreply@sadaqahjar.app"
+
+    # Public-facing base URL for email links (no trailing slash)
+    APP_URL: str = "http://localhost:8000"
 
     @field_validator("JWT_SECRET")
     @classmethod
@@ -31,6 +43,20 @@ class Settings(BaseSettings):
         if value <= 0:
             raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must be greater than zero")
         return value
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+        if isinstance(value, list):
+            return [str(origin).strip() for origin in value if str(origin).strip()]
+        raise ValueError("CORS_ORIGINS must be a comma-separated string or a list")
 
     model_config = ConfigDict(
         env_file=BASE_DIR / ".env",

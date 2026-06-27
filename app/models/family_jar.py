@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
+from datetime import date, datetime, timezone
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
-from datetime import datetime, timezone
 
 class FamilyJar(Base):
     __tablename__ = "family_jars"
@@ -16,7 +17,7 @@ class FamilyJar(Base):
 
     current_stars: Mapped[int] = mapped_column(Integer, default=0)
 
-    created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -25,7 +26,13 @@ class FamilyJar(Base):
 
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+    last_activity_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    streak_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    longest_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     group_current_streak = mapped_column(Integer, default=0)
 

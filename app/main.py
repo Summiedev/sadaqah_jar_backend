@@ -1,19 +1,24 @@
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.exceptions import HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 import app.db.base_class
 
+from app.api.adhkar import router as adhkar_router
 from app.api.admin_analytics import router as admin_analytics_router
 from app.api.admin_charities import router as admin_charities_router
 from app.api.admin_evidence import router as admin_evidence_router
+from app.api.admin_leaderboard_seasons import router as admin_leaderboard_seasons_router
 from app.api.auth import router as auth_router
+from app.api.badges import router as badges_router
 from app.api.charities import router as charities_router
 from app.api.dashboard import router as dashboard_router
 from app.api.family import router as family_router
 from app.api.friday import router as friday_router
 from app.api.leaderboard import router as leaderboard_router
+from app.api.notifications import router as notifications_router
 from app.api.sadaqah import router as sadaqah_router
 from app.api.streak import router as streak_router
 from app.api.websocket import router as websocket_router
@@ -40,22 +45,38 @@ app = FastAPI(
         Exception: general_exception_handler
     }
 )
-app.include_router(auth_router)
-app.include_router(sadaqah_router)
-app.include_router(dashboard_router)
-app.include_router(streak_router)
-app.include_router(leaderboard_router)
-app.include_router(family_router)
-app.include_router(websocket_router)
-app.include_router(admin_analytics_router)
-app.include_router(admin_charities_router)
-app.include_router(admin_evidence_router)
-app.include_router(charities_router)
-app.include_router(friday_router)
 
+api_v1_router = APIRouter(prefix="/api/v1")
 
+api_v1_router.include_router(adhkar_router)
+api_v1_router.include_router(auth_router)
+api_v1_router.include_router(badges_router)
+api_v1_router.include_router(sadaqah_router)
+api_v1_router.include_router(dashboard_router)
+api_v1_router.include_router(streak_router)
+api_v1_router.include_router(leaderboard_router)
+api_v1_router.include_router(family_router)
+api_v1_router.include_router(websocket_router)
+api_v1_router.include_router(admin_analytics_router)
+api_v1_router.include_router(admin_charities_router)
+api_v1_router.include_router(admin_evidence_router)
+api_v1_router.include_router(admin_leaderboard_seasons_router)
+api_v1_router.include_router(charities_router)
+api_v1_router.include_router(friday_router)
+api_v1_router.include_router(notifications_router)
 
-@app.get("/db-check")
-def db_check(db: Session = Depends(get_db)):
+if settings.CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+app.include_router(api_v1_router)
+
+@api_v1_router.get("/db-check")
+def api_v1_db_check(db: Session = Depends(get_db)):
     return {"db": "connected"}
 

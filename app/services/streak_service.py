@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date
 from sqlalchemy.orm import Session
 from app.models.user_streak import UserStreak
 
-def update_streak(db: Session, user_id: int) -> UserStreak:
+def update_streak(db: Session, user_id: int, commit: bool = True) -> UserStreak:
     today = date.today()
     yesterday = today - timedelta(days=1)
 
@@ -11,7 +11,9 @@ def update_streak(db: Session, user_id: int) -> UserStreak:
     if not streak:
         streak = UserStreak(user_id=user_id, current_streak=1, longest_streak=1, last_completed_date=today)
         db.add(streak)
-        db.commit()
+        db.flush()
+        if commit:
+            db.commit()
         db.refresh(streak)
         return streak
 
@@ -27,7 +29,9 @@ def update_streak(db: Session, user_id: int) -> UserStreak:
         streak.longest_streak = streak.current_streak
 
     streak.last_completed_date = today
-    db.commit()
+    db.flush()
+    if commit:
+        db.commit()
     db.refresh(streak)
     return streak
 

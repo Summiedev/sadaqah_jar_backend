@@ -15,11 +15,13 @@ class DonationIntent(Base):
     )
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id")
+        ForeignKey("users.id"),
+        index=True
     )
 
     charity_id: Mapped[int] = mapped_column(
-        ForeignKey("charities.id")
+        ForeignKey("charities.id"),
+        index=True
     )
 
     created_at: Mapped[datetime] = mapped_column(

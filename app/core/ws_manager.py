@@ -11,14 +11,16 @@ class ConnectionManager:
         await websocket.accept()
         self.user_connections.setdefault(user_id, []).append(websocket)
 
-    def disconnect(self, user_id: int):
+    def disconnect(self, user_id: int, websocket: WebSocket):
         conns = self.user_connections.get(user_id, [])
-        for ws in conns:
+        if websocket in conns:
+            conns.remove(websocket)
             try:
-                ws.close()
-            except:
+                websocket.close()
+            except Exception:
                 pass
-        self.user_connections.pop(user_id, None)
+        if not conns:
+            self.user_connections.pop(user_id, None)
 
     async def send_user_event(self, user_id: int, data: dict):
         conns = self.user_connections.get(user_id, [])

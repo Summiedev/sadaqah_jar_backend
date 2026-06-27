@@ -43,3 +43,31 @@ def test_register_and_login(db):
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert "user_id" in response.json()
+
+
+def test_register_username_taken_returns_409(db):
+    db.query(User).filter(User.username == "collision-user").delete()
+    db.query(User).filter(User.email.in_(["collision1@example.com", "collision2@example.com"])).delete()
+    db.commit()
+
+    first = client.post(
+        "/auth/register",
+        json={
+            "username": "collision-user",
+            "email": "collision1@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/auth/register",
+        json={
+            "username": "collision-user",
+            "email": "collision2@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+    assert second.status_code == 409
+    payload = second.json()
+    assert payload["detail"]["code"] == "username_taken"

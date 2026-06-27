@@ -12,3 +12,4 @@ from app.models.badge import Badge
 from app.models.family_jar import FamilyJar
 from app.models.family_jar_member import FamilyJarMember
 from app.models.family_jar_log import FamilyJarLog
+from app.models.leaderboard_season import LeaderboardSeason

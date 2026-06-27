@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, Boolean, Text
+from sqlalchemy import Boolean, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -7,6 +7,10 @@ from app.models.donation_intent import DonationIntent
 
 class Charity(Base):
     __tablename__ = "charities"
+    __table_args__ = (
+        Index("ix_charities_verified_active_category", "is_verified", "is_active", "category"),
+        Index("ix_charities_verified_active_featured", "is_verified", "is_active", "is_featured"),
+    )
 
     id: Mapped[int] = mapped_column(
         Integer,
