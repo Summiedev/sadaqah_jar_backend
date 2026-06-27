@@ -57,9 +57,9 @@ class Settings(BaseSettings):
             return [str(origin).strip() for origin in value if str(origin).strip()]
         raise ValueError("CORS_ORIGINS must be a comma-separated string or a list")
 
-    model_config = ConfigDict(
+        model_config = ConfigDict(
         env_file=BASE_DIR / ".env",
-        env_file_encoding="utf-8"
-    )
-
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )                                                                                                                                                               
 settings = Settings()
