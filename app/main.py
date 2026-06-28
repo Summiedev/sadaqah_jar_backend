@@ -49,21 +49,25 @@ app = FastAPI(
 api_v1_router = APIRouter(prefix="/api/v1")
 
 api_v1_router.include_router(adhkar_router)
-api_v1_router.include_router(auth_router)
-api_v1_router.include_router(badges_router)
-api_v1_router.include_router(sadaqah_router)
-api_v1_router.include_router(dashboard_router)
-api_v1_router.include_router(streak_router)
-api_v1_router.include_router(leaderboard_router)
-api_v1_router.include_router(family_router)
-api_v1_router.include_router(websocket_router)
 api_v1_router.include_router(admin_analytics_router)
 api_v1_router.include_router(admin_charities_router)
 api_v1_router.include_router(admin_evidence_router)
 api_v1_router.include_router(admin_leaderboard_seasons_router)
+api_v1_router.include_router(auth_router)
+api_v1_router.include_router(badges_router)
 api_v1_router.include_router(charities_router)
+api_v1_router.include_router(dashboard_router)
+api_v1_router.include_router(family_router)
 api_v1_router.include_router(friday_router)
+api_v1_router.include_router(leaderboard_router)
 api_v1_router.include_router(notifications_router)
+api_v1_router.include_router(sadaqah_router)
+api_v1_router.include_router(streak_router)
+api_v1_router.include_router(websocket_router)
+
+@api_v1_router.get("/db-check")
+def api_v1_db_check(db: Session = Depends(get_db)):
+    return {"db": "connected"}
 
 if settings.CORS_ORIGINS:
     app.add_middleware(
@@ -76,7 +80,6 @@ if settings.CORS_ORIGINS:
 
 app.include_router(api_v1_router)
 
-@api_v1_router.get("/db-check")
-def api_v1_db_check(db: Session = Depends(get_db)):
-    return {"db": "connected"}
-
+@app.get("/health")
+def health():
+    return {"status": "ok"}
