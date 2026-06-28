@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 media/
-
+alembic/versions/
 # C extensions
 *.so
 test_cases.py
