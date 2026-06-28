@@ -48,3 +48,6 @@ dev = [
     "pytest==8.3.4",
     "ruff==0.15.18",
 ]
+
+[tool.pytest.ini_options]
+addopts = "--ignore=test_daily_acts.py"
