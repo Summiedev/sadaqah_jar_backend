@@ -9,7 +9,11 @@ from app.services.leaderboard_service import get_user_rank_global
 
 # Badge thresholds per category
 STREAK_BADGES = [(7, "7-Day Streak"), (30, "30-Day Streak"), (100, "100-Day Streak")]
-JAR_BADGES = [(1, "First Jar Completed"), (5, "5 Jars Completed"), (10, "10 Jars Completed")]
+JAR_BADGES = [
+    (1, "First Jar Completed"),
+    (5, "5 Jars Completed"),
+    (10, "10 Jars Completed"),
+]
 
 
 def give_user_badge(db: Session, user_id: int, badge_name: str, commit: bool = True):
@@ -106,19 +110,23 @@ def get_badge_progress(db: Session, user_id: int) -> list[dict]:
         r[0]
         for r in db.query(Badge.name)
         .join(UserBadge, UserBadge.badge_id == Badge.id)
-        .filter(UserBadge.user_id == user_id, Badge.name.in_([n for _, n in STREAK_BADGES]))
+        .filter(
+            UserBadge.user_id == user_id, Badge.name.in_([n for _, n in STREAK_BADGES])
+        )
         .all()
     }
 
     for threshold, name in STREAK_BADGES:
         if name not in earned_streak_names:
-            result.append({
-                "category": "streak",
-                "badge": name,
-                "current": current_streak,
-                "threshold": threshold,
-                "progress": min(current_streak / threshold, 1.0),
-            })
+            result.append(
+                {
+                    "category": "streak",
+                    "badge": name,
+                    "current": current_streak,
+                    "threshold": threshold,
+                    "progress": min(current_streak / threshold, 1.0),
+                }
+            )
             break
 
     # Jar progress
@@ -132,19 +140,23 @@ def get_badge_progress(db: Session, user_id: int) -> list[dict]:
         r[0]
         for r in db.query(Badge.name)
         .join(UserBadge, UserBadge.badge_id == Badge.id)
-        .filter(UserBadge.user_id == user_id, Badge.name.in_([n for _, n in JAR_BADGES]))
+        .filter(
+            UserBadge.user_id == user_id, Badge.name.in_([n for _, n in JAR_BADGES])
+        )
         .all()
     }
 
     for threshold, name in JAR_BADGES:
         if name not in earned_jar_names:
-            result.append({
-                "category": "jar",
-                "badge": name,
-                "current": jars_completed,
-                "threshold": threshold,
-                "progress": min(jars_completed / threshold, 1.0),
-            })
+            result.append(
+                {
+                    "category": "jar",
+                    "badge": name,
+                    "current": jars_completed,
+                    "threshold": threshold,
+                    "progress": min(jars_completed / threshold, 1.0),
+                }
+            )
             break
 
     return result

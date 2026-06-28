@@ -1,8 +1,9 @@
 def compute_weekly_stats(db):
     # Stub logic
     print("Computing weekly stats...")
-    
-'''
+
+
+"""
 Later:
 
 total acts
@@ -13,4 +14,4 @@ retention %
 
 streak survival %
 
-'''
+"""

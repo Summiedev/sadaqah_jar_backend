@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -14,10 +14,11 @@ from app.models.family_jar_log import FamilyJarLog
 from app.models.family_jar_member import FamilyJarMember
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
-from app.models.user_streak import UserStreak
-from app.core.cache import get_cached_user_streak
 from app.services.jumua_service import is_friday
-from app.services.leaderboard_service import get_top_family, get_user_rank_ramadan, increment_family_leaderboard, get_user_rank_global
+from app.services.leaderboard_service import (
+    get_top_family,
+    increment_family_leaderboard,
+)
 from app.tasks.scheduled_tasks import family_jar_completion_celebration
 from app.services.ramadan_service import is_ramadan, is_last_10_nights
 from app.services.family_service import update_family_streak_on_contribution
@@ -63,17 +64,31 @@ def require_family_member(
 
 
 @router.post("/create")
-def create_family_jar(name: str, capacity: int = 33, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_family_jar(
+    name: str,
+    capacity: int = 33,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     # Validate inputs
     if not name or len(name.strip()) == 0:
         raise HTTPException(status_code=400, detail="Family jar name cannot be empty")
     if len(name) > 100:
-        raise HTTPException(status_code=400, detail="Family jar name too long (max 100 chars)")
+        raise HTTPException(
+            status_code=400, detail="Family jar name too long (max 100 chars)"
+        )
     if capacity <= 0 or capacity > 1000:
-        raise HTTPException(status_code=400, detail="Capacity must be between 1 and 1000")
-    
+        raise HTTPException(
+            status_code=400, detail="Capacity must be between 1 and 1000"
+        )
+
     user_id = current_user.id
-    jar = FamilyJar(name=name, capacity=capacity, created_by=user_id, invite_code=generate_invite_code())
+    jar = FamilyJar(
+        name=name,
+        capacity=capacity,
+        created_by=user_id,
+        invite_code=generate_invite_code(),
+    )
     db.add(jar)
     db.commit()
     db.refresh(jar)
@@ -83,35 +98,45 @@ def create_family_jar(name: str, capacity: int = 33, current_user: User = Depend
     db.add(member)
     db.commit()
 
-    return {"jar_id": jar.id, "name": jar.name, "capacity": jar.capacity, "invite_code": jar.invite_code}
+    return {
+        "jar_id": jar.id,
+        "name": jar.name,
+        "capacity": jar.capacity,
+        "invite_code": jar.invite_code,
+    }
 
 
 @router.post("/join")
-def join_family_jar(invite_code: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def join_family_jar(
+    invite_code: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
 
     user_id = current_user.id
 
-    jar = db.query(FamilyJar).filter(
-        FamilyJar.invite_code == invite_code,
-        FamilyJar.is_active == True
-    ).first()
+    jar = (
+        db.query(FamilyJar)
+        .filter(FamilyJar.invite_code == invite_code, FamilyJar.is_active)
+        .first()
+    )
 
     if not jar:
         raise HTTPException(status_code=404, detail="Jar not found")
 
     # prevent duplicate joins
-    existing = db.query(FamilyJarMember).filter(
-        FamilyJarMember.family_jar_id == jar.id,
-        FamilyJarMember.user_id == user_id
-    ).first()
+    existing = (
+        db.query(FamilyJarMember)
+        .filter(
+            FamilyJarMember.family_jar_id == jar.id, FamilyJarMember.user_id == user_id
+        )
+        .first()
+    )
 
     if existing:
         raise HTTPException(status_code=400, detail="Already a member")
 
-    member = FamilyJarMember(
-        family_jar_id=jar.id,
-        user_id=user_id
-    )
+    member = FamilyJarMember(family_jar_id=jar.id, user_id=user_id)
 
     db.add(member)
     db.commit()
@@ -200,7 +225,10 @@ def get_jar_detail(
         .group_by(FamilyJarLog.user_id)
         .all()
     )
-    contrib_map = {row.user_id: {"stars": int(row.total_stars or 0), "acts": row.total_acts} for row in member_contributions}
+    contrib_map = {
+        row.user_id: {"stars": int(row.total_stars or 0), "acts": row.total_acts}
+        for row in member_contributions
+    }
 
     members = (
         db.query(FamilyJarMember, User.username)
@@ -226,8 +254,12 @@ def get_jar_detail(
                 "user_id": m.FamilyJarMember.user_id,
                 "username": m.username,
                 "role": m.FamilyJarMember.role,
-                "joined_at": m.FamilyJarMember.joined_at.isoformat() if m.FamilyJarMember.joined_at else None,
-                "contribution": contrib_map.get(m.FamilyJarMember.user_id, {"stars": 0, "acts": 0}),
+                "joined_at": m.FamilyJarMember.joined_at.isoformat()
+                if m.FamilyJarMember.joined_at
+                else None,
+                "contribution": contrib_map.get(
+                    m.FamilyJarMember.user_id, {"stars": 0, "acts": 0}
+                ),
             }
             for m in members
         ],
@@ -321,7 +353,9 @@ def _log_snapshot(log: FamilyJarLog) -> dict:
     }
 
 
-def _lookup_family_request_result(db: Session, user_id: int, jar_id: int, request_id: str) -> dict | None:
+def _lookup_family_request_result(
+    db: Session, user_id: int, jar_id: int, request_id: str
+) -> dict | None:
     log = (
         db.query(FamilyJarLog)
         .filter(
@@ -363,7 +397,7 @@ async def add_star_family_jar(
         #    same jar will wait here rather than corrupting current_stars.
         jar = (
             db.query(FamilyJar)
-            .filter(FamilyJar.id == jar_id, FamilyJar.is_active == True)
+            .filter(FamilyJar.id == jar_id, FamilyJar.is_active)
             .with_for_update()
             .first()
         )
@@ -373,7 +407,9 @@ async def add_star_family_jar(
         # 2) Idempotency check — if this client_request_id was already processed,
         #    return the previous response snapshot (no-op).
         if request_id:
-            existing_result = _lookup_family_request_result(db, user_id, jar_id, request_id)
+            existing_result = _lookup_family_request_result(
+                db, user_id, jar_id, request_id
+            )
             if existing_result is not None:
                 return existing_result
 
@@ -381,17 +417,25 @@ async def add_star_family_jar(
         _require_membership(jar_id, user_id, db)
 
         # 4) Deduplicate same act same day per user.
-        existing_log = db.query(FamilyJarLog).filter(
-            FamilyJarLog.family_jar_id == jar.id,
-            FamilyJarLog.user_id == user_id,
-            FamilyJarLog.act_id == act_id,
-            FamilyJarLog.date == today,
-        ).first()
+        existing_log = (
+            db.query(FamilyJarLog)
+            .filter(
+                FamilyJarLog.family_jar_id == jar.id,
+                FamilyJarLog.user_id == user_id,
+                FamilyJarLog.act_id == act_id,
+                FamilyJarLog.date == today,
+            )
+            .first()
+        )
         if existing_log:
             raise HTTPException(status_code=400, detail="Already added today")
 
         # 5) Validate act.
-        act = db.query(SadaqahAct).filter(SadaqahAct.id == act_id, SadaqahAct.verified == True).first()
+        act = (
+            db.query(SadaqahAct)
+            .filter(SadaqahAct.id == act_id, SadaqahAct.verified)
+            .first()
+        )
         if not act:
             raise HTTPException(status_code=404, detail="Act not found")
 
@@ -446,7 +490,9 @@ async def add_star_family_jar(
     except IntegrityError:
         db.rollback()
         if request_id:
-            existing_result = _lookup_family_request_result(db, user_id, jar_id, request_id)
+            existing_result = _lookup_family_request_result(
+                db, user_id, jar_id, request_id
+            )
             if existing_result is not None:
                 return existing_result
         raise
@@ -459,14 +505,21 @@ async def add_star_family_jar(
     try:
         increment_family_leaderboard(jar.id, user_id, multiplier)
     except Exception:
-        logger.exception("Failed to update family leaderboard cache for jar %s user %s", jar_id, user_id)
+        logger.exception(
+            "Failed to update family leaderboard cache for jar %s user %s",
+            jar_id,
+            user_id,
+        )
 
     try:
-        await manager.send_family_event(jar.id, {
-            "event": "family_update",
-            "current_stars": jar.current_stars,
-            "capacity": jar.capacity,
-        })
+        await manager.send_family_event(
+            jar.id,
+            {
+                "event": "family_update",
+                "current_stars": jar.current_stars,
+                "capacity": jar.capacity,
+            },
+        )
     except Exception:
         logger.exception("Failed to broadcast family update for jar %s", jar_id)
 
@@ -474,23 +527,28 @@ async def add_star_family_jar(
         try:
             family_jar_completion_celebration.delay(jar.id)
         except Exception:
-            logger.exception("Failed to queue family jar completion celebration for jar %s", jar_id)
+            logger.exception(
+                "Failed to queue family jar completion celebration for jar %s", jar_id
+            )
 
     return _jar_snapshot(jar)
 
 
 @router.get("/{jar_id}/leaderboard")
-def family_leaderboard(jar_id: int, limit: int = 10, member: FamilyJarMember = Depends(require_family_member)):
+def family_leaderboard(
+    jar_id: int,
+    limit: int = 10,
+    member: FamilyJarMember = Depends(require_family_member),
+):
     data = get_top_family(jar_id, limit)
 
-    return [
-        {"user_id": int(uid), "stars": int(score)}
-        for uid, score in data
-    ]
-    
+    return [{"user_id": int(uid), "stars": int(score)} for uid, score in data]
+
 
 @router.get("/{jar_id}/top-contributor")
-def top_contributor(jar_id: int, member: FamilyJarMember = Depends(require_family_member)):
+def top_contributor(
+    jar_id: int, member: FamilyJarMember = Depends(require_family_member)
+):
     data = get_top_family(jar_id, 1)
 
     if not data:

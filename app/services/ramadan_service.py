@@ -5,7 +5,7 @@ The hardcoded constants are retained as a documented fallback path only.
 See hijri_service.py for the fallback logic.
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 from app.services.hijri_service import is_last_10_nights as _hijri_last10
 from app.services.hijri_service import is_ramadan as _hijri_is_ramadan

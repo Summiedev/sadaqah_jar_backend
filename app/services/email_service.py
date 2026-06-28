@@ -6,6 +6,7 @@ and the standard email MIME utilities are used.  If SMTP is misconfigured
 (empty host or connection failure) the error is logged and the system
 continues — never break a registration or password-reset flow over email.
 """
+
 import logging
 import smtplib
 import ssl
@@ -19,8 +20,16 @@ logger = logging.getLogger(__name__)
 def send_email(recipient: str, subject: str, html_body: str) -> bool:
     """Send an HTML email.  Returns True if the message was accepted
     by the SMTP relay, False otherwise."""
-    if not settings.SMTP_HOST or settings.SMTP_HOST == "localhost" and not settings.SMTP_USER:
-        logger.warning("SMTP not configured — email would have been sent to %s: %s", recipient, subject)
+    if (
+        not settings.SMTP_HOST
+        or settings.SMTP_HOST == "localhost"
+        and not settings.SMTP_USER
+    ):
+        logger.warning(
+            "SMTP not configured — email would have been sent to %s: %s",
+            recipient,
+            subject,
+        )
         return True  # don't break the caller
 
     msg = MIMEText(html_body, "html", "utf-8")

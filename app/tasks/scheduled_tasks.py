@@ -8,7 +8,6 @@ from app.core.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.models.adhkar import Adhkar, TimeOfDay
 from app.models.family_jar_member import FamilyJarMember
-from app.models.notification import Notification
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
 from app.services.analytics_service import compute_weekly_stats
@@ -22,13 +21,15 @@ from app.services.streak_service import validate_streak
 def generate_daily_acts():
     db = SessionLocal()
     try:
-        candidate_query = db.query(SadaqahAct).filter(SadaqahAct.verified == True)
+        candidate_query = db.query(SadaqahAct).filter(SadaqahAct.verified)
         if not is_ramadan():
-            candidate_query = candidate_query.filter(SadaqahAct.is_ramadan_only == False)
+            candidate_query = candidate_query.filter(not SadaqahAct.is_ramadan_only)
 
         candidate_acts = candidate_query.all()
 
-        active_user_ids = [row[0] for row in db.query(User.id).filter(User.is_active == True).all()]
+        active_user_ids = [
+            row[0] for row in db.query(User.id).filter(User.is_active).all()
+        ]
 
         for user_id in active_user_ids:
             daily_acts = generate_personalized_acts(db, user_id, acts=candidate_acts)
@@ -52,7 +53,7 @@ def generate_daily_acts():
 def check_streak_integrity():
     db = SessionLocal()
     try:
-        users = db.query(User.id).filter(User.is_active == True).yield_per(500)
+        users = db.query(User.id).filter(User.is_active).yield_per(500)
 
         for row in users:
             validate_streak(db, row.id)
@@ -64,7 +65,12 @@ def check_streak_integrity():
 def send_morning_reminder():
     db = SessionLocal()
     try:
-        adhkar_count = db.query(func.count(Adhkar.id)).filter(Adhkar.time_of_day == TimeOfDay.morning).scalar() or 0
+        adhkar_count = (
+            db.query(func.count(Adhkar.id))
+            .filter(Adhkar.time_of_day == TimeOfDay.morning)
+            .scalar()
+            or 0
+        )
 
         if adhkar_count > 0:
             offset = random.randint(0, adhkar_count - 1)
@@ -79,7 +85,7 @@ def send_morning_reminder():
         else:
             message = "Start your day with a good deed."
 
-        for row in db.query(User.id).filter(User.is_active == True).all():
+        for row in db.query(User.id).filter(User.is_active).all():
             create_notification(
                 db,
                 row.id,
@@ -156,9 +162,11 @@ def send_friday_reminder():
     db = SessionLocal()
     try:
         day_index = datetime.utcnow().isocalendar()[1] * 7 + datetime.utcnow().weekday()
-        message = _FRIDAY_RECOMMENDATIONS_PUSH[day_index % len(_FRIDAY_RECOMMENDATIONS_PUSH)]
+        message = _FRIDAY_RECOMMENDATIONS_PUSH[
+            day_index % len(_FRIDAY_RECOMMENDATIONS_PUSH)
+        ]
 
-        for row in db.query(User.id).filter(User.friday_reminder == True).all():
+        for row in db.query(User.id).filter(User.friday_reminder).all():
             create_notification(
                 db,
                 row.id,
@@ -187,7 +195,7 @@ def send_last_ten_nights_reminder():
         day_index = datetime.utcnow().timetuple().tm_yday
         message = _LAST_TEN_RECOMMENDATIONS[day_index % len(_LAST_TEN_RECOMMENDATIONS)]
 
-        for row in db.query(User.id).filter(User.is_active == True).all():
+        for row in db.query(User.id).filter(User.is_active).all():
             create_notification(
                 db,
                 row.id,

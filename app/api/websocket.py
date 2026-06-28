@@ -9,15 +9,17 @@ from app.models.user import User
 
 router = APIRouter(prefix="/websock", tags=["websocket"])
 
+
 def get_user_from_token(token: str, db: Session):
     try:
         payload = decode_access_token(token)
         sub = payload.get("sub")
-        if sub is None: 
+        if sub is None:
             return None
         return db.query(User).filter(User.id == int(sub)).first()
     except (JWTError, TypeError, ValueError):
         return None
+
 
 @router.websocket("/ws/jar/{user_id}")
 async def jar_ws(websocket: WebSocket, user_id: int, token: str = Query(None)):

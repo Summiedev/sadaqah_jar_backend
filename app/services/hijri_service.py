@@ -44,10 +44,16 @@ def _get_hijri_date(gregorian: date) -> tuple[int, int, int] | None:
         return None
     except ValueError as exc:
         # strict=False still raises on some edge dates (e.g. out of range)
-        logger.warning("hijri-converter ValueError for %s: %s — using fallback", gregorian, exc)
+        logger.warning(
+            "hijri-converter ValueError for %s: %s — using fallback", gregorian, exc
+        )
         return None
     except Exception as exc:
-        logger.warning("hijri-converter raised %s for %s — using fallback", type(exc).__name__, gregorian)
+        logger.warning(
+            "hijri-converter raised %s for %s — using fallback",
+            type(exc).__name__,
+            gregorian,
+        )
         return None
 
 

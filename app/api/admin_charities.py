@@ -27,26 +27,31 @@ def list_charities(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    admin = Depends(require_admin),
+    admin=Depends(require_admin),
 ):
     query = db.query(Charity).order_by(Charity.id.desc())
     total = query.count()
     rows = query.offset(offset).limit(limit).all()
-    return {"total": total, "limit": limit, "offset": offset, "data": [_serialize_charity(charity) for charity in rows]}
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [_serialize_charity(charity) for charity in rows],
+    }
 
 
 @router.post("/")
 def create_charity(
     payload: CharityCreate,
     db: Session = Depends(get_db),
-    admin = Depends(require_admin),
+    admin=Depends(require_admin),
 ):
     charity = Charity(
         name=payload.name,
         website_url=str(payload.website_url),
         description=payload.description,
         category=payload.category,
-        is_verified=True
+        is_verified=True,
     )
 
     db.add(charity)
@@ -61,7 +66,7 @@ def update_charity(
     charity_id: int,
     payload: CharityUpdate,
     db: Session = Depends(get_db),
-    admin = Depends(require_admin),
+    admin=Depends(require_admin),
 ):
     charity = db.query(Charity).filter(Charity.id == charity_id).first()
     if not charity:
@@ -86,8 +91,11 @@ def update_charity(
     db.refresh(charity)
     return _serialize_charity(charity)
 
+
 @router.put("/{charity_id}/deactivate")
-def deactivate_charity(charity_id: int, db: Session = Depends(get_db), admin = Depends(require_admin)):
+def deactivate_charity(
+    charity_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)
+):
     charity = db.query(Charity).filter(Charity.id == charity_id).first()
 
     if not charity:
@@ -100,7 +108,9 @@ def deactivate_charity(charity_id: int, db: Session = Depends(get_db), admin = D
 
 
 @router.delete("/{charity_id}")
-def delete_charity(charity_id: int, db: Session = Depends(get_db), admin = Depends(require_admin)):
+def delete_charity(
+    charity_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)
+):
     charity = db.query(Charity).filter(Charity.id == charity_id).first()
 
     if not charity:
@@ -111,8 +121,11 @@ def delete_charity(charity_id: int, db: Session = Depends(get_db), admin = Depen
 
     return {"message": "Charity deleted"}
 
+
 @router.put("/{charity_id}/feature")
-def feature_charity(charity_id: int, db: Session = Depends(get_db), admin = Depends(require_admin)):
+def feature_charity(
+    charity_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)
+):
     charity = db.query(Charity).filter(Charity.id == charity_id).first()
 
     if not charity:

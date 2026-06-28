@@ -109,7 +109,9 @@ class TestGenerateDailyActs:
 
         generate_daily_acts()
 
-        found = any(call_args[0][0] == user.id for call_args in mock_cache.call_args_list)
+        found = any(
+            call_args[0][0] == user.id for call_args in mock_cache.call_args_list
+        )
         assert found, "generate_daily_acts did not cache acts for the active test user"
 
     @patch("app.tasks.scheduled_tasks.cache_daily_acts")

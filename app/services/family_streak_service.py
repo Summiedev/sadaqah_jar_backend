@@ -1,22 +1,24 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from app.models.family_jar import FamilyJar
 from app.models.family_jar_log import FamilyJarLog
 from app.models.family_jar_member import FamilyJarMember
 from app.services.badge_service import give_user_badge
 
+
 def update_family_streak(db, jar_id: int):
     today = datetime.utcnow().date()
-    yesterday = today - timedelta(days=1)
 
-    today_logs = db.query(FamilyJarLog).filter(
-        FamilyJarLog.family_jar_id == jar_id,
-        FamilyJarLog.date == today
-    ).count()
+    today_logs = (
+        db.query(FamilyJarLog)
+        .filter(FamilyJarLog.family_jar_id == jar_id, FamilyJarLog.date == today)
+        .count()
+    )
 
     if today_logs == 0:
         return False  # no streak continuation
 
     return True
+
 
 def check_family_badges(db, jar_id: int):
     jar = db.query(FamilyJar).filter(FamilyJar.id == jar_id).first()

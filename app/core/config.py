@@ -1,10 +1,11 @@
 from pathlib import Path
 from typing import Any, Annotated
 
-from pydantic import ConfigDict, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
     APP_NAME: str
@@ -57,9 +58,5 @@ class Settings(BaseSettings):
             return [str(origin).strip() for origin in value if str(origin).strip()]
         raise ValueError("CORS_ORIGINS must be a comma-separated string or a list")
 
-        model_config = ConfigDict(
-        env_file=BASE_DIR / ".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
-    )                                                                                                                                                               
+
 settings = Settings()

@@ -1,4 +1,12 @@
-from sqlalchemy import Date, Integer, String, ForeignKey, DateTime, UniqueConstraint, Index
+from sqlalchemy import (
+    Date,
+    Integer,
+    String,
+    ForeignKey,
+    DateTime,
+    UniqueConstraint,
+    Index,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from datetime import datetime, timezone
@@ -23,12 +31,8 @@ class FamilyJarLog(Base):
         String(36), nullable=True, index=True
     )
 
-    response_current_stars: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
-    response_capacity: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    response_current_stars: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     response_completed_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
     )

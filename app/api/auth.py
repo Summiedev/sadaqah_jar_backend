@@ -42,6 +42,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_verification_email(user: User, raw_token: str) -> str:
     link = f"{settings.APP_URL}/api/v1/auth/verify-email?token={raw_token}"
     return f"""\
@@ -71,6 +72,7 @@ def _make_password_reset_email(user: User, raw_token: str) -> str:
 # ---------------------------------------------------------------------------
 # Auth endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/register", response_model=TokenResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -119,30 +121,45 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         EmailVerificationToken(
             token=raw_token,
             user_id=user.id,
-            expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=24),
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            + timedelta(hours=24),
         )
     )
     db.commit()
-    send_email(user.email, "Verify your email", _make_verification_email(user, raw_token))
+    send_email(
+        user.email, "Verify your email", _make_verification_email(user, raw_token)
+    )
 
     token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token(db, user.id)
-    return {"access_token": token, "refresh_token": refresh_token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(user_data: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(
-        User.email == user_data.email,
-        User.deleted_at.is_(None),
-    ).first()
+    user = (
+        db.query(User)
+        .filter(
+            User.email == user_data.email,
+            User.deleted_at.is_(None),
+        )
+        .first()
+    )
 
     if not user or not verify_password(user_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token(db, user.id)
-    return {"access_token": token, "refresh_token": refresh_token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -168,6 +185,7 @@ def logout(payload: LogoutRequest, db: Session = Depends(get_db)):
 # Email verification (track-and-prompt only — does not gate any feature)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/verify-email")
 def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -180,7 +198,9 @@ def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
         .first()
     )
     if not vt:
-        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired verification token"
+        )
 
     user = db.query(User).filter(User.id == vt.user_id).first()
     if user:
@@ -196,6 +216,7 @@ def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
 # Password reset (enumeration-safe forgot-password)
 # ---------------------------------------------------------------------------
 
+
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """
@@ -206,10 +227,14 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     optional email send, both of which have no observable difference to the
     caller.
     """
-    user = db.query(User).filter(
-        User.email == payload.email,
-        User.deleted_at.is_(None),
-    ).first()
+    user = (
+        db.query(User)
+        .filter(
+            User.email == payload.email,
+            User.deleted_at.is_(None),
+        )
+        .first()
+    )
 
     if user:
         raw_token = secrets.token_urlsafe(32)
@@ -217,11 +242,14 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
             PasswordResetToken(
                 token=raw_token,
                 user_id=user.id,
-                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1),
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+                + timedelta(hours=1),
             )
         )
         db.commit()
-        send_email(user.email, "Password reset", _make_password_reset_email(user, raw_token))
+        send_email(
+            user.email, "Password reset", _make_password_reset_email(user, raw_token)
+        )
 
     return ForgotPasswordResponse()
 
@@ -241,10 +269,14 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     if not prt:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
-    user = db.query(User).filter(
-        User.id == prt.user_id,
-        User.deleted_at.is_(None),
-    ).first()
+    user = (
+        db.query(User)
+        .filter(
+            User.id == prt.user_id,
+            User.deleted_at.is_(None),
+        )
+        .first()
+    )
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
 
@@ -260,6 +292,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
 # ---------------------------------------------------------------------------
 # Profile
 # ---------------------------------------------------------------------------
+
 
 @router.get("/me", response_model=UserProfileResponse)
 def me(current_user: User = Depends(get_current_user)):
@@ -328,6 +361,7 @@ def update_me(
 # Password change (authenticated)
 # ---------------------------------------------------------------------------
 
+
 @router.patch("/password")
 def change_password(
     payload: ChangePasswordRequest,
@@ -346,6 +380,7 @@ def change_password(
 # ---------------------------------------------------------------------------
 # Preferences (toggle the existing-but-unwired fields)
 # ---------------------------------------------------------------------------
+
 
 @router.patch("/preferences", response_model=UserProfileResponse)
 def update_preferences(
@@ -374,6 +409,7 @@ def update_preferences(
 # ---------------------------------------------------------------------------
 # Account deletion — soft delete with GDPR-style anonymization
 # ---------------------------------------------------------------------------
+
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(

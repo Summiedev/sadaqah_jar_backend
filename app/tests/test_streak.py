@@ -17,6 +17,7 @@ from app.models.user import User
 from app.services.streak_service import update_streak, validate_streak
 from app.core.security import hash_password
 
+
 # Reuse the same fixture pattern as test_auth.py
 @pytest.fixture(scope="module")
 def db():

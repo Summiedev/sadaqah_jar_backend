@@ -21,7 +21,7 @@ def _enforce_admin_rate_limit(admin, limit: int = 10, period: int = 60):
 
 
 @router.get("/daily-users")
-def daily_users(db: Session = Depends(get_db), admin = Depends(require_admin)):
+def daily_users(db: Session = Depends(get_db), admin=Depends(require_admin)):
     _enforce_admin_rate_limit(admin)
     today = datetime.now(timezone.utc).date()
     day_start = datetime.combine(today, datetime.min.time())
@@ -38,7 +38,7 @@ def daily_users(db: Session = Depends(get_db), admin = Depends(require_admin)):
 
 
 @router.get("/top-acts")
-def top_acts(db: Session = Depends(get_db), admin = Depends(require_admin)):
+def top_acts(db: Session = Depends(get_db), admin=Depends(require_admin)):
     _enforce_admin_rate_limit(admin)
     results = (
         db.query(SadaqahLog.act_id, func.count(SadaqahLog.id).label("count"))
@@ -48,14 +48,11 @@ def top_acts(db: Session = Depends(get_db), admin = Depends(require_admin)):
         .all()
     )
 
-    return [
-        {"act_id": act_id, "count": count}
-        for act_id, count in results
-    ]
+    return [{"act_id": act_id, "count": count} for act_id, count in results]
 
 
 @router.get("/stars-today")
-def stars_today(db: Session = Depends(get_db), admin = Depends(require_admin)):
+def stars_today(db: Session = Depends(get_db), admin=Depends(require_admin)):
     _enforce_admin_rate_limit(admin)
     today = datetime.now(timezone.utc).date()
     day_start = datetime.combine(today, datetime.min.time())
@@ -72,7 +69,7 @@ def stars_today(db: Session = Depends(get_db), admin = Depends(require_admin)):
 
 
 @router.get("/donation-intents")
-def donation_intents(db: Session = Depends(get_db), admin = Depends(require_admin)):
+def donation_intents(db: Session = Depends(get_db), admin=Depends(require_admin)):
     _enforce_admin_rate_limit(admin)
     results = (
         db.query(DonationIntent.charity_id, func.count(DonationIntent.id))
@@ -80,7 +77,4 @@ def donation_intents(db: Session = Depends(get_db), admin = Depends(require_admi
         .all()
     )
 
-    return [
-        {"charity_id": charity_id, "count": count}
-        for charity_id, count in results
-    ]
+    return [{"charity_id": charity_id, "count": count} for charity_id, count in results]

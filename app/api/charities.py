@@ -14,9 +14,15 @@ def _enforce_public_rate_limit(request: Request, limit: int = 30, period: int = 
 
 
 @router.get("/")
-def list_charities(request: Request, category: str = None, limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
+def list_charities(
+    request: Request,
+    category: str = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
     _enforce_public_rate_limit(request)
-    query = db.query(Charity).filter(Charity.is_verified == True, Charity.is_active == True)
+    query = db.query(Charity).filter(Charity.is_verified, Charity.is_active)
     if category:
         query = query.filter(Charity.category == category)
     total = query.count()
@@ -38,14 +44,15 @@ def list_charities(request: Request, category: str = None, limit: int = 50, offs
         ],
     }
 
+
 @router.get("/featured")
 def featured_charities(request: Request, db: Session = Depends(get_db)):
     _enforce_public_rate_limit(request)
-    rows = db.query(Charity).filter(
-        Charity.is_verified == True,
-        Charity.is_active == True,
-        Charity.is_featured == True
-    ).all()
+    rows = (
+        db.query(Charity)
+        .filter(Charity.is_verified, Charity.is_active, Charity.is_featured)
+        .all()
+    )
     return [
         {
             "id": row.id,
@@ -66,8 +73,8 @@ def get_charity(charity_id: int, request: Request, db: Session = Depends(get_db)
         db.query(Charity)
         .filter(
             Charity.id == charity_id,
-            Charity.is_verified == True,
-            Charity.is_active == True,
+            Charity.is_verified,
+            Charity.is_active,
         )
         .first()
     )

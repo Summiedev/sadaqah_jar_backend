@@ -10,7 +10,6 @@ Tests for family.py endpoints — targets audit-flagged bugs:
 """
 
 import pytest
-import threading
 from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from fastapi.testclient import TestClient
@@ -54,15 +53,9 @@ def owner(db):
     db.commit()
     db.refresh(u)
     yield u
-    db.query(FamilyJarLog).filter(
-        FamilyJarLog.user_id == u.id
-    ).delete()
-    db.query(FamilyJarMember).filter(
-        FamilyJarMember.user_id == u.id
-    ).delete()
-    db.query(FamilyJar).filter(
-        FamilyJar.created_by == u.id
-    ).delete()
+    db.query(FamilyJarLog).filter(FamilyJarLog.user_id == u.id).delete()
+    db.query(FamilyJarMember).filter(FamilyJarMember.user_id == u.id).delete()
+    db.query(FamilyJar).filter(FamilyJar.created_by == u.id).delete()
     db.query(User).filter(User.id == u.id).delete()
     db.commit()
 
@@ -78,12 +71,8 @@ def member(db):
     db.commit()
     db.refresh(u)
     yield u
-    db.query(FamilyJarLog).filter(
-        FamilyJarLog.user_id == u.id
-    ).delete()
-    db.query(FamilyJarMember).filter(
-        FamilyJarMember.user_id == u.id
-    ).delete()
+    db.query(FamilyJarLog).filter(FamilyJarLog.user_id == u.id).delete()
+    db.query(FamilyJarMember).filter(FamilyJarMember.user_id == u.id).delete()
     db.query(User).filter(User.id == u.id).delete()
     db.commit()
 
@@ -118,10 +107,14 @@ class TestCreateJar:
         assert resp.status_code == 200
         jar_id = resp.json()["jar_id"]
 
-        member_row = db.query(FamilyJarMember).filter(
-            FamilyJarMember.family_jar_id == jar_id,
-            FamilyJarMember.user_id == owner.id,
-        ).first()
+        member_row = (
+            db.query(FamilyJarMember)
+            .filter(
+                FamilyJarMember.family_jar_id == jar_id,
+                FamilyJarMember.user_id == owner.id,
+            )
+            .first()
+        )
         assert member_row is not None
         assert member_row.role == "creator"
 
@@ -405,7 +398,7 @@ class TestAddStarConcurrency:
 
         finally:
             # Cleanup: remove jar logs, members, users, acts
-            for a in test_acts if 'test_acts' in dir() else []:
+            for a in test_acts if "test_acts" in dir() else []:
                 try:
                     db.delete(a)
                 except Exception:
@@ -413,7 +406,9 @@ class TestAddStarConcurrency:
             for u in member_cleanup:
                 try:
                     db.query(FamilyJarLog).filter(FamilyJarLog.user_id == u.id).delete()
-                    db.query(FamilyJarMember).filter(FamilyJarMember.user_id == u.id).delete()
+                    db.query(FamilyJarMember).filter(
+                        FamilyJarMember.user_id == u.id
+                    ).delete()
                     db.query(User).filter(User.id == u.id).delete()
                 except Exception:
                     pass
@@ -436,7 +431,9 @@ class TestFamilyWebsocket:
 
         token = _auth_header(member.id)["Authorization"].split(" ", 1)[1]
         with pytest.raises(WebSocketDisconnect) as excinfo:
-            with client.websocket_connect(f"/api/v1/websock/ws/family-jar/{jar.id}?token={token}") as ws:
+            with client.websocket_connect(
+                f"/api/v1/websock/ws/family-jar/{jar.id}?token={token}"
+            ) as ws:
                 ws.receive_text()
 
         assert excinfo.value.code == 4403

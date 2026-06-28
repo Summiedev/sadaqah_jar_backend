@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
+
 class FamilyJar(Base):
     __tablename__ = "family_jars"
 
@@ -20,8 +21,7 @@ class FamilyJar(Base):
     created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
 
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)

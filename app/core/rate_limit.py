@@ -9,6 +9,7 @@ from app.core.cache import redis_client
 
 logger = logging.getLogger(__name__)
 
+
 def check_rate_limit_key(key: str, limit: int = 5, period: int = 60) -> bool:
     now = int(time.time())
     member = f"{now}:{uuid.uuid4().hex}"

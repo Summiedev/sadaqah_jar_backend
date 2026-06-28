@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Integer, String
 from sqlalchemy.orm import mapped_column
 from app.db.base import Base
+
 
 class Badge(Base):
     __tablename__ = "badges"

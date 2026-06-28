@@ -3,9 +3,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.db.session import SessionLocal
 from app.models.user import User
-from app.core.security import hash_password
 
 client = TestClient(app)
+
 
 @pytest.fixture(scope="module")
 def db():
@@ -16,24 +16,26 @@ def db():
 
 def test_register_and_login(db):
     # Clean user first
-    db.query(User).filter(User.email=="test2@example.com").delete()
+    db.query(User).filter(User.email == "test2@example.com").delete()
     db.commit()
 
     # Register
-    response = client.post("/auth/register", json={
-        "username": "test-user",
-        "email": "test2@example.com",
-        "password": "StrongPass123!"
-    })
+    response = client.post(
+        "/auth/register",
+        json={
+            "username": "test-user",
+            "email": "test2@example.com",
+            "password": "StrongPass123!",
+        },
+    )
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
 
     # Login
-    response = client.post("/auth/login", json={
-        "email": "test2@example.com",
-        "password": "StrongPass123!"
-    })
+    response = client.post(
+        "/auth/login", json={"email": "test2@example.com", "password": "StrongPass123!"}
+    )
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
@@ -47,7 +49,9 @@ def test_register_and_login(db):
 
 def test_register_username_taken_returns_409(db):
     db.query(User).filter(User.username == "collision-user").delete()
-    db.query(User).filter(User.email.in_(["collision1@example.com", "collision2@example.com"])).delete()
+    db.query(User).filter(
+        User.email.in_(["collision1@example.com", "collision2@example.com"])
+    ).delete()
     db.commit()
 
     first = client.post(

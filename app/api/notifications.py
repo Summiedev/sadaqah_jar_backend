@@ -26,13 +26,11 @@ def upsert_device_token(
 ):
     platform = payload.platform.strip().lower()
     if platform not in ("ios", "android"):
-        raise HTTPException(status_code=400, detail="Platform must be 'ios' or 'android'")
+        raise HTTPException(
+            status_code=400, detail="Platform must be 'ios' or 'android'"
+        )
 
-    existing = (
-        db.query(DeviceToken)
-        .filter(DeviceToken.token == payload.token)
-        .first()
-    )
+    existing = db.query(DeviceToken).filter(DeviceToken.token == payload.token).first()
 
     if existing:
         existing.user_id = current_user.id
@@ -61,15 +59,12 @@ def list_notifications(
     query = db.query(Notification).filter(Notification.user_id == current_user.id)
 
     if unread:
-        query = query.filter(Notification.is_read == False)
+        query = query.filter(not Notification.is_read)
 
     total = query.count()
 
     rows = (
-        query.order_by(Notification.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
+        query.order_by(Notification.created_at.desc()).offset(offset).limit(limit).all()
     )
 
     return {
@@ -131,7 +126,7 @@ def mark_all_read(
         db.query(Notification)
         .filter(
             Notification.user_id == current_user.id,
-            Notification.is_read == False,
+            not Notification.is_read,
         )
         .update({"is_read": True}, synchronize_session=False)
     )

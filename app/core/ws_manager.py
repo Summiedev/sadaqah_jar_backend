@@ -2,6 +2,7 @@
 from typing import Dict, List
 from fastapi import WebSocket
 
+
 class ConnectionManager:
     def __init__(self):
         self.user_connections: Dict[int, List[WebSocket]] = {}
@@ -32,12 +33,16 @@ class ConnectionManager:
         self.family_connections.setdefault(jar_id, []).append(websocket)
 
     def disconnect_family(self, jar_id: int, websocket: WebSocket):
-        if jar_id in self.family_connections and websocket in self.family_connections[jar_id]:
+        if (
+            jar_id in self.family_connections
+            and websocket in self.family_connections[jar_id]
+        ):
             self.family_connections[jar_id].remove(websocket)
 
     async def send_family_event(self, jar_id: int, data: dict):
         conns = self.family_connections.get(jar_id, [])
         for ws in conns:
             await ws.send_json(data)
+
 
 manager = ConnectionManager()

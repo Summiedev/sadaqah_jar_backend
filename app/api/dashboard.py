@@ -57,7 +57,9 @@ def get_heatmap(
 
 
 @router.get("/stats")
-def get_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_stats(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     user_id = current_user.id
 
     if not check_rate_limit(user_id, limit=30, period=60):
@@ -118,7 +120,9 @@ def get_stats(current_user: User = Depends(get_current_user), db: Session = Depe
         "total_jars_completed": total_jars or 0,
         "current_streak": streak.current_streak if streak else 0,
         "longest_streak": streak.longest_streak if streak else 0,
-        "most_common_category": str(category_row.category.value) if category_row and category_row.category else None,
+        "most_common_category": str(category_row.category.value)
+        if category_row and category_row.category
+        else None,
         "donations_made_count": donations_count or 0,
     }
 
@@ -127,7 +131,9 @@ def get_stats(current_user: User = Depends(get_current_user), db: Session = Depe
 
 
 @router.get("/category-analytics")
-def get_category_analytics(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_category_analytics(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     user_id = current_user.id
 
     if not check_rate_limit(user_id, limit=30, period=60):
@@ -158,7 +164,9 @@ def get_category_analytics(current_user: User = Depends(get_current_user), db: S
 
     result = [
         {
-            "category": str(row.category.value) if hasattr(row.category, "value") else str(row.category),
+            "category": str(row.category.value)
+            if hasattr(row.category, "value")
+            else str(row.category),
             "count": row.cnt,
             "stars": int(row.stars or 0),
         }

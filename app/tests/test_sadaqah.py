@@ -57,7 +57,9 @@ def _create_act(db, title: str) -> SadaqahAct:
 
 
 def _cleanup_user_state(db, user_id: int) -> None:
-    db.query(SadaqahLog).filter(SadaqahLog.user_id == user_id).delete(synchronize_session=False)
+    db.query(SadaqahLog).filter(SadaqahLog.user_id == user_id).delete(
+        synchronize_session=False
+    )
     db.query(Jar).filter(Jar.user_id == user_id).delete(synchronize_session=False)
     db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
     db.commit()
@@ -84,11 +86,17 @@ def test_add_star_request_id_is_idempotent(db):
         assert second.status_code == 200
         assert first.json() == second.json()
 
-        active_jar = db.query(Jar).filter(Jar.user_id == user.id, Jar.completed_at.is_(None)).first()
+        active_jar = (
+            db.query(Jar)
+            .filter(Jar.user_id == user.id, Jar.completed_at.is_(None))
+            .first()
+        )
         assert active_jar is not None
         assert active_jar.current_stars == first.json()["current_stars"]
     finally:
-        db.query(SadaqahAct).filter(SadaqahAct.id == act.id).delete(synchronize_session=False)
+        db.query(SadaqahAct).filter(SadaqahAct.id == act.id).delete(
+            synchronize_session=False
+        )
         _cleanup_user_state(db, user.id)
 
 
@@ -122,18 +130,17 @@ def test_near_simultaneous_add_star_completes_once_and_spills_to_new_jar(db):
         assert any(item["completed_at"] is not None for item in payloads)
         assert any(item["completed_at"] is None for item in payloads)
 
-        jars = (
-            db.query(Jar)
-            .filter(Jar.user_id == user.id)
-            .order_by(Jar.id.asc())
-            .all()
-        )
+        jars = db.query(Jar).filter(Jar.user_id == user.id).order_by(Jar.id.asc()).all()
         assert len(jars) == 2
         completed_jar = next(j for j in jars if j.completed_at is not None)
         active_jar = next(j for j in jars if j.completed_at is None)
         assert completed_jar.current_stars == 2
         assert active_jar.current_stars == 1
     finally:
-        db.query(SadaqahLog).filter(SadaqahLog.user_id == user.id).delete(synchronize_session=False)
-        db.query(SadaqahAct).filter(SadaqahAct.id.in_([act_one.id, act_two.id])).delete(synchronize_session=False)
+        db.query(SadaqahLog).filter(SadaqahLog.user_id == user.id).delete(
+            synchronize_session=False
+        )
+        db.query(SadaqahAct).filter(SadaqahAct.id.in_([act_one.id, act_two.id])).delete(
+            synchronize_session=False
+        )
         _cleanup_user_state(db, user.id)

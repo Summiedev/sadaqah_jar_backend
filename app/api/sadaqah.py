@@ -18,7 +18,12 @@ from app.core.auth import get_current_user
 from app.core.cache import cache_daily_acts, get_cached_daily_acts
 from app.core.ws_manager import manager
 from app.models.evidence import Evidence
-from app.schemas.sadaqah_act import ActDetailResponse, ActListResponse, ActPageResponse, EvidenceResponse
+from app.schemas.sadaqah_act import (
+    ActDetailResponse,
+    ActListResponse,
+    ActPageResponse,
+    EvidenceResponse,
+)
 
 from app.services.streak_service import update_streak
 from app.services.badge_service import check_and_award_badges
@@ -27,17 +32,22 @@ from app.services.hijri_service import is_last_10_nights as hijri_last10
 from app.services.hijri_service import is_ramadan as hijri_is_ramadan
 from app.services.jumua_service import is_friday
 from app.services.ramadan_service import is_ramadan, is_last_10_nights
-from app.services.leaderboard_service import increment_friday, increment_global, increment_ramadan, increment_weekly
+from app.services.leaderboard_service import (
+    increment_friday,
+    increment_global,
+    increment_ramadan,
+    increment_weekly,
+)
 
 from app.tasks.scheduled_tasks import jar_completion_celebration
 
 router = APIRouter(prefix="/sadaqah", tags=["sadaqah"])
 logger = logging.getLogger(__name__)
 
+
 @router.get("/daily")
 def get_daily_acts(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
 
     user_id = current_user.id
@@ -52,7 +62,7 @@ def get_daily_acts(
     if is_ramadan():
         acts = (
             db.query(SadaqahAct)
-            .filter(SadaqahAct.verified == True)
+            .filter(SadaqahAct.verified)
             .order_by(func.random())
             .limit(20)
             .all()
@@ -60,10 +70,7 @@ def get_daily_acts(
     else:
         acts = (
             db.query(SadaqahAct)
-            .filter(
-                SadaqahAct.verified == True,
-                SadaqahAct.is_ramadan_only == False
-            )
+            .filter(SadaqahAct.verified, not SadaqahAct.is_ramadan_only)
             .order_by(func.random())
             .limit(20)
             .all()
@@ -74,7 +81,7 @@ def get_daily_acts(
             "id": act.id,
             "title": act.title,
             "category": act.category,
-            "difficulty": act.difficulty
+            "difficulty": act.difficulty,
         }
         for act in acts[:5]
     ]
@@ -82,6 +89,7 @@ def get_daily_acts(
     cache_daily_acts(user_id, response)
 
     return response
+
 
 @router.get("/acts", response_model=ActPageResponse)
 def list_acts(
@@ -99,11 +107,7 @@ def list_acts(
 
     total = db.query(func.count(SadaqahAct.id)).scalar()
     rows = (
-        db.query(SadaqahAct)
-        .order_by(SadaqahAct.id)
-        .offset(offset)
-        .limit(limit)
-        .all()
+        db.query(SadaqahAct).order_by(SadaqahAct.id).offset(offset).limit(limit).all()
     )
     return ActPageResponse(
         total=total or 0,
@@ -129,7 +133,9 @@ def get_act_detail(
         id=act.id,
         title=act.title,
         description=act.description,
-        category=act.category.value if hasattr(act.category, "value") else str(act.category),
+        category=act.category.value
+        if hasattr(act.category, "value")
+        else str(act.category),
         difficulty=act.difficulty,
         reward_weight=act.reward_weight,
         evidence=EvidenceResponse(
@@ -139,7 +145,9 @@ def get_act_detail(
             arabic_text=evidence_row.arabic_text,
             english_text=evidence_row.english_text,
             is_verified=evidence_row.is_verified,
-        ) if evidence_row else None,
+        )
+        if evidence_row
+        else None,
     )
 
 
@@ -207,16 +215,24 @@ async def add_star(
                 return existing_request
 
         # Validate the act exists and is verified.
-        act = db.query(SadaqahAct).filter(SadaqahAct.id == act_id, SadaqahAct.verified == True).first()
+        act = (
+            db.query(SadaqahAct)
+            .filter(SadaqahAct.id == act_id, SadaqahAct.verified)
+            .first()
+        )
         if not act:
             raise HTTPException(status_code=404, detail="Act not found")
 
         # Ensure we haven't already logged this act today for this user.
-        existing = db.query(SadaqahLog).filter(
-            SadaqahLog.user_id == user_id,
-            SadaqahLog.act_id == act_id,
-            SadaqahLog.date == today,
-        ).first()
+        existing = (
+            db.query(SadaqahLog)
+            .filter(
+                SadaqahLog.user_id == user_id,
+                SadaqahLog.act_id == act_id,
+                SadaqahLog.date == today,
+            )
+            .first()
+        )
         if existing:
             raise HTTPException(status_code=400, detail="Already added today")
 
@@ -258,7 +274,10 @@ async def add_star(
         active_jar.current_stars += multiplier
 
         just_completed = False
-        if active_jar.current_stars >= active_jar.capacity and not active_jar.completed_at:
+        if (
+            active_jar.current_stars >= active_jar.capacity
+            and not active_jar.completed_at
+        ):
             active_jar.completed_at = now
             just_completed = True
 
@@ -323,12 +342,18 @@ async def add_star(
         logger.exception("Failed to update leaderboard caches for user %s", user_id)
 
     try:
-        await manager.send_user_event(user_id, {
-            "event": "jar_update",
-            "current_stars": active_jar.current_stars,
-            "capacity": active_jar.capacity,
-            "streak": {"current": streak.current_streak, "longest": streak.longest_streak},
-        })
+        await manager.send_user_event(
+            user_id,
+            {
+                "event": "jar_update",
+                "current_stars": active_jar.current_stars,
+                "capacity": active_jar.capacity,
+                "streak": {
+                    "current": streak.current_streak,
+                    "longest": streak.longest_streak,
+                },
+            },
+        )
     except Exception:
         logger.exception("Failed to broadcast jar update for user %s", user_id)
 
@@ -336,7 +361,10 @@ async def add_star(
         try:
             jar_completion_celebration.delay(active_jar.user_id)
         except Exception:
-            logger.exception("Failed to queue jar completion celebration for user %s", active_jar.user_id)
+            logger.exception(
+                "Failed to queue jar completion celebration for user %s",
+                active_jar.user_id,
+            )
 
     return _jar_snapshot(active_jar)
 
@@ -363,11 +391,7 @@ def list_completed_jars(
     total = base_query.count()
 
     rows = (
-        base_query
-        .order_by(Jar.completed_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
+        base_query.order_by(Jar.completed_at.desc()).offset(offset).limit(limit).all()
     )
 
     return {
@@ -381,7 +405,9 @@ def list_completed_jars(
                 "capacity": j.capacity,
                 "completed_at": j.completed_at.isoformat() if j.completed_at else None,
                 "created_at": j.created_at.isoformat() if j.created_at else None,
-                "days_to_complete": (j.completed_at - j.created_at).days if j.completed_at and j.created_at else None,
+                "days_to_complete": (j.completed_at - j.created_at).days
+                if j.completed_at and j.created_at
+                else None,
             }
             for j in rows
         ],
@@ -390,8 +416,7 @@ def list_completed_jars(
 
 @router.get("/jar")
 def get_jar(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
 
     user_id = current_user.id
@@ -406,10 +431,9 @@ def get_jar(
         mode_parts.append("last_10_nights")
     current_mode = mode_parts[0] if mode_parts else "normal"
 
-    jar = db.query(Jar).filter(
-        Jar.user_id == user_id,
-        Jar.completed_at.is_(None)
-    ).first()
+    jar = (
+        db.query(Jar).filter(Jar.user_id == user_id, Jar.completed_at.is_(None)).first()
+    )
 
     if not jar:
         return {"current_stars": 0, "capacity": 33, "current_mode": current_mode}

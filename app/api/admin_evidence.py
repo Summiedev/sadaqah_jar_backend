@@ -28,19 +28,24 @@ def list_evidence(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    admin = Depends(require_admin),
+    admin=Depends(require_admin),
 ):
     query = db.query(Evidence).order_by(Evidence.id.desc())
     total = query.count()
     rows = query.offset(offset).limit(limit).all()
-    return {"total": total, "limit": limit, "offset": offset, "data": [_serialize_evidence(evidence) for evidence in rows]}
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [_serialize_evidence(evidence) for evidence in rows],
+    }
 
 
 @router.post("/")
 def add_evidence(
     payload: EvidenceCreate,
     db: Session = Depends(get_db),
-    admin = Depends(require_admin),
+    admin=Depends(require_admin),
 ):
     evidence = Evidence(
         act_id=payload.act_id,
@@ -57,8 +62,11 @@ def add_evidence(
 
     return _serialize_evidence(evidence)
 
+
 @router.get("/{act_id}")
-def get_act_with_evidence(act_id: int, db: Session = Depends(get_db), admin = Depends(require_admin)):
+def get_act_with_evidence(
+    act_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)
+):
     act = db.query(SadaqahAct).filter(SadaqahAct.id == act_id).first()
 
     if not act:
@@ -79,7 +87,7 @@ def get_act_with_evidence(act_id: int, db: Session = Depends(get_db), admin = De
                 "is_verified": evidence.is_verified,
             }
             for evidence in act.evidences
-        ]
+        ],
     }
 
 
@@ -88,7 +96,7 @@ def update_evidence(
     evidence_id: int,
     payload: EvidenceUpdate,
     db: Session = Depends(get_db),
-    admin = Depends(require_admin),
+    admin=Depends(require_admin),
 ):
     evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
     if not evidence:
@@ -121,7 +129,7 @@ def update_evidence(
 def delete_evidence(
     evidence_id: int,
     db: Session = Depends(get_db),
-    admin = Depends(require_admin),
+    admin=Depends(require_admin),
 ):
     evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
     if not evidence:

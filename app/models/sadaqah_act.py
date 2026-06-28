@@ -29,8 +29,7 @@ class SadaqahAct(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
     category: Mapped[SadaqahCategory] = mapped_column(
-        Enum(SadaqahCategory, native_enum=False),
-        nullable=False
+        Enum(SadaqahCategory, native_enum=False), nullable=False
     )
 
     verified: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -46,8 +45,6 @@ class SadaqahAct(Base):
     estimated_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     evidences = relationship(
-        "Evidence",
-        cascade="all, delete-orphan",
-        back_populates="act"
+        "Evidence", cascade="all, delete-orphan", back_populates="act"
     )
     logs = relationship("SadaqahLog", backref="act")

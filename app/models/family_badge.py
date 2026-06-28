@@ -1,6 +1,6 @@
 # app/models/family_badge.py
 
-from sqlalchemy import Integer, ForeignKey
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
@@ -10,10 +10,6 @@ class FamilyBadge(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    family_id: Mapped[int] = mapped_column(
-        ForeignKey("family_jars.id")
-    )
+    family_id: Mapped[int] = mapped_column(ForeignKey("family_jars.id"))
 
-    badge_id: Mapped[int] = mapped_column(
-        ForeignKey("badges.id")
-    )
+    badge_id: Mapped[int] = mapped_column(ForeignKey("badges.id"))

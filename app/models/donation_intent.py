@@ -5,32 +5,16 @@ from datetime import datetime, timezone
 from app.db.base import Base
 
 
-
 class DonationIntent(Base):
     __tablename__ = "donation_intents"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
-        index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
 
-    charity_id: Mapped[int] = mapped_column(
-        ForeignKey("charities.id"),
-        index=True
-    )
+    charity_id: Mapped[int] = mapped_column(ForeignKey("charities.id"), index=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
-    charity= relationship(
-        "Charity",
-        back_populates="donation_intents"
-    )
-
-  
+    charity = relationship("Charity", back_populates="donation_intents")

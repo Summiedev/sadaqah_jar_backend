@@ -23,7 +23,9 @@ def create_refresh_token(db: Session, user_id: int) -> str:
     """Create and persist a hashed refresh token, returning only the raw token once."""
     raw_token = secrets.token_urlsafe(REFRESH_TOKEN_BYTES)
     token_hash = hash_refresh_token(raw_token)
-    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
+        days=REFRESH_TOKEN_EXPIRE_DAYS
+    )
 
     db.add(
         RefreshToken(

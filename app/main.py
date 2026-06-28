@@ -28,13 +28,11 @@ from app.core.logger import logger
 from app.db.deps import get_db
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("API startup complete")
     yield
     logger.info("API shutdown")
-    
 
 
 app = FastAPI(
@@ -42,8 +40,8 @@ app = FastAPI(
     lifespan=lifespan,
     exception_handlers={
         HTTPException: http_exception_handler,
-        Exception: general_exception_handler
-    }
+        Exception: general_exception_handler,
+    },
 )
 
 api_v1_router = APIRouter(prefix="/api/v1")
@@ -65,9 +63,11 @@ api_v1_router.include_router(sadaqah_router)
 api_v1_router.include_router(streak_router)
 api_v1_router.include_router(websocket_router)
 
+
 @api_v1_router.get("/db-check")
 def api_v1_db_check(db: Session = Depends(get_db)):
     return {"db": "connected"}
+
 
 if settings.CORS_ORIGINS:
     app.add_middleware(
@@ -79,6 +79,7 @@ if settings.CORS_ORIGINS:
     )
 
 app.include_router(api_v1_router)
+
 
 @app.get("/health")
 def health():

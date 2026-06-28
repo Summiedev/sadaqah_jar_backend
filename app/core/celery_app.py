@@ -4,14 +4,13 @@ from celery.schedules import crontab
 celery_app = Celery(
     "sadaqah_worker",
     broker="redis://localhost:6379/0",
-    backend="redis://localhost:6379/0"
+    backend="redis://localhost:6379/0",
 )
 
 celery_app.conf.timezone = "UTC"
 celery_app.conf.enable_utc = True
 
 celery_app.autodiscover_tasks(["app.tasks"])
-
 
 
 celery_app.conf.beat_schedule = {

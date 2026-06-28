@@ -1,4 +1,3 @@
-import random
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -90,7 +89,4 @@ def friday_stats(request: Request, db: Session = Depends(get_db)):
         .scalar()
     )
 
-    return {
-        "friday_stars": total_stars or 0,
-        "active_users": total_users or 0
-    }
+    return {"friday_stars": total_stars or 0, "active_users": total_users or 0}

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator
 
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -9,16 +10,24 @@ class UserCreate(BaseModel):
     @classmethod
     def password_strength(cls, v: str) -> str:
         if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         if not any(c.isalpha() for c in v):
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         if not any(c.isdigit() for c in v):
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         return v
+
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -46,11 +55,17 @@ class ResetPasswordRequest(BaseModel):
     @classmethod
     def password_strength(cls, v: str) -> str:
         if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         if not any(c.isalpha() for c in v):
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         if not any(c.isdigit() for c in v):
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         return v
 
 
@@ -62,11 +77,17 @@ class ChangePasswordRequest(BaseModel):
     @classmethod
     def password_strength(cls, v: str) -> str:
         if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         if not any(c.isalpha() for c in v):
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         if not any(c.isdigit() for c in v):
-            raise ValueError("Password must be at least 8 characters and include a letter and a number")
+            raise ValueError(
+                "Password must be at least 8 characters and include a letter and a number"
+            )
         return v
 
 
@@ -93,4 +114,6 @@ class UserProfileUpdate(BaseModel):
 
 
 class ForgotPasswordResponse(BaseModel):
-    message: str = "If an account with that email exists, a password reset link has been sent."
+    message: str = (
+        "If an account with that email exists, a password reset link has been sent."
+    )

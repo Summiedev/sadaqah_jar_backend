@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -7,7 +8,7 @@ from alembic import context
 
 
 from app.db.base import Base
-import app.models
+
 target_metadata = Base.metadata
 
 # this is the Alembic Config object, which provides
@@ -19,15 +20,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Allow overriding the config URL with the DATABASE_URL env var (useful for CI/remote runs)
-import os
-db_url = os.environ.get('DATABASE_URL')
+db_url = os.environ.get("DATABASE_URL")
 if db_url:
-    if db_url.startswith('postgresql://'):
-        db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
-    config.set_main_option('sqlalchemy.url', db_url)
-
-
-
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:
@@ -69,10 +66,10 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-           connection=connection,
-    target_metadata=target_metadata,
-    include_schemas=True,
-    version_table="alembic_version",
+            connection=connection,
+            target_metadata=target_metadata,
+            include_schemas=True,
+            version_table="alembic_version",
         )
 
         with context.begin_transaction():

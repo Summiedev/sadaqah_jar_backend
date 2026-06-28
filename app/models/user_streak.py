@@ -11,29 +11,17 @@ class UserStreak(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
-        unique=True,
-        index=True,
-        nullable=False
+        ForeignKey("users.id"), unique=True, index=True, nullable=False
     )
 
-    current_streak: Mapped[int] = mapped_column(
-        Integer,
-        default=0
-    )
+    current_streak: Mapped[int] = mapped_column(Integer, default=0)
 
-    longest_streak: Mapped[int] = mapped_column(
-        Integer,
-        default=0
-    )
+    longest_streak: Mapped[int] = mapped_column(Integer, default=0)
 
-    last_completed_date: Mapped[date | None] = mapped_column(
-        Date,
-        nullable=True
-    )
+    last_completed_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(
-    DateTime,
-    default=lambda: datetime.now(timezone.utc),
-    onupdate=lambda: datetime.now(timezone.utc),
-)
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
