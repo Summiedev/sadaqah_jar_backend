@@ -2,12 +2,18 @@ from pathlib import Path
 from typing import Any, Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, NoDecode
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
     APP_NAME: str
     ENV: str
 
