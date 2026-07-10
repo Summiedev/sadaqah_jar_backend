@@ -1,5 +1,5 @@
-"""
-Tests for streak_service.py — targets the exact bugs flagged in the audit:
+﻿"""
+Tests for streak_service.py - targets the exact bugs flagged in the audit:
 
 1. `update_streak()`: first-call initialisation creates streak with current=1,
    longest=1. Second-call on the same day is idempotent.
@@ -59,12 +59,13 @@ class TestUpdateStreak:
 
     def test_consecutive_day_increments(self, db, user):
         s1 = update_streak(db, user.id)
+        previous_current = s1.current_streak
         # Manually set last_completed_date to yesterday
         s1.last_completed_date = date.today() - timedelta(days=1)
         db.commit()
 
         s2 = update_streak(db, user.id)
-        assert s2.current_streak == s1.current_streak + 1
+        assert s2.current_streak == previous_current + 1
 
     def test_missed_day_resets_to_one(self, db, user):
         s1 = update_streak(db, user.id)
@@ -84,7 +85,7 @@ class TestUpdateStreak:
         s.last_completed_date = date.today() - timedelta(days=3)
         db.commit()
 
-        # Miss days → reset
+        # Miss days -> reset
         s2 = update_streak(db, user.id)
         assert s2.current_streak == 1
         assert s2.longest_streak == 5  # preserved

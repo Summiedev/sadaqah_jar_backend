@@ -1,11 +1,14 @@
-# app/db/session.py
+﻿from urllib.parse import urlparse
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-engine = create_engine(
-    settings.DATABASE_URL, pool_pre_ping=True
-)  # avoids dead DB connections
+_engine_kwargs = {"pool_pre_ping": True}
+if urlparse(settings.DATABASE_URL).scheme.startswith("sqlite"):
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(settings.DATABASE_URL, **_engine_kwargs)  # avoids dead DB connections
 """
 A session is:
 

@@ -1,4 +1,4 @@
-import uuid
+﻿import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.security import create_access_token, hash_password
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, engine
 from app.main import app
 from app.models.jar import Jar
 from app.models.sadaqah_act import SadaqahAct
@@ -45,7 +45,7 @@ def _create_act(db, title: str) -> SadaqahAct:
     act = SadaqahAct(
         title=title,
         description="Test act",
-        category="charity",
+        category="general",
         difficulty=1,
         reward_weight=1,
         verified=True,
@@ -101,6 +101,9 @@ def test_add_star_request_id_is_idempotent(db):
 
 
 def test_near_simultaneous_add_star_completes_once_and_spills_to_new_jar(db):
+    if engine.dialect.name == "sqlite":
+        pytest.skip("Concurrency semantics require PostgreSQL row locking.")
+
     user = _create_user(db, "race")
     act_one = _create_act(db, "Race act one")
     act_two = _create_act(db, "Race act two")
@@ -144,3 +147,6 @@ def test_near_simultaneous_add_star_completes_once_and_spills_to_new_jar(db):
             synchronize_session=False
         )
         _cleanup_user_state(db, user.id)
+
+
+

@@ -1,4 +1,4 @@
-__all__ = [
+﻿__all__ = [
     "User",
     "SadaqahAct",
     "Jar",
@@ -17,6 +17,7 @@ __all__ = [
     "RefreshToken",
     "UserBadge",
     "UserStreak",
+    "Notification",
 ]
 
 from .user import User
@@ -37,3 +38,4 @@ from .password_reset_token import PasswordResetToken
 from .refresh_token import RefreshToken
 from .user_badge import UserBadge
 from .user_streak import UserStreak
+from .notification import Notification

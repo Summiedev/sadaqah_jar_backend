@@ -8,6 +8,7 @@ Create Date: 2026-06-17 23:30:00.000000
 from typing import Sequence, Union
 
 from alembic import op
+import sqlalchemy as sa
 
 
 revision: str = "e1f2a3b4c5d6"
@@ -22,7 +23,7 @@ def upgrade() -> None:
         "jars",
         ["user_id", "completed_at"],
         unique=False,
-        postgresql_where=op.text("completed_at IS NOT NULL"),
+        postgresql_where=sa.text("completed_at IS NOT NULL"),
     )
 
 

@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 import requests
 
 # Test login and daily acts endpoint
 login_data = {"email": "fatima@test.com", "password": "password123"}
 login_response = requests.post(
-    "https://sadaqah-jar-backend.onrender.com/auth/login", json=login_data, timeout=30
+    "https://api.sad-aqah.app/api/v1/auth/login", json=login_data, timeout=30
 )
 print(f"Login Status: {login_response.status_code}")
 login_json = login_response.json()
@@ -16,7 +16,7 @@ if login_response.status_code == 200 and "access_token" in login_json:
     # Test daily acts endpoint
     headers = {"Authorization": f"Bearer {token}"}
     daily_response = requests.get(
-        "https://sadaqah-jar-backend.onrender.com/sadaqah/daily",
+        "https://api.sad-aqah.app/api/v1/sadaqah/daily",
         headers=headers,
         timeout=30,
     )

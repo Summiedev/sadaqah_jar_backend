@@ -1,12 +1,12 @@
-"""
-Tests for family.py endpoints — targets audit-flagged bugs:
+﻿"""
+Tests for family.py endpoints â€” targets audit-flagged bugs:
 
-1. Create jar → creator is auto-added as member with role="creator"
-2. Join jar → valid invite code adds member; duplicate join is prevented
-3. Add-star → non-member gets 403; already-logged act same day gets 400
-4. Add-star concurrency → 5+ distinct members adding stars simultaneously must
+1. Create jar â†’ creator is auto-added as member with role="creator"
+2. Join jar â†’ valid invite code adds member; duplicate join is prevented
+3. Add-star â†’ non-member gets 403; already-logged act same day gets 400
+4. Add-star concurrency â†’ 5+ distinct members adding stars simultaneously must
    produce exactly N increments with no lost updates (atomic row-lock fix).
-5. Leaderboard → returns top N members by stars
+5. Leaderboard â†’ returns top N members by stars
 """
 
 import pytest
@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 from app.main import app
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, engine
 from app.models.user import User
 from app.models.family_jar import FamilyJar
 from app.models.family_jar_member import FamilyJarMember
@@ -82,7 +82,7 @@ def act(db):
     a = SadaqahAct(
         title="Test act",
         description="A test act",
-        category="charity",
+        category="general",
         difficulty=1,
         reward_weight=1,
         verified=True,
@@ -100,7 +100,7 @@ class TestCreateJar:
 
     def test_creator_is_member(self, db, owner):
         resp = client.post(
-            "/family/create",
+            "/api/v1/family/create",
             params={"name": "Test Family", "capacity": 33},
             headers=_auth_header(owner.id),
         )
@@ -131,7 +131,7 @@ class TestJoinJar:
         db.refresh(jar)
 
         resp = client.post(
-            "/family/join",
+            "/api/v1/family/join",
             params={"invite_code": "JOIN123"},
             headers=_auth_header(member.id),
         )
@@ -148,14 +148,14 @@ class TestJoinJar:
 
         # First join
         client.post(
-            "/family/join",
+            "/api/v1/family/join",
             params={"invite_code": "DUP123"},
             headers=_auth_header(member.id),
         )
 
-        # Second join — must fail
+        # Second join â€” must fail
         resp = client.post(
-            "/family/join",
+            "/api/v1/family/join",
             params={"invite_code": "DUP123"},
             headers=_auth_header(member.id),
         )
@@ -164,7 +164,7 @@ class TestJoinJar:
 
     def test_invalid_code_returns_404(self, member):
         resp = client.post(
-            "/family/join",
+            "/api/v1/family/join",
             params={"invite_code": "NONEXIST"},
             headers=_auth_header(member.id),
         )
@@ -183,7 +183,7 @@ class TestAddStar:
         db.refresh(jar)
 
         resp = client.post(
-            "/family/add-star",
+            "/api/v1/family/add-star",
             params={"jar_id": jar.id, "act_id": act.id},
             headers=_auth_header(member.id),
         )
@@ -202,7 +202,7 @@ class TestAddStar:
         db.commit()
 
         resp = client.post(
-            "/family/add-star",
+            "/api/v1/family/add-star",
             params={"jar_id": jar.id, "act_id": act.id},
             headers=_auth_header(member.id),
         )
@@ -221,14 +221,14 @@ class TestAddStar:
 
         # First add-star
         client.post(
-            "/family/add-star",
+            "/api/v1/family/add-star",
             params={"jar_id": jar.id, "act_id": act.id},
             headers=_auth_header(member.id),
         )
 
-        # Second add-star same act — must fail
+        # Second add-star same act â€” must fail
         resp = client.post(
-            "/family/add-star",
+            "/api/v1/family/add-star",
             params={"jar_id": jar.id, "act_id": act.id},
             headers=_auth_header(member.id),
         )
@@ -245,7 +245,7 @@ class TestFamilyLeaderboard:
         db.refresh(jar)
 
         resp = client.get(
-            f"/family/{jar.id}/leaderboard",
+            f"/api/v1/family/{jar.id}/leaderboard",
             headers=_auth_header(member.id),
         )
         assert resp.status_code == 403
@@ -302,6 +302,9 @@ class TestAddStarConcurrency:
     """
 
     def test_concurrent_multi_member_add_star(self, db, owner, act):
+        if engine.dialect.name == "sqlite":
+            pytest.skip("Concurrency semantics require PostgreSQL row locking.")
+
         NUM_MEMBERS = 6
         CAPACITY = NUM_MEMBERS * 2  # enough room for all
 
@@ -342,7 +345,7 @@ class TestAddStarConcurrency:
                 a = SadaqahAct(
                     title=f"Concurrency act {i}",
                     description=f"Test act for concurrency {i}",
-                    category="charity",
+                    category="general",
                     difficulty=1,
                     reward_weight=1,
                     verified=True,
@@ -357,7 +360,7 @@ class TestAddStarConcurrency:
             def _do_add_star(user_id: int, act_id: int) -> int:
                 """Call the add-star endpoint for a given member and return stars_added."""
                 resp = client.post(
-                    "/family/add-star",
+                    "/api/v1/family/add-star",
                     params={"jar_id": jar.id, "act_id": act_id},
                     headers=_auth_header(user_id),
                 )
@@ -437,3 +440,7 @@ class TestFamilyWebsocket:
                 ws.receive_text()
 
         assert excinfo.value.code == 4403
+
+
+
+

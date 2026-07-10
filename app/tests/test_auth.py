@@ -21,7 +21,7 @@ def test_register_and_login(db):
 
     # Register
     response = client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json={
             "username": "test-user",
             "email": "test2@example.com",
@@ -34,7 +34,7 @@ def test_register_and_login(db):
 
     # Login
     response = client.post(
-        "/auth/login", json={"email": "test2@example.com", "password": "StrongPass123!"}
+        "/api/v1/auth/login", json={"email": "test2@example.com", "password": "StrongPass123!"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -42,7 +42,7 @@ def test_register_and_login(db):
 
     # Protected route
     token = data["access_token"]
-    response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert "user_id" in response.json()
 
@@ -55,7 +55,7 @@ def test_register_username_taken_returns_409(db):
     db.commit()
 
     first = client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json={
             "username": "collision-user",
             "email": "collision1@example.com",
@@ -65,7 +65,7 @@ def test_register_username_taken_returns_409(db):
     assert first.status_code == 200
 
     second = client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json={
             "username": "collision-user",
             "email": "collision2@example.com",
@@ -74,4 +74,4 @@ def test_register_username_taken_returns_409(db):
     )
     assert second.status_code == 409
     payload = second.json()
-    assert payload["detail"]["code"] == "username_taken"
+    assert payload["message"]["code"] == "username_taken"

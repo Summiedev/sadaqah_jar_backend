@@ -30,7 +30,7 @@ def test_ramadan_leaderboard_returns_empty_outside_configured_window(db, monkeyp
     monkeypatch.setattr(leaderboard_api, "_utc_today", lambda: date(2026, 6, 18))
 
     try:
-        response = client.get("/leaderboard/ramadan")
+        response = client.get("/api/v1/leaderboard/ramadan")
         assert response.status_code == 200
         assert response.json() == []
     finally:
