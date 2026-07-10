@@ -1,11 +1,15 @@
-# app/services/streak_service.py
+﻿# app/services/streak_service.py
 from datetime import datetime, timedelta, date
 from sqlalchemy.orm import Session
 from app.models.user_streak import UserStreak
 
 
+def _utc_today() -> date:
+    return datetime.utcnow().date()
+
+
 def update_streak(db: Session, user_id: int, commit: bool = True) -> UserStreak:
-    today = date.today()
+    today = _utc_today()
     yesterday = today - timedelta(days=1)
 
     streak = db.query(UserStreak).filter(UserStreak.user_id == user_id).first()
@@ -47,7 +51,7 @@ def validate_streak(db: Session, user_id: int):
     if not streak or not streak.last_completed_date:
         return
 
-    today = datetime.utcnow().date()
+    today = _utc_today()
     days_missed = (today - streak.last_completed_date).days
     if days_missed > 1:
         streak.current_streak = 0
