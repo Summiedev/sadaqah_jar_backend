@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from app.books import repository as repo
 from app.books.schemas import (
     BookChapterRead,

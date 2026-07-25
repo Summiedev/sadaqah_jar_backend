@@ -9,6 +9,8 @@ Service methods publish domain events so other domains (notifications, family,
 journey, analytics) can react without tight coupling.
 """
 
+from __future__ import annotations
+
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
