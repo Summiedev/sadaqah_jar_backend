@@ -1,8 +1,11 @@
 import json
+import os
 from unittest.mock import patch, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 
 from app.main import app
 from app.db.session import SessionLocal
