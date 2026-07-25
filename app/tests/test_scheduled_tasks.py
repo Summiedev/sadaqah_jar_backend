@@ -14,7 +14,7 @@ import pytest
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.jar import Jar
-from app.models.notification import Notification
+from app.notifications.models import Notification
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
 
@@ -32,7 +32,6 @@ def user(db):
         username="scheduled_test",
         email="scheduled_test@example.com",
         hashed_password=hash_password("TestPass123"),
-        is_active=True,
     )
     db.add(u)
     db.commit()

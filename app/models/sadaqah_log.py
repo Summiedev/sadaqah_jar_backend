@@ -8,6 +8,7 @@ from sqlalchemy import (
     Boolean,
     Index,
     String,
+    Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
@@ -65,3 +66,5 @@ class SadaqahLog(Base):
     friday_boost: Mapped[bool] = mapped_column(Boolean, default=False)
 
     ramadan_bonus: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)

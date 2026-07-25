@@ -1,7 +1,7 @@
 [project]
-name = "sadaqah-jar-backend"
+name = "mizan-backend"
 version = "0.1.0"
-description = "Sadaqah Jar API"
+description = "Mizan API"
 requires-python = ">=3.12"
 dependencies = [
     "annotated-doc==0.0.4",

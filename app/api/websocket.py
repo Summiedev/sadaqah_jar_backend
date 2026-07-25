@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from jose import JWTError
 from app.core.ws_manager import manager
 from app.core.security import decode_access_token
-from app.api.family import _require_membership
+from app.family.repository import get_member
 from app.db.session import SessionLocal
 from sqlalchemy.orm import Session
 from app.models.user import User
@@ -56,7 +56,10 @@ async def family_jar_ws(websocket: WebSocket, jar_id: int, token: str = Query(No
         if user is None:
             await websocket.close(code=4001, reason="Invalid token")
             return
-        _require_membership(jar_id, user.id, db)
+        member = get_member(db, jar_id, user.id)
+        if not member:
+            await websocket.close(code=4403, reason="Family membership required")
+            return
     except Exception:
         await websocket.close(code=4403, reason="Family membership required")
         return

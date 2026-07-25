@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    FROM_EMAIL: str = "noreply@sadaqahjar.app"
+    FROM_EMAIL: str = "noreply@mizan.app"
 
     # Public-facing base URL for email links (no trailing slash)
     APP_URL: str = "http://localhost:8000"
@@ -67,3 +67,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+API_V1_PREFIX = "/api/v1"

@@ -1,0 +1,1 @@
+"""Sadaqah domain package."""

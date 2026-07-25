@@ -1,31 +1,26 @@
 from contextlib import asynccontextmanager
-from fastapi import APIRouter, Depends, FastAPI
+from uuid import uuid4
+
+from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
+from starlette.middleware.base import BaseHTTPMiddleware
 
-import app.db.base_class
-
-from app.api.adhkar import router as adhkar_router
-from app.api.admin_analytics import router as admin_analytics_router
-from app.api.admin_charities import router as admin_charities_router
-from app.api.admin_evidence import router as admin_evidence_router
-from app.api.admin_leaderboard_seasons import router as admin_leaderboard_seasons_router
-from app.api.auth import router as auth_router
-from app.api.badges import router as badges_router
-from app.api.charities import router as charities_router
-from app.api.dashboard import router as dashboard_router
-from app.api.family import router as family_router
-from app.api.friday import router as friday_router
-from app.api.leaderboard import router as leaderboard_router
-from app.api.notifications import router as notifications_router
-from app.api.sadaqah import router as sadaqah_router
-from app.api.streak import router as streak_router
-from app.api.websocket import router as websocket_router
+from app.api.router import api_router
 from app.core.config import settings
-from app.core.exceptions import general_exception_handler, http_exception_handler
+from app.core.exceptions import AppException
+from app.core.exception_handlers import app_exception_handler, general_exception_handler, http_exception_handler
+from app.core.observability import set_request_id
 from app.core.logger import logger
-from app.db.deps import get_db
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid4()))
+        set_request_id(request_id)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 
 @asynccontextmanager
@@ -40,34 +35,12 @@ app = FastAPI(
     lifespan=lifespan,
     exception_handlers={
         HTTPException: http_exception_handler,
+        AppException: app_exception_handler,
         Exception: general_exception_handler,
     },
 )
 
-api_v1_router = APIRouter(prefix="/api/v1")
-
-api_v1_router.include_router(adhkar_router)
-api_v1_router.include_router(admin_analytics_router)
-api_v1_router.include_router(admin_charities_router)
-api_v1_router.include_router(admin_evidence_router)
-api_v1_router.include_router(admin_leaderboard_seasons_router)
-api_v1_router.include_router(auth_router)
-api_v1_router.include_router(badges_router)
-api_v1_router.include_router(charities_router)
-api_v1_router.include_router(dashboard_router)
-api_v1_router.include_router(family_router)
-api_v1_router.include_router(friday_router)
-api_v1_router.include_router(leaderboard_router)
-api_v1_router.include_router(notifications_router)
-api_v1_router.include_router(sadaqah_router)
-api_v1_router.include_router(streak_router)
-api_v1_router.include_router(websocket_router)
-
-
-@api_v1_router.get("/db-check")
-def api_v1_db_check(db: Session = Depends(get_db)):
-    return {"db": "connected"}
-
+app.add_middleware(RequestIdMiddleware)
 
 if settings.CORS_ORIGINS:
     app.add_middleware(
@@ -78,9 +51,10 @@ if settings.CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-app.include_router(api_v1_router)
+app.include_router(api_router)
 
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+

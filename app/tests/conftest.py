@@ -1,6 +1,5 @@
 ﻿from pathlib import Path
 import os
-import shutil
 import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -14,9 +13,16 @@ if _TEST_DB_PATH.exists():
     _TEST_DB_PATH.unlink()
 
 os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{_TEST_DB_PATH.as_posix()}"
+os.environ.setdefault("APP_NAME", "Mizan Test API")
+os.environ.setdefault("ENV", "test")
+os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6399/15")
+os.environ.setdefault("JWT_SECRET", "test-secret-must-have-at-least-32-characters")
+os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
 
-from app.db.base import Base
-import app.models  # noqa: F401 - register ORM models before create_all
-from app.db.session import engine
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
 
-Base.metadata.create_all(bind=engine)
+_alembic = Config(str(PROJECT_ROOT / "alembic.ini"))
+_alembic.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
+_alembic.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+command.upgrade(_alembic, "head")

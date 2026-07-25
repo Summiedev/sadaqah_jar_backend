@@ -1,0 +1,215 @@
+from pydantic import BaseModel, EmailStr, field_validator
+
+from app.users.models import Role, UserMode
+
+PASSWORD_ERROR = (
+    "Password must be at least 8 characters and include a letter and a number"
+)
+
+
+def _validate_password_strength(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError(PASSWORD_ERROR)
+    if not any(c.isalpha() for c in v):
+        raise ValueError(PASSWORD_ERROR)
+    if not any(c.isdigit() for c in v):
+        raise ValueError(PASSWORD_ERROR)
+    return v
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str
+    username: str
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+
+# ---------------------------------------------------------------------------
+# Profile
+# ---------------------------------------------------------------------------
+
+
+class UserProfileResponse(BaseModel):
+    user_id: int
+    username: str
+    email: EmailStr
+    email_verified: bool
+    role: Role
+    mode: UserMode
+    first_name: str | None = None
+    last_name: str | None = None
+    avatar_data: str | None = None
+    timezone: str | None = None
+    locale: str | None = None
+    evidence_mode: bool = False
+    friday_reminder: bool = False
+    last_active: str | None = None
+    created_at: str | None = None
+
+
+class UserProfileUpdate(BaseModel):
+    username: str | None = None
+    email: EmailStr | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    avatar_data: str | None = None
+    timezone: str | None = None
+    locale: str | None = None
+
+
+class UserModeUpdate(BaseModel):
+    mode: UserMode
+
+
+class AvatarUpdate(BaseModel):
+    avatar_data: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Preferences
+# ---------------------------------------------------------------------------
+
+
+class UserPreferencesUpdate(BaseModel):
+    theme: str | None = None
+    language: str | None = None
+    notification_preferences: dict | None = None
+    reminder_preferences: dict | None = None
+    accessibility_preferences: dict | None = None
+    privacy_preferences: dict | None = None
+    timezone: str | None = None
+    evidence_mode: bool | None = None
+    friday_reminder: bool | None = None
+
+
+class UserPreferencesResponse(BaseModel):
+    theme: str
+    language: str
+    notification_preferences: dict
+    reminder_preferences: dict
+    accessibility_preferences: dict
+    privacy_preferences: dict
+    timezone: str | None = None
+    selected_mode: UserMode
+
+
+# ---------------------------------------------------------------------------
+# Sessions
+# ---------------------------------------------------------------------------
+
+
+class SessionResponse(BaseModel):
+    id: int
+    device_id: str | None
+    created_at: str | None
+    last_used_at: str | None
+    expires_at: str | None
+    is_current: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Devices
+# ---------------------------------------------------------------------------
+
+
+class DeviceResponse(BaseModel):
+    id: int
+    device_id: str
+    platform: str
+    device_name: str | None
+    app_version: str | None
+    has_push_token: bool
+    last_active: str | None
+    created_at: str | None
+
+
+class PushTokenRequest(BaseModel):
+    device_id: str
+    platform: str
+    device_name: str | None = None
+    app_version: str | None = None
+    push_token: str | None = None
+
+    @field_validator("platform")
+    @classmethod
+    def valid_platform(cls, v: str) -> str:
+        value = v.strip().lower()
+        if value not in ("ios", "android", "web"):
+            raise ValueError("platform must be 'ios', 'android', or 'web'")
+        return value
+
+    @field_validator("device_id")
+    @classmethod
+    def non_empty_device_id(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("device_id is required")
+        return v.strip()
+
+
+class DeviceUpdate(BaseModel):
+    device_name: str | None = None
+    push_token: str | None = None
+    app_version: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Email / password recovery
+# ---------------------------------------------------------------------------
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str = (
+        "If an account with that email exists, a password reset link has been sent."
+    )
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)

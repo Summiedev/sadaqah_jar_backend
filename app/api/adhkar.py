@@ -38,3 +38,33 @@ def get_morning_adhkar(
         }
         for row in rows
     ]
+
+
+@router.get("/evening")
+def get_evening_adhkar(
+    limit: int = Query(5, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return random evening adhkar entries, ordered randomly.
+    Mirrors get_morning_adhkar but filters by TimeOfDay.evening.
+    """
+    rows = (
+        db.query(Adhkar)
+        .filter(Adhkar.time_of_day == TimeOfDay.evening)
+        .order_by(func.random())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "id": row.id,
+            "text_arabic": row.text_arabic,
+            "text_translation": row.text_translation,
+            "source": row.source,
+            "repeat_count": row.repeat_count,
+        }
+        for row in rows
+    ]

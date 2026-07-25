@@ -1,38 +1,9 @@
-from jose import JWTError
-from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+"""Compatibility imports for legacy modules.
 
-from app.core.security import decode_access_token
-from app.db.session import get_db
-from app.models.user import User
+Authentication dependencies are owned by ``app.users.dependencies``.  This
+module remains until legacy product modules are migrated feature by feature.
+"""
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+from app.users.dependencies import get_current_user, oauth2_scheme
 
-
-def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
-) -> User:
-    credentials_exception = HTTPException(
-        status_code=401, detail="Invalid authentication credentials"
-    )
-    try:
-        payload = decode_access_token(token)
-        sub = payload.get("sub")
-        if sub is None:
-            raise credentials_exception
-        user_id = int(sub)
-    except JWTError:
-        raise credentials_exception
-
-    user = (
-        db.query(User)
-        .filter(
-            User.id == user_id,
-            User.deleted_at.is_(None),
-        )
-        .first()
-    )
-    if user is None:
-        raise credentials_exception
-    return user
+__all__ = ["get_current_user", "oauth2_scheme"]

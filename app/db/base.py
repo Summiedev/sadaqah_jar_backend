@@ -6,24 +6,19 @@ class Base(DeclarativeBase):
 
 
 # Import all models so Base.metadata is populated.
-import app.models.adhkar  # noqa: F401
-import app.models.badge  # noqa: F401
-import app.models.charity  # noqa: F401
-import app.models.device_token  # noqa: F401
-import app.models.donation_intent  # noqa: F401
-import app.models.email_verification_token  # noqa: F401
-import app.models.evidence  # noqa: F401
-import app.models.family_badge  # noqa: F401
-import app.models.family_jar  # noqa: F401
-import app.models.family_jar_log  # noqa: F401
-import app.models.family_jar_member  # noqa: F401
-import app.models.jar  # noqa: F401
-import app.models.leaderboard_season  # noqa: F401
-import app.models.notification  # noqa: F401
-import app.models.password_reset_token  # noqa: F401
-import app.models.refresh_token  # noqa: F401
-import app.models.sadaqah_act  # noqa: F401
-import app.models.sadaqah_log  # noqa: F401
-import app.models.user  # noqa: F401
-import app.models.user_badge  # noqa: F401
-import app.models.user_streak  # noqa: F401
+import app.models.badge  # noqa: E402,F401
+import app.models.charity  # noqa: E402,F401
+import app.models.donation_intent  # noqa: E402,F401
+import app.models.evidence  # noqa: E402,F401
+import app.family.models  # noqa: E402,F401
+import app.journey.models  # noqa: E402,F401
+import app.books.models  # noqa: E402,F401
+import app.models.jar  # noqa: E402,F401
+import app.models.leaderboard_season  # noqa: E402,F401
+import app.notifications.models  # noqa: E402,F401
+import app.models.sadaqah_act  # noqa: E402,F401
+import app.models.sadaqah_log  # noqa: E402,F401
+import app.models.user_badge  # noqa: E402,F401
+import app.models.user_streak  # noqa: E402,F401
+import app.users.models  # noqa: E402,F401
+import app.sadaqah.models  # noqa: E402,F401

@@ -7,7 +7,6 @@ from app.core.cache import cache_daily_acts
 from app.core.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.models.adhkar import Adhkar, TimeOfDay
-from app.models.family_jar_member import FamilyJarMember
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
 from app.services.analytics_service import compute_weekly_stats
@@ -28,7 +27,7 @@ def generate_daily_acts():
         candidate_acts = candidate_query.all()
 
         active_user_ids = [
-            row[0] for row in db.query(User.id).filter(User.is_active).all()
+            row[0] for row in db.query(User.id).filter(User.deleted_at.is_(None)).all()
         ]
 
         for user_id in active_user_ids:
@@ -53,7 +52,7 @@ def generate_daily_acts():
 def check_streak_integrity():
     db = SessionLocal()
     try:
-        users = db.query(User.id).filter(User.is_active).yield_per(500)
+        users = db.query(User.id).filter(User.deleted_at.is_(None)).yield_per(500)
 
         for row in users:
             validate_streak(db, row.id)
@@ -85,7 +84,7 @@ def send_morning_reminder():
         else:
             message = "Start your day with a good deed."
 
-        for row in db.query(User.id).filter(User.is_active).all():
+        for row in db.query(User.id).filter(User.deleted_at.is_(None)).all():
             create_notification(
                 db,
                 row.id,
@@ -119,25 +118,8 @@ def jar_completion_celebration(user_id: int):
 
 @celery_app.task
 def family_jar_completion_celebration(jar_id: int):
-    db = SessionLocal()
-    try:
-        member_ids = [
-            row.user_id
-            for row in db.query(FamilyJarMember.user_id)
-            .filter(FamilyJarMember.family_jar_id == jar_id)
-            .all()
-        ]
-        if not member_ids:
-            return
-        for uid in member_ids:
-            create_notification(
-                db,
-                uid,
-                title="Family jar complete",
-                message="Your family jar is full! Great teamwork!",
-            )
-    finally:
-        db.close()
+    """Legacy task - no-op. Family domain uses activity timeline instead."""
+    pass
 
 
 _FRIDAY_RECOMMENDATIONS_PUSH = [
@@ -166,7 +148,7 @@ def send_friday_reminder():
             day_index % len(_FRIDAY_RECOMMENDATIONS_PUSH)
         ]
 
-        for row in db.query(User.id).filter(User.friday_reminder).all():
+        for row in db.query(User.id).filter(User.deleted_at.is_(None)).all():
             create_notification(
                 db,
                 row.id,
@@ -195,7 +177,7 @@ def send_last_ten_nights_reminder():
         day_index = datetime.utcnow().timetuple().tm_yday
         message = _LAST_TEN_RECOMMENDATIONS[day_index % len(_LAST_TEN_RECOMMENDATIONS)]
 
-        for row in db.query(User.id).filter(User.is_active).all():
+        for row in db.query(User.id).filter(User.deleted_at.is_(None)).all():
             create_notification(
                 db,
                 row.id,

@@ -11,8 +11,10 @@ from app.core.rate_limit import check_rate_limit
 from app.db.deps import get_db
 from app.models.user import User
 from app.models.jar import Jar
-from app.models.sadaqah_act import SadaqahAct
+from app.models.sadaqah_act import SadaqahAct, SadaqahCategory
 from app.models.sadaqah_log import SadaqahLog
+from app.services.hijri_service import is_last_10_nights as hijri_last10
+from app.services.hijri_service import is_ramadan as hijri_is_ramadan
 
 from app.core.auth import get_current_user
 from app.core.cache import cache_daily_acts, get_cached_daily_acts
@@ -187,15 +189,50 @@ def _lookup_request_result(db: Session, user_id: int, request_id: str) -> dict |
     return _log_snapshot(log)
 
 
+_QUICK_ADD_TYPE_MAP = {
+    "Money": SadaqahCategory.donation,
+    "Food": SadaqahCategory.community,
+    "Kindness": SadaqahCategory.kindness,
+    "Dhikr": SadaqahCategory.dhikr,
+    "Prayer": SadaqahCategory.general,
+    "Remove harm": SadaqahCategory.character,
+    "Smile": SadaqahCategory.kindness,
+    "Time": SadaqahCategory.general,
+}
+
+
+def _get_or_create_quick_act(db: Session, act_type: str) -> SadaqahAct:
+    act = (
+        db.query(SadaqahAct)
+        .filter(SadaqahAct.title == act_type, SadaqahAct.verified)
+        .first()
+    )
+    if act is None:
+        category = _QUICK_ADD_TYPE_MAP.get(act_type, SadaqahCategory.general)
+        act = SadaqahAct(
+            title=act_type,
+            description=f"Quick add: {act_type}",
+            category=category,
+            verified=True,
+            difficulty=1,
+            reward_weight=1,
+        )
+        db.add(act)
+        db.flush()
+    return act
+
+
 @router.post("/jar/add-star")
 async def add_star(
-    act_id: int,
+    act_id: int = 0,
+    type: str | None = None,
+    note: str | None = None,
     request_id: str | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if act_id <= 0:
-        raise HTTPException(status_code=400, detail="Invalid act ID")
+    if act_id <= 0 and not type:
+        raise HTTPException(status_code=400, detail="Either act_id or type is required")
 
     user_id = current_user.id
     request_id = request_id.strip() if request_id else None
@@ -214,14 +251,17 @@ async def add_star(
             if existing_request is not None:
                 return existing_request
 
-        # Validate the act exists and is verified.
-        act = (
-            db.query(SadaqahAct)
-            .filter(SadaqahAct.id == act_id, SadaqahAct.verified)
-            .first()
-        )
-        if not act:
-            raise HTTPException(status_code=404, detail="Act not found")
+        if type:
+            act = _get_or_create_quick_act(db, type)
+            act_id = act.id
+        else:
+            act = (
+                db.query(SadaqahAct)
+                .filter(SadaqahAct.id == act_id, SadaqahAct.verified)
+                .first()
+            )
+            if not act:
+                raise HTTPException(status_code=404, detail="Act not found")
 
         # Ensure we haven't already logged this act today for this user.
         existing = (
@@ -298,6 +338,7 @@ async def add_star(
             stars_earned=multiplier,
             friday_boost=friday,
             ramadan_bonus=ramadan,
+            note=note,
             response_current_stars=active_jar.current_stars,
             response_capacity=active_jar.capacity,
             response_completed_at=active_jar.completed_at,

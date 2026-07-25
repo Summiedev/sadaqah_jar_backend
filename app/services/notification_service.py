@@ -2,7 +2,7 @@
 
 from sqlalchemy.orm import Session
 
-from app.models.notification import Notification
+from app.notifications.models import Notification
 
 
 def create_notification(
@@ -10,13 +10,17 @@ def create_notification(
     user_id: int,
     title: str,
     message: str,
+    category: str | None = None,
+    action: str | None = None,
     commit: bool = True,
 ):
     """Create a durable in-app notification row."""
     notification = Notification(
         user_id=user_id,
+        category=category,
         title=title,
         message=message,
+        action=action,
     )
     db.add(notification)
     if commit:
