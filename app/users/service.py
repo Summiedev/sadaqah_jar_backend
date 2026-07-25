@@ -420,11 +420,18 @@ def google_auth(db: Session, payload: GoogleAuthRequest) -> dict:
         raise InvalidTokenException("Invalid Google ID token") from exc
 
     google_id = data.get("sub")
-    email = data.get("email")
+    email = data.get("email", "").lower()
     email_verified = data.get("email_verified") == "true"
+    token_audience = data.get("aud")
 
-    if not google_id or not email or not email_verified:
+    if not google_id or not email:
         raise GoogleOAuthException("Google token missing required fields")
+
+    if not email_verified:
+        raise GoogleOAuthException("Google email is not verified")
+
+    if not settings.GOOGLE_CLIENT_ID or token_audience != settings.GOOGLE_CLIENT_ID:
+        raise InvalidTokenException("Google ID token audience mismatch")
 
     user = get_user_by_google_id(db, google_id)
     if user is None:
@@ -445,20 +452,6 @@ def google_auth(db: Session, payload: GoogleAuthRequest) -> dict:
                 first_name=data.get("given_name"),
                 last_name=data.get("family_name"),
             )
-        link_google_account(db, user, google_id)
+        if user.google_id is None:
+            link_google_account(db, user, google_id)
     return _issue_tokens(db, user)
-
-
-def get_google_auth_url() -> dict:
-    import urllib.parse
-
-    params = {
-        "client_id": settings.GOOGLE_CLIENT_ID,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-        "response_type": "code",
-        "scope": "openid email profile",
-        "access_type": "offline",
-        "prompt": "consent",
-    }
-    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
-    return {"auth_url": url}

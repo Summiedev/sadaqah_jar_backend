@@ -18,6 +18,7 @@ os.environ.setdefault("ENV", "test")
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6399/15")
 os.environ.setdefault("JWT_SECRET", "test-secret-must-have-at-least-32-characters")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402

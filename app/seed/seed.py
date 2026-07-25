@@ -128,21 +128,21 @@ class DatabaseSeeder:
     # Users
     # ------------------------------------------------------------------
     def seed_users(self) -> list[User]:
-        names = [
+        seed_profiles = [
             ("summie", "summie@admin.com", "ADMIN"),
-            ("fatima", "fatima@test.com", "USER"),
-            ("ali", "ali@test.com", "USER"),
-            ("aisha", "aisha@test.com", "USER"),
-            ("omar", "omar@test.com", "USER"),
-            ("zahra", "zahra@test.com", "USER"),
-            ("hassan", "hassan@test.com", "USER"),
-            ("leila", "leila@test.com", "USER"),
-            ("karim", "karim@test.com", "USER"),
-            ("amira", "amira@test.com", "USER"),
+            ("fatima", "fatima@example.com", "USER"),
+            ("ali", "ali@example.com", "USER"),
+            ("aisha", "aisha@example.com", "USER"),
+            ("omar", "omar@example.com", "USER"),
+            ("zahra", "zahra@example.com", "USER"),
+            ("hassan", "hassan@example.com", "USER"),
+            ("leila", "leila@example.com", "USER"),
+            ("karim", "karim@example.com", "USER"),
+            ("amira", "amira@example.com", "USER"),
         ]
 
         users: list[User] = []
-        for username, email, role in names:
+        for username, email, role in seed_profiles:
             user = self.db.query(User).filter(User.email == email).first()
             if user:
                 user.username = username

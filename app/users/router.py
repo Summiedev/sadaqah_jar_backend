@@ -16,7 +16,6 @@ from app.users.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     GoogleAuthRequest,
-    GoogleUrlResponse,
     PushTokenRequest,
     RefreshRequest,
     ResendVerificationRequest,
@@ -88,11 +87,6 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: DbDep)
 def resend_verification(payload: ResendVerificationRequest, request: Request, db: DbDep):
     enforce_auth_rate_limit(request, "resend-verification", limit=3, period=900)
     return service.resend_verification(db, payload)
-
-
-@auth_router.get("/google/url", response_model=GoogleUrlResponse)
-def google_auth_url():
-    return service.get_google_auth_url()
 
 
 @auth_router.post("/google", response_model=TokenResponse)

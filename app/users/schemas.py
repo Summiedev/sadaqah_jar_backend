@@ -66,10 +66,6 @@ class GoogleAuthRequest(BaseModel):
     id_token: str
 
 
-class GoogleUrlResponse(BaseModel):
-    auth_url: str
-
-
 # ---------------------------------------------------------------------------
 # Profile
 # ---------------------------------------------------------------------------
