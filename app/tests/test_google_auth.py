@@ -7,6 +7,9 @@ from fastapi.testclient import TestClient
 
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 
+from app.core.config import settings
+settings.GOOGLE_CLIENT_ID = "test-google-client-id"
+
 from app.main import app
 from app.db.session import SessionLocal
 from app.models.user import User
