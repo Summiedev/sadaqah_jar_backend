@@ -52,6 +52,24 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class ResendVerificationResponse(BaseModel):
+    message: str = (
+        "If an account with that email exists and is not verified, a new verification link has been sent."
+    )
+
+
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+
+class GoogleUrlResponse(BaseModel):
+    auth_url: str
+
+
 # ---------------------------------------------------------------------------
 # Profile
 # ---------------------------------------------------------------------------

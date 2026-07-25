@@ -9,14 +9,18 @@ from app.users.dependencies import enforce_auth_rate_limit, get_current_user
 from app.users.models import User
 from app.users.repository import hash_refresh_token
 from app.users.schemas import (
-    ChangePasswordRequest,
     AvatarUpdate,
+    ChangePasswordRequest,
     DeviceResponse,
     DeviceUpdate,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
+    GoogleAuthRequest,
+    GoogleUrlResponse,
     PushTokenRequest,
     RefreshRequest,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
     ResetPasswordRequest,
     SessionResponse,
     TokenResponse,
@@ -78,6 +82,22 @@ def verify_email(db: DbDep, token: str = Query(...)):
 def forgot_password(payload: ForgotPasswordRequest, request: Request, db: DbDep):
     enforce_auth_rate_limit(request, "forgot-password")
     return service.forgot_password(db, payload.email)
+
+
+@auth_router.post("/resend-verification", response_model=ResendVerificationResponse)
+def resend_verification(payload: ResendVerificationRequest, request: Request, db: DbDep):
+    enforce_auth_rate_limit(request, "resend-verification", limit=3, period=900)
+    return service.resend_verification(db, payload)
+
+
+@auth_router.get("/google/url", response_model=GoogleUrlResponse)
+def google_auth_url():
+    return service.get_google_auth_url()
+
+
+@auth_router.post("/google", response_model=TokenResponse)
+def google_auth(payload: GoogleAuthRequest, db: DbDep):
+    return service.google_auth(db, payload)
 
 
 @auth_router.post("/reset-password")

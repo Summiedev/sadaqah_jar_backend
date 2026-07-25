@@ -1,52 +1,65 @@
 """
-Lightweight email service using stdlib smtplib.
+Email service backed by Resend via direct HTTP API.
 
-No new dependency over requirements.txt — only Python's built-in smtplib
-and the standard email MIME utilities are used.  If SMTP is misconfigured
-(empty host or connection failure) the error is logged and the system
-continues — never break a registration or password-reset flow over email.
+Uses httpx (already in requirements.txt) — no extra dependency needed.
 """
 
+from __future__ import annotations
+
 import logging
-import smtplib
-import ssl
-from email.mime.text import MIMEText
+import os
+
+import httpx
 
 from app.core.config import settings
+from app.emails.templates import password_reset_email_html, verification_email_html
 
 logger = logging.getLogger(__name__)
 
 
+def _resend_api_key() -> str | None:
+    key = getattr(settings, "RESEND_API_KEY", "") or os.getenv("RESEND_API_KEY", "")
+    return key if key else None
+
+
 def send_email(recipient: str, subject: str, html_body: str) -> bool:
-    """Send an HTML email.  Returns True if the message was accepted
-    by the SMTP relay, False otherwise."""
-    if (
-        not settings.SMTP_HOST
-        or settings.SMTP_HOST == "localhost"
-        and not settings.SMTP_USER
-    ):
+    """Send an HTML email via Resend. Returns True on success, False otherwise."""
+    api_key = _resend_api_key()
+    if not api_key:
         logger.warning(
-            "SMTP not configured — email would have been sent to %s: %s",
+            "RESEND_API_KEY not configured — email would have been sent to %s: %s",
             recipient,
             subject,
         )
-        return True  # don't break the caller
-
-    msg = MIMEText(html_body, "html", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = settings.FROM_EMAIL
-    msg["To"] = recipient
+        return True
 
     try:
-        ctx = ssl.create_default_context()
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
-            if settings.SMTP_PORT == 587:
-                server.starttls(context=ctx)
-            if settings.SMTP_USER:
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(settings.FROM_EMAIL, [recipient], msg.as_string())
+        resp = httpx.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "from": settings.FROM_EMAIL,
+                "to": [recipient],
+                "subject": subject,
+                "html": html_body,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
         logger.info("Email sent to %s: %s", recipient, subject)
         return True
     except Exception as exc:
         logger.error("Failed to send email to %s: %s", recipient, exc)
         return False
+
+
+def send_verification_email(recipient: str, token: str, user_name: str | None = None) -> bool:
+    subject = "Verify your email address"
+    html_body = verification_email_html(token, user_name)
+    return send_email(recipient, subject, html_body)
+
+
+def send_password_reset_email(recipient: str, token: str) -> bool:
+    subject = "Reset your password"
+    html_body = password_reset_email_html(token)
+    return send_email(recipient, subject, html_body)

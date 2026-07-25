@@ -37,3 +37,8 @@ class UsernameTakenException(ConflictException):
 class ForbiddenException(ResourceNotFoundException):
     def __init__(self, message: str = "Operation not permitted"):
         super().__init__(message)
+
+
+class GoogleOAuthException(AuthenticationException):
+    def __init__(self, message: str = "Google authentication failed"):
+        super().__init__(message)

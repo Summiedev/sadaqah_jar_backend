@@ -39,6 +39,16 @@ def get_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
 
 
+def get_user_by_google_id(db: Session, google_id: str) -> User | None:
+    return db.scalar(select(User).where(User.google_id == google_id))
+
+
+def link_google_account(db: Session, user: User, google_id: str) -> None:
+    user.google_id = google_id
+    db.add(user)
+    db.commit()
+
+
 def create_user(
     db: Session,
     *,

@@ -1,12 +1,18 @@
 import json
 
+import httpx
+import secrets
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.exceptions import BusinessRuleException
 from app.core.security import create_access_token, hash_password, verify_password
+from app.services.email_service import send_verification_email
 from app.users import repository as repo
 from app.users.exceptions import (
     EmailTakenException,
     ForbiddenException,
+    GoogleOAuthException,
     InvalidCredentialsException,
     InvalidTokenException,
     ResourceNotFoundException,
@@ -16,16 +22,20 @@ from app.users.models import User, UserPreference, UserSession
 from app.users.repository import (
     create_session,
     get_valid_session,
+    link_google_account,
     revoke_session,
     revoke_session_by_id,
     revoke_all_sessions,
     list_sessions,
+    get_user_by_google_id,
 )
 from app.users.schemas import (
     ChangePasswordRequest,
     DeviceResponse,
     ForgotPasswordResponse,
+    GoogleAuthRequest,
     PushTokenRequest,
+    ResendVerificationRequest,
     SessionResponse,
     UserModeUpdate,
     UserPreferencesResponse,
@@ -364,3 +374,91 @@ def change_password(db: Session, user: User, payload: ChangePasswordRequest) -> 
     db.add(user)
     db.commit()
     repo.revoke_all_sessions(db, user.id)
+
+
+# ---------------------------------------------------------------------------
+# Resend verification
+# ---------------------------------------------------------------------------
+
+
+def resend_verification(db: Session, payload: ResendVerificationRequest) -> dict:
+    email = validate_email(payload.email) or ""
+    user = repo.get_user_by_email(db, email)
+    if user is None or user.deleted_at is not None:
+        return {"message": "If an account with that email exists and is not verified, a new verification link has been sent."}
+    if user.email_verified:
+        raise BusinessRuleException("Email is already verified")
+    raw_token = repo.create_email_verification(db, user.id)
+    send_verification_email(user.email, raw_token, user.first_name or user.username)
+    return {"message": "If an account with that email exists and is not verified, a new verification link has been sent."}
+
+
+# ---------------------------------------------------------------------------
+# Google OAuth
+# ---------------------------------------------------------------------------
+
+
+def _derive_username(email: str) -> str:
+    local = email.split("@")[0]
+    safe = "".join(c for c in local if c.isalnum() or c in "_-")
+    return safe[:50].strip() or "user"
+
+
+def google_auth(db: Session, payload: GoogleAuthRequest) -> dict:
+    id_token = payload.id_token.strip()
+    if not id_token:
+        raise InvalidTokenException("Missing Google ID token")
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": id_token},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as exc:
+        raise InvalidTokenException("Invalid Google ID token") from exc
+
+    google_id = data.get("sub")
+    email = data.get("email")
+    email_verified = data.get("email_verified") == "true"
+
+    if not google_id or not email or not email_verified:
+        raise GoogleOAuthException("Google token missing required fields")
+
+    user = get_user_by_google_id(db, google_id)
+    if user is None:
+        user = repo.get_user_by_email(db, email)
+        if user is None:
+            base_username = _derive_username(email)
+            username = base_username
+            counter = 1
+            while repo.get_user_by_username(db, username) is not None:
+                username = f"{base_username}{counter}"
+                counter += 1
+            random_password = secrets.token_urlsafe(32)
+            user = repo.create_user(
+                db,
+                username=username,
+                email=email,
+                hashed_password=hash_password(random_password),
+                first_name=data.get("given_name"),
+                last_name=data.get("family_name"),
+            )
+        link_google_account(db, user, google_id)
+    return _issue_tokens(db, user)
+
+
+def get_google_auth_url() -> dict:
+    import urllib.parse
+
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+    return {"auth_url": url}

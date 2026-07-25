@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # Public-facing base URL for email links (no trailing slash)
     APP_URL: str = "http://localhost:8000"
 
+    GOOGLE_CLIENT_ID: str = "your-google-client-id"
+    GOOGLE_CLIENT_SECRET: str = "your-google-client-secret"
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
+
+    RESEND_API_KEY: str = ""
+
     @field_validator("JWT_SECRET")
     @classmethod
     def validate_jwt_secret(cls, value: str) -> str:

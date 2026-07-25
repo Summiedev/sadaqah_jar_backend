@@ -43,6 +43,7 @@ class User(Base):
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False), default=Role.USER)
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    google_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     avatar_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_active: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, index=True)
