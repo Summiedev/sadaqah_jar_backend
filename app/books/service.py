@@ -6,6 +6,7 @@ from app.books.schemas import (
     BookCreate,
     BookListResponse,
     BookRead,
+    BookDetail,
     BookUpdate,
 )
 
@@ -21,7 +22,7 @@ def list_books(db, offset: int = 0, limit: int = 50, published_only: bool = True
     return BookListResponse(total=total, limit=limit, offset=offset, data=data)
 
 
-def get_book_detail(db, book_id: int) -> BookRead | None:
+def get_book_detail(db, book_id: int) -> BookDetail | None:
     book = repo.get_book(db, book_id)
     if not book:
         return None
@@ -126,7 +127,7 @@ def _serialize(db, book) -> BookRead:
     )
 
 
-def _serialize_detail(db, book) -> BookRead:
+def _serialize_detail(db, book) -> BookDetail:
     base = _serialize(db, book)
     chapters = repo.list_chapters(db, book.id)
     chapter_reads = [
@@ -140,7 +141,7 @@ def _serialize_detail(db, book) -> BookRead:
         )
         for c in chapters
     ]
-    return BookRead(
+    return BookDetail(
         **base.model_dump(),
         chapters=chapter_reads,
     )

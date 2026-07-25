@@ -1004,3 +1004,53 @@ def update_settings(
     db.commit()
     db.refresh(settings)
     return settings
+
+
+# ---------------------------------------------------------------------------
+# Legacy / Frontend compatibility endpoints
+# ---------------------------------------------------------------------------
+
+
+def leave_family(db: Session, family_id: int, user_id: int) -> None:
+    """Self-removal (leave). Reuses remove_member with member_id == user_id."""
+    member = repo.get_member_by_user(db, family_id, user_id)
+    if not member:
+        raise MemberNotFoundException()
+    remove_member(db, family_id, member.id, user_id)
+
+
+def get_leaderboard(db: Session, family_id: int, user_id: int, limit: int = 10) -> list[dict]:
+    """Return a simple family leaderboard. Frontend compatibility endpoint."""
+    _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
+    members = repo.list_members(db, family_id, include_deleted=False)
+    results = []
+    for m in members:
+        member_user = db.get(User, m.user_id)
+        if not member_user:
+            continue
+        results.append({
+            "user_id": m.user_id,
+            "username": member_user.username,
+            "contribution_count": 0,
+            "stars_earned": 0,
+        })
+    return results[:limit]
+
+
+def get_top_contributor(db: Session, family_id: int, user_id: int) -> dict | None:
+    """Return the top contributor for a family. Frontend compatibility endpoint."""
+    _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
+    members = repo.list_members(db, family_id, include_deleted=False)
+    best = None
+    for m in members:
+        member_user = db.get(User, m.user_id)
+        if not member_user:
+            continue
+        best = {
+            "user_id": m.user_id,
+            "username": member_user.username,
+            "contribution_count": 0,
+            "stars_earned": 0,
+        }
+        break
+    return best

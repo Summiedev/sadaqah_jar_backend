@@ -57,6 +57,7 @@ def create_admin_book(
     admin=Depends(require_admin),
 ):
     book = service.create_book(db, payload)
+    db.commit()
     return _serialize(book)
 
 
@@ -70,6 +71,7 @@ def update_admin_book(
     book = service.update_book(db, book_id, payload)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
+    db.commit()
     return _serialize(book)
 
 
@@ -80,6 +82,7 @@ def delete_admin_book(
     admin=Depends(require_admin),
 ):
     service.delete_book(db, book_id)
+    db.commit()
     return {"message": "Book deleted"}
 
 
@@ -108,6 +111,7 @@ def create_admin_chapter(
     chapter = service.create_chapter(db, book_id, payload)
     if not chapter:
         raise HTTPException(status_code=404, detail="Book not found")
+    db.commit()
     return _serialize_chapter(chapter)
 
 
@@ -122,6 +126,7 @@ def update_admin_chapter(
     chapter = service.update_chapter(db, chapter_id, payload)
     if not chapter:
         raise HTTPException(status_code=404, detail="Chapter not found")
+    db.commit()
     return _serialize_chapter(chapter)
 
 
@@ -133,4 +138,5 @@ def delete_admin_chapter(
     admin=Depends(require_admin),
 ):
     service.delete_chapter(db, chapter_id)
+    db.commit()
     return {"message": "Chapter deleted"}

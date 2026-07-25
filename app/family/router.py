@@ -62,6 +62,27 @@ def create_family(payload: FamilyCreate, db: DbDep, current_user: CurrentUser):
     )
 
 
+@router.post("/create", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+def create_family_legacy(
+    db: DbDep,
+    current_user: CurrentUser,
+    name: str = Query(..., min_length=1),
+    capacity: int = Query(33, ge=1),
+):
+    """Legacy alias for POST /family/. Accepts query params for frontend compatibility."""
+    family, event = service.create_family(db, FamilyCreate(name=name, cover_icon=None), current_user.id)
+    return Envelope(
+        data={
+            "id": family.id,
+            "name": family.name,
+            "invite_code": family.invite_code,
+            "cover_icon": family.cover_icon,
+            "created_at": family.created_at.isoformat(),
+        },
+        message="Family created",
+    )
+
+
 @router.get("/{family_id}", response_model=Envelope)
 def get_family(family_id: int, db: DbDep, current_user: CurrentUser):
     """Get family detail with members and goals."""
@@ -141,6 +162,27 @@ def remove_member(
     """Remove a member. Admin+ or self-removal (leave)."""
     service.remove_member(db, family_id, member_id, current_user.id)
     return Envelope(message="Member removed")
+
+
+@router.post("/{family_id}/leave", response_model=Envelope)
+def leave_family(family_id: int, db: DbDep, current_user: CurrentUser):
+    """Leave a family. Self-removal."""
+    service.leave_family(db, family_id, current_user.id)
+    return Envelope(message="Left family")
+
+
+@router.get("/{family_id}/leaderboard", response_model=Envelope)
+def get_leaderboard(family_id: int, db: DbDep, current_user: CurrentUser, limit: int = Query(10, ge=1, le=50)):
+    """Family leaderboard."""
+    data = service.get_leaderboard(db, family_id, current_user.id, limit=limit)
+    return Envelope(data=data)
+
+
+@router.get("/{family_id}/top-contributor", response_model=Envelope)
+def get_top_contributor(family_id: int, db: DbDep, current_user: CurrentUser):
+    """Top contributor for a family."""
+    data = service.get_top_contributor(db, family_id, current_user.id)
+    return Envelope(data=data)
 
 
 # ---------------------------------------------------------------------------
