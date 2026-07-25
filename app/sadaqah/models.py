@@ -85,7 +85,7 @@ class ActivityCompletion(Base, TimestampMixin, SoftDeleteMixin):
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     family_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("family.id", ondelete="SET NULL"), nullable=True, index=True
+        ForeignKey("families.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     completed_at: Mapped[datetime] = mapped_column(
@@ -135,7 +135,7 @@ class ActivitySession(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     family_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("family.id", ondelete="SET NULL"), nullable=True, index=True
+        ForeignKey("families.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     __table_args__ = (
