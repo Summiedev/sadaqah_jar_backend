@@ -28,10 +28,14 @@ def db():
 
 def _clean(email: str, username: str):
     db = SessionLocal()
-    db.query(User).filter(User.email == email).delete()
-    db.query(User).filter(User.username == username).delete()
-    db.commit()
-    db.close()
+    try:
+        db.query(User).filter(User.email == email).delete()
+        db.query(User).filter(User.username == username).delete()
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
 
 
 def _mock_tokeninfo_response(email="google-user@example.com", google_id="google-123456789"):
@@ -50,8 +54,13 @@ def _mock_client(email="google-user@example.com", google_id="google-123456789"):
     mock_response = MagicMock()
     mock_response.raise_for_status.return_value = None
     mock_response.json.return_value = _mock_tokeninfo_response(email, google_id)
+
     mock_client = MagicMock()
-    mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+    mock_client_instance = MagicMock()
+    mock_client_instance.get.return_value = mock_response
+    mock_client_instance.__enter__.return_value = mock_client_instance
+    mock_client_instance.__exit__ = MagicMock(return_value=False)
+    mock_client.return_value = mock_client_instance
     return mock_client
 
 

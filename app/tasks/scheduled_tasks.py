@@ -1,17 +1,19 @@
-import random
-from datetime import datetime
-
-from sqlalchemy import func
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from app.core.cache import cache_daily_acts
 from app.core.celery_app import celery_app
 from app.db.session import SessionLocal
-from app.models.adhkar import Adhkar, TimeOfDay
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
+from app.notifications.models import NotificationTemplate, ScheduledNotification
 from app.services.analytics_service import compute_weekly_stats
 from app.services.notification_service import create_notification
 from app.services.personalization_service import generate_personalized_acts
+from app.services.push_notification_service import send_push_notification
+from app.services.prayer_reminder_service import schedule_prayer_relative_templates
+from app.services.prayer_time_service import PrayerTimeLookupError, get_prayer_times
+from app.services.reminder_content_service import resolve_reminder_content
 from app.services.ramadan_service import is_ramadan
 from app.services.streak_service import validate_streak
 
@@ -49,6 +51,79 @@ def generate_daily_acts():
 
 
 @celery_app.task
+def schedule_daily_prayer_reminders():
+    """Calculate and enqueue today's prayer-relative reminders per user.
+
+    The durable schedule table makes this task safe to retry and gives later
+    delivery stages an audit trail instead of relying solely on broker ETA.
+    """
+    db = SessionLocal()
+    try:
+        users = (
+            db.query(User)
+            .filter(
+                User.deleted_at.is_(None),
+                User.latitude.is_not(None),
+                User.longitude.is_not(None),
+            )
+            .yield_per(250)
+        )
+        for user in users:
+            timezone_name = user.preferences.timezone if user.preferences else None
+            if not timezone_name:
+                continue
+            try:
+                local_date = datetime.now(ZoneInfo(timezone_name)).date()
+                times = get_prayer_times(
+                    user.latitude, user.longitude, local_date, timezone_name
+                )
+                schedules = schedule_prayer_relative_templates(
+                    db, user_id=user.id, local_date=local_date, prayer_times=times
+                )
+                db.commit()
+                for schedule in schedules:
+                    result = deliver_scheduled_notification.apply_async(
+                        args=[schedule.id], eta=schedule.scheduled_for.replace(tzinfo=timezone.utc)
+                    )
+                    schedule.celery_task_id = result.id
+                if schedules:
+                    db.commit()
+            except (PrayerTimeLookupError, ValueError):
+                db.rollback()
+    finally:
+        db.close()
+
+
+@celery_app.task
+def deliver_scheduled_notification(schedule_id: int):
+    """Deliver a persisted reminder once; push transport is added in Stage 2."""
+    db = SessionLocal()
+    try:
+        schedule = db.get(ScheduledNotification, schedule_id)
+        if schedule is None or schedule.status != "scheduled":
+            return
+        template = db.get(NotificationTemplate, schedule.template_id)
+        if template is None or not template.enabled:
+            schedule.status = "cancelled"
+            db.commit()
+            return
+        title, message = resolve_reminder_content(db, schedule, template)
+        create_notification(db, schedule.user_id, title=title, message=message, category=template.category)
+        send_push_notification(
+            db,
+            user_id=schedule.user_id,
+            title=title,
+            body=message,
+            data={"category": template.category, "template_key": template.key},
+        )
+        schedule.status = "delivered"
+        schedule.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.commit()
+    finally:
+        db.close()
+
+
+@celery_app.task
 def check_streak_integrity():
     db = SessionLocal()
     try:
@@ -62,37 +137,8 @@ def check_streak_integrity():
 
 @celery_app.task
 def send_morning_reminder():
-    db = SessionLocal()
-    try:
-        adhkar_count = (
-            db.query(func.count(Adhkar.id))
-            .filter(Adhkar.time_of_day == TimeOfDay.morning)
-            .scalar()
-            or 0
-        )
-
-        if adhkar_count > 0:
-            offset = random.randint(0, adhkar_count - 1)
-            featured = (
-                db.query(Adhkar)
-                .filter(Adhkar.time_of_day == TimeOfDay.morning)
-                .offset(offset)
-                .limit(1)
-                .first()
-            )
-            message = f"Morning dhikr: {featured.text_translation[:120]}..."
-        else:
-            message = "Start your day with a good deed."
-
-        for row in db.query(User.id).filter(User.deleted_at.is_(None)).all():
-            create_notification(
-                db,
-                row.id,
-                title="Morning reminder",
-                message=message,
-            )
-    finally:
-        db.close()
+    """Compatibility entry point; morning adhkar is prayer-relative now."""
+    schedule_daily_prayer_reminders()
 
 
 @celery_app.task
@@ -122,14 +168,6 @@ def family_jar_completion_celebration(jar_id: int):
     pass
 
 
-_FRIDAY_RECOMMENDATIONS_PUSH = [
-    "Send abundant salawat upon the Prophet today.",
-    "Read Surah Al-Kahf - it is a light between two Fridays.",
-    "Give charity today - Friday charity is specially multiplied.",
-    "Make dua in the last hour after Asr - it is the hour of acceptance.",
-    "Reach out to a relative to strengthen family ties.",
-]
-
 _LAST_TEN_RECOMMENDATIONS = [
     "Last 10 nights: Wake up for Qiyam al-Layl and pour your heart out to Allah.",
     "Last 10 nights: Increase your dhikr - SubhanAllah, Alhamdulillah, Allahu Akbar.",
@@ -141,22 +179,8 @@ _LAST_TEN_RECOMMENDATIONS = [
 
 @celery_app.task
 def send_friday_reminder():
-    db = SessionLocal()
-    try:
-        day_index = datetime.utcnow().isocalendar()[1] * 7 + datetime.utcnow().weekday()
-        message = _FRIDAY_RECOMMENDATIONS_PUSH[
-            day_index % len(_FRIDAY_RECOMMENDATIONS_PUSH)
-        ]
-
-        for row in db.query(User.id).filter(User.deleted_at.is_(None)).all():
-            create_notification(
-                db,
-                row.id,
-                title="Friday reminder",
-                message=message,
-            )
-    finally:
-        db.close()
+    """Compatibility entry point; Friday delivery uses the shared FCM path."""
+    schedule_daily_prayer_reminders()
 
 
 @celery_app.task

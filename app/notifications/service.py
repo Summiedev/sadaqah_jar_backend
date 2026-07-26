@@ -1,5 +1,7 @@
 """Notifications domain service layer."""
 
+import json
+
 from sqlalchemy.orm import Session
 
 from app.notifications import repository as repo
@@ -12,6 +14,16 @@ from app.notifications.schemas import (
     NotificationResponse,
     NotificationTemplateResponse,
 )
+
+
+def _strategy_config(value: str | dict | None) -> dict | None:
+    if isinstance(value, dict) or value is None:
+        return value
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError:
+        return None
+    return decoded if isinstance(decoded, dict) else None
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +140,7 @@ def list_templates(
             message_template=t.message_template,
             category=t.category,
             strategy=t.strategy,
-            strategy_config=t.strategy_config,
+            strategy_config=_strategy_config(t.strategy_config),
             enabled=t.enabled,
             created_at=t.created_at,
             updated_at=t.updated_at,
@@ -148,7 +160,7 @@ def get_template(db: Session, key: str) -> NotificationTemplateResponse:
         message_template=template.message_template,
         category=template.category,
         strategy=template.strategy,
-        strategy_config=template.strategy_config,
+        strategy_config=_strategy_config(template.strategy_config),
         enabled=template.enabled,
         created_at=template.created_at,
         updated_at=template.updated_at,
@@ -164,7 +176,7 @@ def create_template(db: Session, payload: dict) -> NotificationTemplateResponse:
         message_template=template.message_template,
         category=template.category,
         strategy=template.strategy,
-        strategy_config=template.strategy_config,
+        strategy_config=_strategy_config(template.strategy_config),
         enabled=template.enabled,
         created_at=template.created_at,
         updated_at=template.updated_at,
@@ -182,7 +194,7 @@ def update_template(db: Session, key: str, payload: dict) -> NotificationTemplat
         message_template=template.message_template,
         category=template.category,
         strategy=template.strategy,
-        strategy_config=template.strategy_config,
+        strategy_config=_strategy_config(template.strategy_config),
         enabled=template.enabled,
         created_at=template.created_at,
         updated_at=template.updated_at,

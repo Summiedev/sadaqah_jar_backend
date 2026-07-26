@@ -42,3 +42,11 @@ class AdhkarFavoriteResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ReadingProgressResponse(BaseModel):
+    book_id: int
+    chapter_number: int
+    last_read_at: datetime
+
+    model_config = {"from_attributes": True}

@@ -20,6 +20,7 @@ Usage:
 """
 
 import argparse
+import json
 import random
 import sys
 from datetime import datetime, timedelta, date
@@ -70,7 +71,7 @@ from app.journey.models import (
     JourneyAdhkarProgress,
     JourneyAdhkarFavorite,
 )
-from app.notifications.models import Notification
+from app.notifications.models import Notification, NotificationTemplate, SchedulingStrategy
 from app.books.models import Book, BookChapter
 
 
@@ -584,6 +585,34 @@ class DatabaseSeeder:
         self.db.commit()
         print(f"[OK] Created notifications for {len(users)} users")
 
+    def seed_notification_templates(self) -> None:
+        """Seed editable reminder definitions; runtime tasks contain no wording."""
+        templates = [
+            ("morning_adhkar", "Morning adhkar", "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×", "adhkar", {"anchor": "fajr", "offset_minutes": 30, "content_source": "morning_adhkar"}),
+            ("evening_adhkar", "Evening adhkar", "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×", "adhkar", {"anchor": "asr", "offset_minutes": 30, "content_source": "evening_adhkar"}),
+            ("salatul_duha", "Salatul Duha", "A gentle window for two rak'ahs of Duha is open.", "prayer", {"anchor": "duha_start", "offset_minutes": 15}),
+            ("witr_reminder", "Remember Witr", "Complete your night with Witr before sleep.", "prayer", {"anchor": "isha", "offset_minutes": 45}),
+            ("daily_sadaqah", "Today's sadaqah", "{act_title}: {act_description}", "charity", {"anchor": "zuhr", "offset_minutes": 30, "content_source": "personalized_sadaqah"}),
+            ("quran_reminder", "A moment with the Quran", "Open the Quran today, even for a few verses, and reflect on what you read.", "reading", {"anchor": "maghrib", "offset_minutes": 30}),
+            ("friday_reminder", "Friday reminder", "{message}", "islamic_occasions", {"anchor": "zuhr", "offset_minutes": -30, "days_of_week": [4], "content_source": "rotating_messages", "messages": ["Send abundant salawat upon the Prophet today.", "Read Surah Al-Kahf - it is a light between two Fridays.", "Give charity today - Friday charity is specially multiplied.", "Make dua in the last hour after Asr - it is the hour of acceptance.", "Reach out to a relative to strengthen family ties."]}),
+        ]
+        created = 0
+        for key, title, message, category, config in templates:
+            if self.db.query(NotificationTemplate).filter(NotificationTemplate.key == key).first():
+                continue
+            self.db.add(NotificationTemplate(
+                key=key,
+                title_template=title,
+                message_template=message,
+                category=category,
+                strategy=SchedulingStrategy.PRAYER_RELATIVE.value,
+                strategy_config=json.dumps(config),
+                enabled=True,
+            ))
+            created += 1
+        self.db.commit()
+        print(f"[OK] Created {created} notification templates")
+
     # ------------------------------------------------------------------
     # Admin badges
     # ------------------------------------------------------------------
@@ -728,6 +757,7 @@ class DatabaseSeeder:
             self.seed_journey_reflections(users)
             self.seed_journey_adhkar(users)
             self.seed_notifications(users)
+            self.seed_notification_templates()
             self.seed_badges(users)
             self.seed_books()
 

@@ -18,6 +18,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.scheduled_tasks.generate_daily_acts",
         "schedule": crontab(hour=0, minute=1),
     },
+    "schedule-daily-prayer-reminders": {
+        "task": "app.tasks.scheduled_tasks.schedule_daily_prayer_reminders",
+        "schedule": crontab(hour=0, minute=5),
+    },
     "check-streak": {
         "task": "app.tasks.scheduled_tasks.check_streak_integrity",
         "schedule": crontab(hour=2, minute=0),
@@ -25,9 +29,5 @@ celery_app.conf.beat_schedule = {
     "weekly-aggregate": {
         "task": "app.tasks.scheduled_tasks.aggregate_weekly_stats",
         "schedule": crontab(hour=0, minute=0, day_of_week=0),
-    },
-    "jumua-reminder": {
-        "task": "app.tasks.scheduled_tasks.send_friday_reminder",
-        "schedule": crontab(hour=6, minute=0, day_of_week="fri"),
     },
 }

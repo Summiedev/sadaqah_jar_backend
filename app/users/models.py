@@ -45,6 +45,11 @@ class User(Base):
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     google_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     avatar_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Coordinates are deliberately stored on the account rather than inferred
+    # from an IP address. Prayer times are location-sensitive and this gives
+    # users an explicit, durable source of truth.
+    latitude: Mapped[float | None] = mapped_column(nullable=True)
+    longitude: Mapped[float | None] = mapped_column(nullable=True)
     last_active: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(

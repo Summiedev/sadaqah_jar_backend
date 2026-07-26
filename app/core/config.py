@@ -40,6 +40,15 @@ class Settings(BaseSettings):
 
     RESEND_API_KEY: str = ""
 
+    # Aladhan calculation method ID; 2 is ISNA. Override for the convention
+    # used by your audience without changing application code.
+    PRAYER_CALCULATION_METHOD: int = 2
+    PRAYER_API_TIMEOUT_SECONDS: float = 10.0
+
+    # Absolute path to a Firebase service-account JSON file. Keep this secret
+    # out of source control; leaving it blank makes push delivery a no-op.
+    FCM_SERVICE_ACCOUNT_PATH: str = ""
+
     @field_validator("JWT_SECRET")
     @classmethod
     def validate_jwt_secret(cls, value: str) -> str:

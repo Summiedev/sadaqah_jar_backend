@@ -12,6 +12,7 @@ from app.journey.exceptions import (
     ReflectionNotFoundException,
 )
 from app.journey.schemas import (
+    ReadingProgressResponse,
     ReflectionCreate,
     ReflectionResponse,
     AdhkarProgressResponse,
@@ -180,3 +181,32 @@ def list_adhkar_favorites(
         )
         for f in favorites
     ]
+
+
+# ---------------------------------------------------------------------------
+# Reading Progress
+# ---------------------------------------------------------------------------
+
+
+def save_reading_progress(
+    db: Session, user_id: int, book_id: int, chapter_number: int
+) -> ReadingProgressResponse:
+    progress = repo.upsert_reading_progress(db, user_id, book_id, chapter_number)
+    db.commit()
+    db.refresh(progress)
+    return ReadingProgressResponse(
+        book_id=progress.book_id,
+        chapter_number=progress.chapter_number,
+        last_read_at=progress.last_read_at,
+    )
+
+
+def get_last_reading(db: Session, user_id: int) -> ReadingProgressResponse | None:
+    progress = repo.get_last_reading_progress(db, user_id)
+    if not progress:
+        return None
+    return ReadingProgressResponse(
+        book_id=progress.book_id,
+        chapter_number=progress.chapter_number,
+        last_read_at=progress.last_read_at,
+    )

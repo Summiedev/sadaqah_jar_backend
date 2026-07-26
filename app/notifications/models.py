@@ -10,6 +10,7 @@ from sqlalchemy import (
     Index,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -83,4 +84,29 @@ class NotificationTemplate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class ScheduledNotification(Base):
+    """A durable, idempotent record of a reminder queued for delivery."""
+
+    __tablename__ = "scheduled_notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    template_id: Mapped[int] = mapped_column(
+        ForeignKey("notification_templates.id", ondelete="CASCADE"), nullable=False
+    )
+    local_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="scheduled", nullable=False)
+    celery_task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "template_id", "local_date", name="uq_scheduled_notification_daily"),
+        Index("ix_scheduled_notifications_due", "status", "scheduled_for"),
     )

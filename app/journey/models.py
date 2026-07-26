@@ -72,3 +72,21 @@ class JourneyAdhkarFavorite(Base, TimestampMixin):
             "user_id", "adhkar_id", name="uq_journey_adhkar_favorite"
         ),
     )
+
+
+class JourneyReadingProgress(Base, TimestampMixin):
+    __tablename__ = "journey_reading_progress"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    book_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    chapter_number: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    last_read_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "book_id", name="uq_journey_reading_progress"
+        ),
+    )

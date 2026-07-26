@@ -20,10 +20,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-must-have-at-least-32-character
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 
-from alembic import command  # noqa: E402
-from alembic.config import Config  # noqa: E402
+from app.db.base import Base  # noqa: E402
+from app.db.session import engine  # noqa: E402
 
-_alembic = Config(str(PROJECT_ROOT / "alembic.ini"))
-_alembic.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
-_alembic.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
-command.upgrade(_alembic, "head")
+Base.metadata.create_all(bind=engine)

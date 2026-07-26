@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.users.models import (
     EmailVerificationToken,
     PasswordResetToken,
+    Role,
     User,
     UserDevice,
     UserMode,
@@ -57,6 +58,7 @@ def create_user(
     hashed_password: str,
     first_name: str | None = None,
     last_name: str | None = None,
+    role: Role | None = None,
 ) -> User:
     user = User(
         username=username,
@@ -64,6 +66,7 @@ def create_user(
         hashed_password=hashed_password,
         first_name=first_name,
         last_name=last_name,
+        role=role or Role.USER,
     )
     user.preferences = UserPreference()
     db.add(user)

@@ -41,6 +41,7 @@ dependencies = [
     "wrapt==2.0.1",
     "alembic==1.18.5",
     "httpx==0.28.1",
+    "firebase-admin==6.6.0",
 ]
 
 [dependency-groups]

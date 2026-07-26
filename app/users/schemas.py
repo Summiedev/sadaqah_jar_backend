@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 from app.users.models import Role, UserMode
 
@@ -26,11 +26,19 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     username: str
+    role: str | None = None
 
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str) -> str:
         return _validate_password_strength(v)
+
+    @field_validator("role")
+    @classmethod
+    def normalize_role(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return v.upper()
 
 
 class UserLogin(BaseModel):
@@ -53,7 +61,7 @@ class LogoutRequest(BaseModel):
 
 
 class ResendVerificationRequest(BaseModel):
-    email: EmailStr
+    email: EmailStr | None = None
 
 
 class ResendVerificationResponse(BaseModel):
@@ -82,6 +90,8 @@ class UserProfileResponse(BaseModel):
     last_name: str | None = None
     avatar_data: str | None = None
     timezone: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     locale: str | None = None
     evidence_mode: bool = False
     friday_reminder: bool = False
@@ -96,7 +106,19 @@ class UserProfileUpdate(BaseModel):
     last_name: str | None = None
     avatar_data: str | None = None
     timezone: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     locale: str | None = None
+
+    @model_validator(mode="after")
+    def coordinates_are_complete_and_valid(self):
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude must be provided together")
+        if self.latitude is not None and not -90 <= self.latitude <= 90:
+            raise ValueError("latitude must be between -90 and 90")
+        if self.longitude is not None and not -180 <= self.longitude <= 180:
+            raise ValueError("longitude must be between -180 and 180")
+        return self
 
 
 class UserModeUpdate(BaseModel):

@@ -84,9 +84,14 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: DbDep)
 
 
 @auth_router.post("/resend-verification", response_model=ResendVerificationResponse)
-def resend_verification(payload: ResendVerificationRequest, request: Request, db: DbDep):
+def resend_verification(
+    payload: ResendVerificationRequest,
+    request: Request,
+    db: DbDep,
+    current_user: User = Depends(get_current_user),
+):
     enforce_auth_rate_limit(request, "resend-verification", limit=3, period=900)
-    return service.resend_verification(db, payload)
+    return service.resend_verification(db, current_user, payload)
 
 
 @auth_router.post("/google", response_model=TokenResponse)

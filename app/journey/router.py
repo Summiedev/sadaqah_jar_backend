@@ -16,6 +16,7 @@ from app.users.dependencies import get_current_user
 from app.users.models import User
 from app.journey import service
 from app.journey.schemas import (
+    ReadingProgressResponse,
     ReflectionCreate,
 )
 
@@ -97,3 +98,28 @@ def unfavorite_adhkar(adhkar_id: int, db: DbDep, current_user: CurrentUser):
 def list_adhkar_favorites(db: DbDep, current_user: CurrentUser):
     favorites = service.list_adhkar_favorites(db, current_user.id)
     return Envelope(data=favorites)
+
+
+# ---------------------------------------------------------------------------
+# Reading Progress
+# ---------------------------------------------------------------------------
+
+
+@router.post("/reading/progress", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+def save_reading_progress(
+    payload: ReadingProgressResponse,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    progress = service.save_reading_progress(
+        db, current_user.id, payload.book_id, payload.chapter_number
+    )
+    return Envelope(data=progress, message="Progress saved")
+
+
+@router.get("/reading/last", response_model=Envelope)
+def get_last_reading(db: DbDep, current_user: CurrentUser):
+    progress = service.get_last_reading(db, current_user.id)
+    if progress is None:
+        return Envelope(data=None)
+    return Envelope(data=progress)

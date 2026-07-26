@@ -10,6 +10,7 @@ class SadaqahCategory(PyEnum):
     community = "community"
     donation = "donation"
     kindness = "kindness"
+    prayer = "prayer"
     family = "family"
     knowledge = "knowledge"
     environment = "environment"

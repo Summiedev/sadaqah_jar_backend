@@ -1,6 +1,7 @@
 """Notifications domain repository layer."""
 
 from datetime import datetime, timezone
+import json
 from typing import Sequence
 
 from sqlalchemy import select, func
@@ -136,7 +137,7 @@ def create_template(db: Session, payload: dict) -> NotificationTemplate:
         message_template=payload["message_template"],
         category=payload["category"],
         strategy=payload["strategy"],
-        strategy_config=payload.get("strategy_config"),
+        strategy_config=_serialize_strategy_config(payload.get("strategy_config")),
     )
     db.add(template)
     db.commit()
@@ -151,11 +152,20 @@ def update_template(db: Session, key: str, payload: dict) -> NotificationTemplat
 
     for field in ("title_template", "message_template", "category", "strategy", "strategy_config", "enabled"):
         if field in payload:
-            setattr(template, field, payload[field])
+            value = payload[field]
+            if field == "strategy_config":
+                value = _serialize_strategy_config(value)
+            setattr(template, field, value)
 
     db.commit()
     db.refresh(template)
     return template
+
+
+def _serialize_strategy_config(value: dict | str | None) -> str | None:
+    if value is None or isinstance(value, str):
+        return value
+    return json.dumps(value)
 
 
 def delete_template(db: Session, key: str) -> bool:

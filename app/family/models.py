@@ -17,11 +17,11 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -375,7 +375,7 @@ class FamilyActivity(Base):
     event_type: Mapped[EventType] = mapped_column(
         Enum(EventType, native_enum=False), nullable=False, index=True
     )
-    extra: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 
     family = relationship("Family", back_populates="activities")
@@ -398,7 +398,7 @@ class FamilySettings(Base):
         ForeignKey("families.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
     )
     notification_preferences: Mapped[dict] = mapped_column(
-        JSONB, default=dict, nullable=False
+        JSON, default=dict, nullable=False
     )
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)

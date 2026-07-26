@@ -15,9 +15,9 @@ from app.users.exceptions import (
     GoogleOAuthException,
     InvalidCredentialsException,
     InvalidTokenException,
-    ResourceNotFoundException,
     UsernameTakenException,
 )
+from app.users.models import Role
 from app.users.models import User, UserPreference, UserSession
 from app.users.repository import (
     create_session,
@@ -69,6 +69,12 @@ def register(db: Session, payload: UserRegister, device_id: str | None = None) -
     if repo.get_user_by_username(db, username):
         raise UsernameTakenException()
 
+    requested_role = None
+    if payload.role in {Role.ADMIN.value, "ADMIN"}:
+        existing_count = db.query(User).count()
+        if existing_count == 0:
+            requested_role = Role.ADMIN
+
     user = repo.create_user(
         db,
         username=username,
@@ -76,6 +82,7 @@ def register(db: Session, payload: UserRegister, device_id: str | None = None) -
         hashed_password=hash_password(payload.password),
         first_name=payload.first_name if hasattr(payload, "first_name") else None,
         last_name=payload.last_name if hasattr(payload, "last_name") else None,
+        role=requested_role,
     )
     return _issue_tokens(db, user, device_id=device_id)
 
@@ -126,6 +133,8 @@ def _profile_response(db: Session, user: User) -> UserProfileResponse:
         last_name=user.last_name,
         avatar_data=user.avatar_data,
         timezone=prefs.timezone,
+        latitude=user.latitude,
+        longitude=user.longitude,
         locale=prefs.language,
         evidence_mode=bool(notifications.get("evidence_mode", False)),
         friday_reminder=bool(notifications.get("friday_reminder", False)),
@@ -167,6 +176,9 @@ def update_profile(db: Session, user: User, payload: UserProfileUpdate) -> UserP
     if payload.timezone is not None:
         prefs = repo.get_or_create_preferences(db, user)
         prefs.timezone = payload.timezone.strip() or None
+    if payload.latitude is not None:
+        user.latitude = payload.latitude
+        user.longitude = payload.longitude
     if payload.locale is not None:
         prefs = repo.get_or_create_preferences(db, user)
         prefs.language = payload.locale.strip() or "en"
@@ -381,8 +393,10 @@ def change_password(db: Session, user: User, payload: ChangePasswordRequest) -> 
 # ---------------------------------------------------------------------------
 
 
-def resend_verification(db: Session, payload: ResendVerificationRequest) -> dict:
-    email = validate_email(payload.email) or ""
+def resend_verification(
+    db: Session, current_user: User, payload: ResendVerificationRequest
+) -> dict:
+    email = validate_email(payload.email) if payload.email else current_user.email
     user = repo.get_user_by_email(db, email)
     if user is None or user.deleted_at is not None:
         return {"message": "If an account with that email exists and is not verified, a new verification link has been sent."}

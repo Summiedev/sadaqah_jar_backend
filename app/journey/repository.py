@@ -10,6 +10,7 @@ from app.journey.models import (
     JourneyReflection,
     JourneyAdhkarProgress,
     JourneyAdhkarFavorite,
+    JourneyReadingProgress,
 )
 
 
@@ -155,3 +156,44 @@ def remove_adhkar_favorite(db: Session, user_id: int, adhkar_id: int) -> None:
     if favorite is not None:
         db.delete(favorite)
         db.flush()
+
+
+# ---------------------------------------------------------------------------
+# Reading Progress
+# ---------------------------------------------------------------------------
+
+
+def upsert_reading_progress(
+    db: Session, user_id: int, book_id: int, chapter_number: int
+) -> JourneyReadingProgress:
+    progress = db.scalar(
+        select(JourneyReadingProgress).where(
+            JourneyReadingProgress.user_id == user_id,
+            JourneyReadingProgress.book_id == book_id,
+        )
+    )
+    now = _utcnow()
+    if progress is None:
+        progress = JourneyReadingProgress(
+            user_id=user_id,
+            book_id=book_id,
+            chapter_number=chapter_number,
+            last_read_at=now,
+        )
+        db.add(progress)
+    else:
+        progress.chapter_number = chapter_number
+        progress.last_read_at = now
+    db.flush()
+    return progress
+
+
+def get_last_reading_progress(
+    db: Session, user_id: int
+) -> JourneyReadingProgress | None:
+    return db.scalar(
+        select(JourneyReadingProgress)
+        .where(JourneyReadingProgress.user_id == user_id)
+        .order_by(JourneyReadingProgress.last_read_at.desc())
+        .limit(1)
+    )

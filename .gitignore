@@ -186,3 +186,8 @@ scripts/smoke-session-management.sh
 curl_test.sh
 docker/.env
 .env.example
+
+# Firebase Admin service-account credentials (never commit)
+firebase-service-account*.json
+service-account*.json
+secrets/

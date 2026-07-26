@@ -97,6 +97,7 @@ def get_daily_acts(
 def list_acts(
     limit: int = 20,
     offset: int = 0,
+    verified_only: bool = True,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -107,12 +108,13 @@ def list_acts(
     if offset < 0:
         offset = 0
 
-    total = db.query(func.count(SadaqahAct.id)).scalar()
-    rows = (
-        db.query(SadaqahAct).order_by(SadaqahAct.id).offset(offset).limit(limit).all()
-    )
+    query = db.query(SadaqahAct)
+    if verified_only:
+        query = query.filter(SadaqahAct.verified)
+    total = query.with_entities(func.count(SadaqahAct.id)).scalar() or 0
+    rows = query.order_by(SadaqahAct.id).offset(offset).limit(limit).all()
     return ActPageResponse(
-        total=total or 0,
+        total=total,
         limit=limit,
         offset=offset,
         data=[ActListResponse.model_validate(a) for a in rows],
@@ -357,6 +359,18 @@ async def add_star(
         db.commit()
         db.refresh(active_jar)
         db.refresh(streak)
+
+        try:
+            from app.core.cache import cache_user_streak
+            cache_user_streak(
+                user_id,
+                {
+                    "current_streak": streak.current_streak,
+                    "longest_streak": streak.longest_streak,
+                },
+            )
+        except Exception:
+            logger.exception("Failed to refresh streak cache for user %s", user_id)
     except IntegrityError:
         db.rollback()
         if request_id:
