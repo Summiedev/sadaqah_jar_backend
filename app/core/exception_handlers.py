@@ -52,6 +52,7 @@ _EXCEPTION_STATUS_MAP = {
     "auth.email_taken": status.HTTP_409_CONFLICT,
     "auth.invalid_credentials": status.HTTP_401_UNAUTHORIZED,
     "auth.invalid_token": status.HTTP_401_UNAUTHORIZED,
+    "auth.invalid_google_token": status.HTTP_401_UNAUTHORIZED,
 }
 
 _FRIENDLY_MESSAGES = {
