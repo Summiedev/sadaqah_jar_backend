@@ -30,10 +30,8 @@ from app.schemas.sadaqah_act import (
 from app.services.streak_service import update_streak
 from app.services.badge_service import check_and_award_badges
 
-from app.services.hijri_service import is_last_10_nights as hijri_last10
-from app.services.hijri_service import is_ramadan as hijri_is_ramadan
 from app.services.jumua_service import is_friday
-from app.services.ramadan_service import is_ramadan, is_last_10_nights
+from app.services.ramadan_service import is_ramadan as ramadan_is_ramadan, is_last_10_nights as ramadan_last10
 from app.services.leaderboard_service import (
     increment_friday,
     increment_global,
@@ -61,7 +59,7 @@ def get_daily_acts(
     if cached:
         return cached
 
-    if is_ramadan():
+    if ramadan_is_ramadan():
         acts = (
             db.query(SadaqahAct)
             .filter(SadaqahAct.verified)
@@ -72,7 +70,7 @@ def get_daily_acts(
     else:
         acts = (
             db.query(SadaqahAct)
-            .filter(SadaqahAct.verified, not SadaqahAct.is_ramadan_only)
+            .filter(SadaqahAct.verified, ~SadaqahAct.is_ramadan_only)
             .order_by(func.random())
             .limit(20)
             .all()
@@ -221,6 +219,7 @@ def _get_or_create_quick_act(db: Session, act_type: str) -> SadaqahAct:
         )
         db.add(act)
         db.flush()
+        db.commit()
     return act
 
 
@@ -281,8 +280,8 @@ async def add_star(
         # Compute multiplier.
         multiplier = act.reward_weight or 1
         friday = is_friday()
-        ramadan = is_ramadan(today)
-        last10 = is_last_10_nights(today)
+        ramadan = ramadan_is_ramadan(today)
+        last10 = ramadan_last10(today)
 
         if friday:
             multiplier *= 2

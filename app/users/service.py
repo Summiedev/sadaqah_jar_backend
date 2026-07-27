@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import BusinessRuleException
 from app.core.security import create_access_token, hash_password, verify_password
-from app.services.email_service import send_verification_email
+from app.services.email_service import send_verification_email, send_password_reset_email
 from app.users import repository as repo
 from app.users.exceptions import (
     EmailTakenException,
@@ -80,10 +80,12 @@ def register(db: Session, payload: UserRegister, device_id: str | None = None) -
         username=username,
         email=email,
         hashed_password=hash_password(payload.password),
-        first_name=payload.first_name if hasattr(payload, "first_name") else None,
-        last_name=payload.last_name if hasattr(payload, "last_name") else None,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
         role=requested_role,
     )
+    raw_token = repo.create_email_verification(db, user.id)
+    send_verification_email(user.email, raw_token, user.first_name or user.username)
     return _issue_tokens(db, user, device_id=device_id)
 
 
@@ -362,7 +364,8 @@ def delete_user_device(db: Session, user: User, device_id: int) -> None:
 def forgot_password(db: Session, email: str) -> ForgotPasswordResponse:
     user = repo.get_user_by_email(db, validate_email(email) or "")
     if user and user.deleted_at is None:
-        repo.create_password_reset(db, user.id)
+        raw_token = repo.create_password_reset(db, user.id)
+        send_password_reset_email(user.email, raw_token)
     return ForgotPasswordResponse()
 
 
@@ -374,9 +377,12 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
     repo.revoke_all_sessions(db, user.id)
 
 
-def verify_email(db: Session, token: str) -> None:
-    if repo.consume_email_verification(db, token) is None:
+def verify_email(db: Session, token: str) -> dict:
+    user = repo.consume_email_verification(db, token)
+    if user is None:
         raise InvalidTokenException()
+    tokens = _issue_tokens(db, user)
+    return tokens
 
 
 def change_password(db: Session, user: User, payload: ChangePasswordRequest) -> None:

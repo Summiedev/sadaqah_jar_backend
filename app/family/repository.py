@@ -284,7 +284,7 @@ def expire_pending_invitations(db: Session, family_id: int) -> int:
             synchronize_session=False,
         )
     )
-    db.flush()
+    db.commit()
     return count
 
 
@@ -510,6 +510,76 @@ def add_prayer_response(
     except IntegrityError:
         db.rollback()
         return None
+
+
+# ---------------------------------------------------------------------------
+# PrayerComment
+# ---------------------------------------------------------------------------
+
+
+def get_prayer_comment_by_id(db: Session, comment_id: int) -> PrayerComment | None:
+    return db.scalar(
+        select(PrayerComment).where(
+            PrayerComment.id == comment_id,
+            PrayerComment.deleted_at.is_(None),
+        )
+    )
+
+
+def list_prayer_comments(
+    db: Session, prayer_request_id: int, limit: int = 50, offset: int = 0
+) -> tuple[Sequence[PrayerComment], int]:
+    total = db.scalar(
+        select(func.count(PrayerComment.id)).where(
+            PrayerComment.prayer_request_id == prayer_request_id,
+            PrayerComment.deleted_at.is_(None),
+        )
+    ) or 0
+
+    rows = (
+        db.scalars(
+            select(PrayerComment)
+            .where(
+                PrayerComment.prayer_request_id == prayer_request_id,
+                PrayerComment.deleted_at.is_(None),
+            )
+            .order_by(PrayerComment.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        .all()
+    )
+    return rows, total
+
+
+def create_prayer_comment(
+    db: Session,
+    *,
+    prayer_request_id: int,
+    author_id: int,
+    text: str,
+) -> PrayerComment:
+    comment = PrayerComment(
+        prayer_request_id=prayer_request_id,
+        author_id=author_id,
+        text=text,
+    )
+    db.add(comment)
+    db.flush()
+    return comment
+
+
+def update_prayer_comment(db: Session, comment: PrayerComment, text: str) -> PrayerComment:
+    comment.text = text
+    db.add(comment)
+    db.flush()
+    return comment
+
+
+def soft_delete_prayer_comment(db: Session, comment: PrayerComment) -> None:
+    comment.deleted_at = _utcnow()
+    db.add(comment)
+    db.flush()
 
 
 # ---------------------------------------------------------------------------

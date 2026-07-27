@@ -6,7 +6,7 @@ Follows REST conventions with consistent response envelopes.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.envelope import Envelope, Meta
@@ -21,6 +21,7 @@ from app.family.schemas import (
     GoalUpdate,
     PrayerRequestCreate,
     PrayerRespond,
+    PrayerCommentCreate,
     ReflectionCreate,
     ReflectionEncourage,
     SettingsUpdate,
@@ -415,6 +416,79 @@ def respond_to_prayer(
     """Add a response to a prayer request."""
     counts = service.respond_to_prayer(db, family_id, prayer_id, payload, current_user.id)
     return Envelope(data={"response_counts": counts})
+
+
+@router.get("/{family_id}/prayers/{prayer_id}/comments", response_model=Envelope)
+def list_prayer_comments(
+    family_id: int,
+    prayer_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """List comments for a prayer request."""
+    comments, total = service.list_prayer_comments(db, family_id, prayer_id, current_user.id, limit=limit, offset=offset)
+    return Envelope(
+        data=comments,
+        meta=Meta(total=total),
+    )
+
+
+@router.post("/{family_id}/prayers/{prayer_id}/comments", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+def create_prayer_comment(
+    family_id: int,
+    prayer_id: int,
+    payload: PrayerCommentCreate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Add a comment to a prayer request."""
+    comment = service.create_prayer_comment(db, family_id, prayer_id, payload, current_user.id)
+    return Envelope(
+        data={
+            "id": comment.id,
+            "text": comment.text,
+            "author_id": comment.author_id,
+            "created_at": comment.created_at.isoformat(),
+        },
+        message="Comment added",
+    )
+
+
+@router.patch("/{family_id}/prayers/{prayer_id}/comments/{comment_id}", response_model=Envelope)
+def update_prayer_comment(
+    family_id: int,
+    prayer_id: int,
+    comment_id: int,
+    payload: PrayerCommentCreate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Edit a comment. Author only."""
+    comment = service.update_prayer_comment(db, family_id, prayer_id, comment_id, payload, current_user.id)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return Envelope(
+        data={
+            "id": comment.id,
+            "text": comment.text,
+        },
+        message="Comment updated",
+    )
+
+
+@router.delete("/{family_id}/prayers/{prayer_id}/comments/{comment_id}", response_model=Envelope)
+def delete_prayer_comment(
+    family_id: int,
+    prayer_id: int,
+    comment_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Delete a comment. Author only."""
+    service.delete_prayer_comment(db, family_id, prayer_id, comment_id, current_user.id)
+    return Envelope(message="Comment deleted")
 
 
 @router.post("/{family_id}/prayers/{prayer_id}/answer", response_model=Envelope)

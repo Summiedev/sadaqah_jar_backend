@@ -44,7 +44,7 @@ def _wraps(title: str, inner: str, expiry_text: str) -> str:
 def verification_email_html(token: str, user_name: str | None = None) -> str:
     link = f"{settings.APP_URL}/verify-email?token={token}"
     first_name = user_name.split(" ")[0] if user_name else "friend"
-    
+
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
         <td style="padding: 0 48px;">
@@ -71,13 +71,13 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
                 color: {BRAND_MUTED};
                 margin: 0 0 32px;
                 line-height: 1.65;
-            ">Please verify your email address to unlock your personal sanctuary:</p>
+            ">Your account has been created successfully. Please verify your email address to unlock your personal sanctuary and begin your journey:</p>
         </td>
     </tr>
 </table>"""
 
     cta = cta_button(link, "Verify my email")
-    
+
     below_cta = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
         <td align="center" style="padding: 0 48px;">
@@ -107,8 +107,8 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
 {safety_notice()}
 {expiry_notice("This link expires in <strong>24 hours</strong> for your security.")}"""
 
-    title = "Verify your email address — Mizan"
-    
+    title = "Welcome to Mizan — Verify your email"
+
     return _wraps(title, body + cta + post, "This link expires in 24 hours for your security.")
 
 

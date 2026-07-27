@@ -11,7 +11,7 @@ touching these endpoints.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.envelope import Envelope, Meta
@@ -20,6 +20,7 @@ from app.users.dependencies import get_current_user
 from app.users.models import User
 from app.notifications import service
 from app.notifications.schemas import (
+    DeviceTokenRequest,
     NotificationTemplateCreate,
 )
 
@@ -59,8 +60,14 @@ def get_unread_count(db: DbDep, current_user: CurrentUser):
 def mark_notification_read(notification_id: int, db: DbDep, current_user: CurrentUser):
     notification = service.mark_read(db, notification_id, current_user.id)
     if notification is None:
-        return Envelope(message="Notification not found")
+        raise HTTPException(status_code=404, detail="Notification not found")
     return Envelope(data=notification)
+
+
+@router.delete("/{notification_id}", response_model=Envelope)
+def delete_notification(notification_id: int, db: DbDep, current_user: CurrentUser):
+    service.delete_notification(db, notification_id, current_user.id)
+    return Envelope(message="Notification deleted")
 
 
 @router.post("/read-all", response_model=Envelope)
@@ -113,14 +120,14 @@ def delete_template(key: str, db: DbDep, current_user: CurrentUser):
 
 
 @router.post("/device-token", response_model=Envelope)
-def register_device_token(db: DbDep, current_user: CurrentUser, payload: dict):
+def register_device_token(db: DbDep, current_user: CurrentUser, payload: DeviceTokenRequest):
     device = service.register_device(
         db,
         current_user.id,
-        device_id=payload["device_id"],
-        platform=payload["platform"],
-        device_name=payload.get("device_name"),
-        app_version=payload.get("app_version"),
-        push_token=payload.get("push_token"),
+        device_id=payload.device_id,
+        platform=payload.platform,
+        device_name=payload.device_name,
+        app_version=payload.app_version,
+        push_token=payload.push_token,
     )
     return Envelope(data=device)

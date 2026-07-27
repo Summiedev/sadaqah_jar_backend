@@ -119,6 +119,10 @@ def mark_all_read(db: Session, user_id: int) -> int:
     return repo.mark_all_notifications_read(db, user_id)
 
 
+def delete_notification(db: Session, notification_id: int, user_id: int) -> None:
+    repo.delete_notification(db, notification_id, user_id)
+
+
 def get_unread_count(db: Session, user_id: int) -> int:
     return repo.get_unread_count(db, user_id)
 

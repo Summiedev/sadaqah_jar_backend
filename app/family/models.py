@@ -257,10 +257,33 @@ class PrayerRequest(Base):
     responses = relationship(
         "PrayerRequestResponse", back_populates="prayer_request", cascade="all, delete-orphan"
     )
+    comments = relationship(
+        "PrayerComment", back_populates="prayer_request", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("ix_prayer_requests_list", "family_id", "is_answered", "created_at"),
     )
+
+
+class PrayerComment(Base):
+    __tablename__ = "prayer_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    prayer_request_id: Mapped[int] = mapped_column(
+        ForeignKey("prayer_requests.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    author_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+
+    prayer_request = relationship("PrayerRequest", back_populates="comments")
 
 
 # ---------------------------------------------------------------------------

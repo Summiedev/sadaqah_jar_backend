@@ -26,6 +26,8 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     username: str
+    first_name: str | None = None
+    last_name: str | None = None
     role: str | None = None
 
     @field_validator("password")
@@ -61,7 +63,19 @@ class LogoutRequest(BaseModel):
 
 
 class ResendVerificationRequest(BaseModel):
-    email: EmailStr | None = None
+    email: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        stripped = v.strip()
+        if not stripped:
+            return None
+        if "@" not in stripped or "." not in stripped.split("@")[-1]:
+            raise ValueError("Please provide a valid email address")
+        return stripped
 
 
 class ResendVerificationResponse(BaseModel):

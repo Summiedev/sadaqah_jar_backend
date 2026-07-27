@@ -99,6 +99,13 @@ def mark_all_notifications_read(db: Session, user_id: int) -> int:
     return result
 
 
+def delete_notification(db: Session, notification_id: int, user_id: int) -> None:
+    notification = get_notification(db, notification_id, user_id)
+    if notification is not None:
+        db.delete(notification)
+        db.commit()
+
+
 def get_unread_count(db: Session, user_id: int) -> int:
     return db.scalar(
         select(func.count(Notification.id)).where(

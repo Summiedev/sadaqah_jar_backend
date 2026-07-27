@@ -44,6 +44,7 @@ class BaseRepository(Generic[ModelType]):
             if hasattr(instance, key):
                 setattr(instance, key, value)
         db.flush()
+        db.commit()
         db.refresh(instance)
         return instance
 

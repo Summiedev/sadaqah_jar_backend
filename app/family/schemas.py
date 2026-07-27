@@ -194,6 +194,7 @@ class PrayerRequestResponse(BaseModel):
     is_answered: bool
     is_private: bool
     response_counts: dict[str, int] = {}
+    comment_counts: dict[str, int] = {}
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -201,6 +202,21 @@ class PrayerRequestResponse(BaseModel):
 
 class PrayerRespond(BaseModel):
     response_type: PrayerResponseType
+
+
+class PrayerCommentCreate(BaseModel):
+    text: str = Field(..., min_length=1)
+
+
+class PrayerCommentResponse(BaseModel):
+    id: int
+    prayer_request_id: int
+    author_id: int
+    author_name: str = ""
+    text: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ---------------------------------------------------------------------------

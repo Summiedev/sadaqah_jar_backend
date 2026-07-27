@@ -71,10 +71,10 @@ def logout(payload: RefreshRequest, db: DbDep):
     service.logout(db, payload.refresh_token)
 
 
-@auth_router.get("/verify-email")
+@auth_router.get("/verify-email", response_model=TokenResponse)
 def verify_email(db: DbDep, token: str = Query(...)):
-    service.verify_email(db, token)
-    return {"message": "Email verified successfully"}
+    tokens = service.verify_email(db, token)
+    return tokens
 
 
 @auth_router.post("/forgot-password", response_model=ForgotPasswordResponse)

@@ -1,3 +1,5 @@
+import re
+
 from app.users.exceptions import ForbiddenException
 
 
@@ -13,4 +15,7 @@ def validate_username(username: str | None) -> str | None:
 def validate_email(email: str | None) -> str | None:
     if email is None:
         return None
-    return email.strip().lower()
+    stripped = email.strip().lower()
+    if not stripped or not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', stripped):
+        raise ValueError("Invalid email format")
+    return stripped

@@ -34,6 +34,7 @@ from app.family.exceptions import (
     ReflectionNotFoundException,
     SettingsNotFoundException,
 )
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.family import repository as repo
@@ -46,10 +47,13 @@ from app.family.models import (
     FamilyMember,
     FamilyGoal,
     PrayerRequest,
+    PrayerComment,
     FamilyReflection,
     FamilySettings,
 )
+from app.models.sadaqah_log import SadaqahLog
 from app.core.envelope import Meta
+from sqlalchemy import func
 from app.family.schemas import (
     FamilyCreate,
     FamilyUpdate,
@@ -260,7 +264,6 @@ def create_family(
         actor_id=user_id,
         extra={"name": payload.name},
     )
-    db.commit()
 
     return family, event
 
@@ -440,7 +443,6 @@ def update_member_role(
         actor_id=user_id,
         extra={"target_user_id": member.user_id, "new_role": payload.role.value},
     )
-    db.commit()
 
     return member
 
@@ -461,7 +463,6 @@ def remove_member(db: Session, family_id: int, member_id: int, user_id: int) -> 
             event_type=EventType.MEMBER_LEFT,
             actor_id=user_id,
         )
-        db.commit()
         return
 
     # Removing others requires MANAGE_MEMBERS permission
@@ -481,7 +482,6 @@ def remove_member(db: Session, family_id: int, member_id: int, user_id: int) -> 
         actor_id=user_id,
         extra={"removed_user_id": target_member.user_id},
     )
-    db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -570,7 +570,6 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
         event_type=EventType.MEMBER_JOINED,
         actor_id=user_id,
     )
-    db.commit()
 
     return family
 
@@ -595,9 +594,7 @@ def decline_invitation(db: Session, invite_code: str, user_id: int) -> None:
         event_type=EventType.INVITATION_DECLINED,
         actor_id=user_id,
     )
-    db.commit()
-
-
+    return None
 # ---------------------------------------------------------------------------
 # Goals
 # ---------------------------------------------------------------------------
@@ -654,7 +651,6 @@ def create_goal(
         actor_id=user_id,
         extra={"goal_id": goal.id, "title": payload.title},
     )
-    db.commit()
 
     return goal
 
@@ -707,7 +703,6 @@ def complete_goal(db: Session, family_id: int, goal_id: int, user_id: int) -> Fa
         actor_id=user_id,
         extra={"goal_id": goal.id, "title": goal.title},
     )
-    db.commit()
 
     return goal
 
@@ -791,7 +786,6 @@ def create_prayer_request(
         event_type=EventType.PRAYER_REQUEST_CREATED,
         actor_id=user_id,
     )
-    db.commit()
 
     return prayer
 
@@ -817,6 +811,99 @@ def respond_to_prayer(
     return repo.get_prayer_response_counts(db, prayer_id)
 
 
+def list_prayer_comments(
+    db: Session,
+    family_id: int,
+    prayer_id: int,
+    user_id: int,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[PrayerCommentResponse], int]:
+    """List comments for a prayer request."""
+    _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
+
+    prayer = repo.get_prayer_request_by_id(db, prayer_id)
+    if not prayer or prayer.family_id != family_id:
+        raise PrayerRequestNotFoundException()
+
+    comments, total = repo.list_prayer_comments(db, prayer_id, limit=limit, offset=offset)
+
+    results = []
+    for c in comments:
+        author_name = _get_username(db, c.author_id)
+        results.append(
+            PrayerCommentResponse(
+                id=c.id,
+                prayer_request_id=c.prayer_request_id,
+                author_id=c.author_id,
+                author_name=author_name,
+                text=c.text,
+                created_at=c.created_at,
+            )
+        )
+
+    return results, total
+
+
+def create_prayer_comment(
+    db: Session, family_id: int, prayer_id: int, payload: PrayerCommentCreate, user_id: int
+) -> PrayerComment:
+    """Add a comment to a prayer request."""
+    _require_permission(db, family_id, user_id, Permission.CREATE_PRAYER)
+
+    prayer = repo.get_prayer_request_by_id(db, prayer_id)
+    if not prayer or prayer.family_id != family_id:
+        raise PrayerRequestNotFoundException()
+
+    comment = repo.create_prayer_comment(
+        db,
+        prayer_request_id=prayer_id,
+        author_id=user_id,
+        text=payload.text,
+    )
+    db.commit()
+    db.refresh(comment)
+
+    return comment
+
+
+def update_prayer_comment(
+    db: Session, family_id: int, prayer_id: int, comment_id: int, payload: PrayerCommentCreate, user_id: int
+) -> PrayerComment | None:
+    """Edit a comment. Author only."""
+    _require_permission(db, family_id, user_id, Permission.CREATE_PRAYER)
+
+    comment = repo.get_prayer_comment_by_id(db, comment_id)
+    if not comment or comment.prayer_request_id != prayer_id:
+        raise PrayerRequestNotFoundException()
+
+    if comment.author_id != user_id:
+        raise FamilyPermissionDeniedException("Only the author can edit this comment")
+
+    comment = repo.update_prayer_comment(db, comment, payload.text)
+    db.commit()
+    db.refresh(comment)
+
+    return comment
+
+
+def delete_prayer_comment(
+    db: Session, family_id: int, prayer_id: int, comment_id: int, user_id: int
+) -> None:
+    """Delete a comment. Author only."""
+    _require_permission(db, family_id, user_id, Permission.CREATE_PRAYER)
+
+    comment = repo.get_prayer_comment_by_id(db, comment_id)
+    if not comment or comment.prayer_request_id != prayer_id:
+        raise PrayerRequestNotFoundException()
+
+    if comment.author_id != user_id:
+        raise FamilyPermissionDeniedException("Only the author can delete this comment")
+
+    repo.soft_delete_prayer_comment(db, comment)
+    db.commit()
+
+
 def answer_prayer(
     db: Session, family_id: int, prayer_id: int, user_id: int
 ) -> PrayerRequest:
@@ -840,7 +927,6 @@ def answer_prayer(
         event_type=EventType.PRAYER_REQUEST_ANSWERED,
         actor_id=user_id,
     )
-    db.commit()
 
     return prayer
 
@@ -902,7 +988,6 @@ def create_reflection(
         event_type=EventType.REFLECTION_SHARED,
         actor_id=user_id,
     )
-    db.commit()
 
     return reflection
 
@@ -1023,17 +1108,38 @@ def get_leaderboard(db: Session, family_id: int, user_id: int, limit: int = 10) 
     """Return a simple family leaderboard. Frontend compatibility endpoint."""
     _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
     members = repo.list_members(db, family_id, include_deleted=False)
+    member_user_ids = [m.user_id for m in members if m.user_id]
+
+    if not member_user_ids:
+        return []
+
+    stats = (
+        db.query(
+            SadaqahLog.user_id,
+            func.count(SadaqahLog.id).label("contribution_count"),
+            func.coalesce(func.sum(SadaqahLog.stars_earned), 0).label("stars_earned"),
+        )
+        .filter(SadaqahLog.user_id.in_(member_user_ids))
+        .group_by(SadaqahLog.user_id)
+        .all()
+    )
+
+    stats_map = {row.user_id: (row.contribution_count, row.stars_earned) for row in stats}
+
     results = []
     for m in members:
+        from app.users.models import User
         member_user = db.get(User, m.user_id)
         if not member_user:
             continue
+        contribution_count, stars_earned = stats_map.get(m.user_id, (0, 0))
         results.append({
             "user_id": m.user_id,
             "username": member_user.username,
-            "contribution_count": 0,
-            "stars_earned": 0,
-        })
+            "contribution_count": contribution_count,
+            "stars_earned": stars_earned,
+        }        )
+    results.sort(key=lambda x: (x["contribution_count"], x["stars_earned"]), reverse=True)
     return results[:limit]
 
 
@@ -1041,16 +1147,44 @@ def get_top_contributor(db: Session, family_id: int, user_id: int) -> dict | Non
     """Return the top contributor for a family. Frontend compatibility endpoint."""
     _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
     members = repo.list_members(db, family_id, include_deleted=False)
-    best = None
-    for m in members:
-        member_user = db.get(User, m.user_id)
-        if not member_user:
-            continue
-        best = {
-            "user_id": m.user_id,
-            "username": member_user.username,
-            "contribution_count": 0,
-            "stars_earned": 0,
-        }
-        break
-    return best
+    member_user_ids = [m.user_id for m in members if m.user_id]
+
+    if not member_user_ids:
+        return None
+
+    top = (
+        db.query(
+            SadaqahLog.user_id,
+            func.count(SadaqahLog.id).label("contribution_count"),
+            func.coalesce(func.sum(SadaqahLog.stars_earned), 0).label("stars_earned"),
+        )
+        .filter(SadaqahLog.user_id.in_(member_user_ids))
+        .group_by(SadaqahLog.user_id)
+        .order_by(func.count(SadaqahLog.id).desc(), func.sum(SadaqahLog.stars_earned).desc())
+        .first()
+    )
+
+    if not top:
+        for m in members:
+            from app.users.models import User
+            member_user = db.get(User, m.user_id)
+            if member_user:
+                return {
+                    "user_id": m.user_id,
+                    "username": member_user.username,
+                    "contribution_count": 0,
+                    "stars_earned": 0,
+                }
+        return None
+
+    from app.users.models import User
+    member_user = db.get(User, top.user_id)
+    if not member_user:
+        return None
+
+    return {
+        "user_id": top.user_id,
+        "username": member_user.username,
+        "contribution_count": top.contribution_count,
+        "stars_earned": top.stars_earned,
+    }
