@@ -60,6 +60,8 @@ from app.family.schemas import (
     GoalCreate,
     GoalUpdate,
     PrayerRequestCreate,
+    PrayerCommentCreate,
+    PrayerCommentResponse,
     PrayerRespond,
     ReflectionCreate,
     ReflectionEncourage,
