@@ -16,6 +16,7 @@ from app.family.models import (
     FamilyInvitation,
     FamilyGoal,
     PrayerRequest,
+    PrayerComment,
     PrayerRequestResponse,
     FamilyReflection,
     ReflectionEncouragement,
