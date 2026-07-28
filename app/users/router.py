@@ -23,6 +23,7 @@ from app.users.schemas import (
     ResetPasswordRequest,
     SessionResponse,
     TokenResponse,
+    VerifyEmailOtpRequest,
     UserLogin,
     UserModeUpdate,
     UserPreferencesResponse,
@@ -75,6 +76,11 @@ def logout(payload: RefreshRequest, db: DbDep):
 def verify_email(db: DbDep, token: str = Query(...)):
     tokens = service.verify_email(db, token)
     return tokens
+
+
+@auth_router.post("/verify-email", response_model=TokenResponse)
+def verify_email_otp(payload: VerifyEmailOtpRequest, db: DbDep, device_id: DeviceId = None):
+    return service.verify_email(db, payload.code, device_id=device_id)
 
 
 @auth_router.post("/forgot-password", response_model=ForgotPasswordResponse)

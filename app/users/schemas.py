@@ -54,6 +54,18 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class VerifyEmailOtpRequest(BaseModel):
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, value: str) -> str:
+        code = value.strip()
+        if len(code) != 6 or not code.isdigit():
+            raise ValueError("Enter the six-digit code from your email")
+        return code
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
@@ -80,7 +92,7 @@ class ResendVerificationRequest(BaseModel):
 
 class ResendVerificationResponse(BaseModel):
     message: str = (
-        "If an account with that email exists and is not verified, a new verification link has been sent."
+        "If an account with that email exists and is not verified, a new verification code has been sent."
     )
 
 

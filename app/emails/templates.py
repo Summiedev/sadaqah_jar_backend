@@ -1,15 +1,11 @@
 from app.core.config import settings
 from app.emails.base import (
-    BRAND_CARD,
     BRAND_EMERALD,
-    BRAND_GOLD,
-    BRAND_GOLD_LIGHT,
     BRAND_INK,
     BRAND_LINE,
     BRAND_MUTED,
     BRAND_SUBTLE,
     FONT_BODY,
-    FONT_STACK,
     _body_close,
     _body_open,
     card_close,
@@ -47,7 +43,6 @@ def _wraps(title: str, inner: str, expiry_text: str) -> str:
 # ─────────────────────────────────────────────────────────────
 
 def verification_email_html(token: str, user_name: str | None = None) -> str:
-    link = f"{settings.APP_URL}/verify-email?token={token}"
     first_name = user_name.split(" ")[0] if user_name else "friend"
 
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -60,7 +55,7 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
                 color: {BRAND_MUTED};
                 margin: 0 0 8px;
                 line-height: 1.65;
-            ">Assalamu alaikum, <strong style="color: {BRAND_INK};">{first_name}</strong>,</p>
+            ">Assalamu alaikum <strong style="color: {BRAND_INK};">{first_name}</strong>,</p>
             <p style="
                 font-family: {FONT_BODY};
                 font-size: 16px;
@@ -68,7 +63,7 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
                 color: {BRAND_MUTED};
                 margin: 0 0 6px;
                 line-height: 1.65;
-            ">Welcome to <strong style="color: {BRAND_INK};">Mizan</strong> — a quiet space to nurture your spiritual life and acts of goodness.</p>
+            ">So glad you're here.</p>
             <p style="
                 font-family: {FONT_BODY};
                 font-size: 16px;
@@ -76,12 +71,10 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
                 color: {BRAND_MUTED};
                 margin: 0 0 32px;
                 line-height: 1.65;
-            ">Your account has been created successfully. Please verify your email address to unlock your personal sanctuary and begin your journey:</p>
+            ">Mizan is a quiet space to grow your spiritual life, one small act of goodness at a time. To keep your account safe and yours alone, please verify your email with the code below:</p>
         </td>
     </tr>
 </table>"""
-
-    cta = cta_button(link, "Verify my email")
 
     below_cta = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
@@ -92,10 +85,12 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
                 color: {BRAND_SUBTLE};
                 margin: 28px 0 20px;
                 line-height: 1.65;
-            ">Or copy and paste this link into your browser:</p>
+            ">Your six-digit verification code:</p>
             <p style="
                 font-family: {FONT_BODY};
-                font-size: 12px;
+                font-size: 30px;
+                font-weight: 700;
+                letter-spacing: 8px;
                 color: {BRAND_EMERALD};
                 word-break: break-all;
                 margin: 0;
@@ -103,7 +98,7 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
                 padding: 10px 14px;
                 border-radius: 8px;
                 border: 1px solid {BRAND_LINE};
-            ">{link}</p>
+            ">{token}</p>
         </td>
     </tr>
 </table>"""
@@ -114,7 +109,7 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
 
     title = "Welcome to Mizan — Verify your email"
 
-    return _wraps(title, body + cta + post, "This link expires in 24 hours for your security.")
+    return _wraps(title, body + post, "This code expires in 24 hours for your security.")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -142,7 +137,7 @@ def password_reset_email_html(token: str) -> str:
                 color: {BRAND_MUTED};
                 margin: 0 0 6px;
                 line-height: 1.65;
-            ">We received a request to reset the password for your <strong style="color: {BRAND_INK};">Mizan</strong> account.</p>
+            ">We received a request to reset your Mizan account password.</p>
             <p style="
                 font-family: {FONT_BODY};
                 font-size: 16px;
@@ -150,7 +145,7 @@ def password_reset_email_html(token: str) -> str:
                 color: {BRAND_MUTED};
                 margin: 0 0 32px;
                 line-height: 1.65;
-            ">Click the button below to choose a new password:</p>
+            ">Choose a new password below:</p>
         </td>
     </tr>
 </table>"""

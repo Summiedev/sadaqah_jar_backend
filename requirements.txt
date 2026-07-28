@@ -38,3 +38,4 @@ wrapt==2.0.1
 alembic==1.18.5
 firebase-admin==6.6.0
 ruff==0.15.18
+python-multipart==0.0.20

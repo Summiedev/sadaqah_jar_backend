@@ -16,6 +16,8 @@ class BookRead(BaseModel):
     author: str
     description: str | None = None
     cover_url: str | None = None
+    file_url: str | None = None
+    file_type: str | None = None
     category: str
     language: str
     published: bool
@@ -33,6 +35,8 @@ class BookCreate(BaseModel):
     author: str
     description: str | None = None
     cover_url: str | None = None
+    file_url: str | None = None
+    file_type: str | None = None
     category: str
     language: str = "en"
     published: bool = True

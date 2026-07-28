@@ -291,7 +291,8 @@ def delete_device(db: Session, device: UserDevice) -> None:
 
 
 def create_email_verification(db: Session, user_id: int) -> str:
-    raw = secrets.token_urlsafe(32)
+    # Codes are friendlier than email links on mobile; only their hash is stored.
+    raw = f"{secrets.randbelow(1_000_000):06d}"
     db.add(
         EmailVerificationToken(
             token_hash=hash_one_time_token(raw),

@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_admin
@@ -16,6 +20,8 @@ def _serialize(book) -> dict:
         "author": book.author,
         "description": book.description,
         "cover_url": book.cover_url,
+        "file_url": book.file_url,
+        "file_type": book.file_type,
         "category": book.category,
         "language": book.language,
         "published": book.published,
@@ -59,6 +65,38 @@ def create_admin_book(
     book = service.create_book(db, payload)
     db.commit()
     return _serialize(book)
+
+
+@router.post("/{book_id}/file")
+async def upload_book_file(book_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), admin=Depends(require_admin)):
+    book = service.get_book_detail(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    suffix = Path(file.filename or "").suffix.lower()
+    allowed = {".pdf", ".epub", ".txt", ".md"}
+    if suffix not in allowed:
+        raise HTTPException(status_code=400, detail="Upload a PDF, EPUB, TXT, or Markdown file")
+    content = await file.read()
+    if not content or len(content) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Choose a file between 1 byte and 25 MB")
+    directory = Path("uploads/books")
+    directory.mkdir(parents=True, exist_ok=True)
+    filename = f"{book_id}-{uuid4().hex}{suffix}"
+    (directory / filename).write_bytes(content)
+    updated = service.update_book(db, book_id, BookUpdate(file_url=f"/admin/books/{book_id}/file/download", file_type=file.content_type or suffix.lstrip(".")))
+    db.commit()
+    return _serialize(updated)
+
+
+@router.get("/{book_id}/file/download")
+def download_book_file(book_id: int, db: Session = Depends(get_db)):
+    book = service.get_book_detail(db, book_id)
+    if not book or not book.file_url:
+        raise HTTPException(status_code=404, detail="No reading file has been uploaded for this book")
+    matches = list(Path("uploads/books").glob(f"{book_id}-*"))
+    if not matches:
+        raise HTTPException(status_code=404, detail="The uploaded file is no longer available")
+    return FileResponse(matches[-1], media_type=book.file_type or "application/octet-stream", filename=matches[-1].name)
 
 
 @router.patch("/{book_id}")

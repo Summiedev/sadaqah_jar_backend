@@ -120,6 +120,8 @@ def _serialize(db, book) -> BookRead:
         author=book.author,
         description=book.description,
         cover_url=book.cover_url,
+        file_url=book.file_url,
+        file_type=book.file_type,
         category=book.category,
         language=book.language,
         published=book.published,

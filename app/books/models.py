@@ -35,6 +35,8 @@ class Book(Base):
     author: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    file_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    file_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     category: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     language: Mapped[str] = mapped_column(String(8), default="en", nullable=False)
     published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)

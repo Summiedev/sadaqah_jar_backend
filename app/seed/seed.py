@@ -590,11 +590,20 @@ class DatabaseSeeder:
         templates = [
             ("morning_adhkar", "Morning adhkar", "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×", "adhkar", {"anchor": "fajr", "offset_minutes": 30, "content_source": "morning_adhkar"}),
             ("evening_adhkar", "Evening adhkar", "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×", "adhkar", {"anchor": "asr", "offset_minutes": 30, "content_source": "evening_adhkar"}),
-            ("salatul_duha", "Salatul Duha", "A gentle window for two rak'ahs of Duha is open.", "prayer", {"anchor": "duha_start", "offset_minutes": 15}),
-            ("witr_reminder", "Remember Witr", "Complete your night with Witr before sleep.", "prayer", {"anchor": "isha", "offset_minutes": 45}),
-            ("daily_sadaqah", "Today's sadaqah", "{act_title}: {act_description}", "charity", {"anchor": "zuhr", "offset_minutes": 30, "content_source": "personalized_sadaqah"}),
-            ("quran_reminder", "A moment with the Quran", "Open the Quran today, even for a few verses, and reflect on what you read.", "reading", {"anchor": "maghrib", "offset_minutes": 30}),
-            ("friday_reminder", "Friday reminder", "{message}", "islamic_occasions", {"anchor": "zuhr", "offset_minutes": -30, "days_of_week": [4], "content_source": "rotating_messages", "messages": ["Send abundant salawat upon the Prophet today.", "Read Surah Al-Kahf - it is a light between two Fridays.", "Give charity today - Friday charity is specially multiplied.", "Make dua in the last hour after Asr - it is the hour of acceptance.", "Reach out to a relative to strengthen family ties."]}),
+            ("salatul_duha", "Salatul Duha", "A gentle two rak'ahs of Duha fit nicely right now.", "prayer", {"anchor": "duha_start", "offset_minutes": 15}),
+            ("witr_reminder", "Remember Witr", "Close the day with Witr before you rest.", "prayer", {"anchor": "isha", "offset_minutes": 45}),
+            ("daily_sadaqah", "Today's sadaqah", "A small goodness for today: {act_title}. {act_description}", "charity", {"anchor": "zuhr", "offset_minutes": 30, "content_source": "personalized_sadaqah"}),
+            ("afternoon_sadaqah", "Afternoon sadaqah", "The afternoon is a wonderful time for a small sadaqah. {act_title}: {act_description}", "charity", {"anchor": "asr", "offset_minutes": -10, "content_source": "personalized_sadaqah"}),
+            ("midday_dhikr", "A moment of dhikr", "Pause and say: La ilaha illallah. A gentle moment of tahlil for your heart.", "reflection", {"anchor": "duha_start", "offset_minutes": 45}),
+            ("evening_tahlil", "Evening tahlil", "A quiet moment of dhikr before the evening settles in. SubhanAllah, Alhamdulillah, Allahu Akbar.", "reflection", {"anchor": "maghrib", "offset_minutes": 15}),
+            ("quran_reminder", "A moment with the Quran", "Open the Quran today, even for a few verses, and let it settle in your heart.", "reading", {"anchor": "maghrib", "offset_minutes": 30}),
+            ("friday_reminder", "Friday reminder", "{message}", "islamic_occasions", {"anchor": "zuhr", "offset_minutes": -30, "days_of_week": [4], "content_source": "rotating_messages", "messages": ["Send abundant salawat upon the Prophet today.", "Read Surah Al-Kahf — it is a light between two Fridays.", "Give charity today — even a little carries extra weight on Jumu'ah.", "Make dua in the last hour after Asr — it is the hour of acceptance.", "Reach out to a relative to strengthen family ties."]}),
+            ("friday_kahf_reminder", "Read Surah Al-Kahf", "It is still Friday. Read Surah Al-Kahf — it is a light between two Fridays and a protection for the week ahead.", "islamic_occasions", {"anchor": "asr", "offset_minutes": 30, "days_of_week": [4], "content_source": "rotating_messages", "messages": ["Read Surah Al-Kahf while it is still Friday.", "Surah Al-Kahf is a light for your heart and a protection for your week."]}),
+            ("pre_fajr", "A few minutes before Fajr", "Fajr is approaching. Wake gently and ready yourself for the day with Allah.", "prayer", {"anchor": "fajr", "offset_minutes": -10}),
+            ("pre_dhuhr", "Approaching Dhuhr", "Dhuhr is near. Clear your mind and step into prayer.", "prayer", {"anchor": "zuhr", "offset_minutes": -10}),
+            ("pre_maghrib", "Approaching Maghrib", "Maghrib is close. Pause your work and turn to Allah.", "prayer", {"anchor": "maghrib", "offset_minutes": -10}),
+            ("pre_isha", "Approaching Isha", "Isha is coming. End the day in prayer and quiet reflection.", "prayer", {"anchor": "isha", "offset_minutes": -10}),
+            ("pre_sleep_dhikr", "A moment before sleep", "Before you rest, spend a quiet moment with Allah. La ilaha illallah.", "reflection", {"anchor": "isha", "offset_minutes": -15}),
         ]
         created = 0
         for key, title, message, category, config in templates:
@@ -764,12 +773,12 @@ class DatabaseSeeder:
             print("\n[OK] Database seeding completed successfully!\n")
             print("[DATA] Summary:")
             print(f"   • {len(users)} users (admin: summie@admin.com / password123)")
-            print(f"   • Legacy jars: completed (1), mid-progress (1), varied (rest)")
-            print(f"   • Streaks: broken (2), active (multiple), varying lengths")
-            print(f"   • 1 active family (3 members), 1 archived family")
-            print(f"   • Remaining users: solo mode")
-            print(f"   • Journey reflections, adhkar favorites/progress seeded")
-            print(f"   • Notifications, badges, activities, books seeded")
+            print("   • Legacy jars: completed (1), mid-progress (1), varied (rest)")
+            print("   • Streaks: broken (2), active (multiple), varying lengths")
+            print("   • 1 active family (3 members), 1 archived family")
+            print("   • Remaining users: solo mode")
+            print("   • Journey reflections, adhkar favorites/progress seeded")
+            print("   • Notifications, badges, activities, books seeded")
             print()
 
         except Exception as e:

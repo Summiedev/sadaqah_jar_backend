@@ -377,11 +377,11 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
     repo.revoke_all_sessions(db, user.id)
 
 
-def verify_email(db: Session, token: str) -> dict:
+def verify_email(db: Session, token: str, device_id: str | None = None) -> dict:
     user = repo.consume_email_verification(db, token)
     if user is None:
         raise InvalidTokenException()
-    tokens = _issue_tokens(db, user)
+    tokens = _issue_tokens(db, user, device_id=device_id)
     return tokens
 
 
@@ -405,12 +405,12 @@ def resend_verification(
     email = validate_email(payload.email) if payload.email else current_user.email
     user = repo.get_user_by_email(db, email)
     if user is None or user.deleted_at is not None:
-        return {"message": "If an account with that email exists and is not verified, a new verification link has been sent."}
+        return {"message": "If an account with that email exists and is not verified, a new verification code has been sent."}
     if user.email_verified:
         raise BusinessRuleException("Email is already verified")
     raw_token = repo.create_email_verification(db, user.id)
     send_verification_email(user.email, raw_token, user.first_name or user.username)
-    return {"message": "If an account with that email exists and is not verified, a new verification link has been sent."}
+    return {"message": "If an account with that email exists and is not verified, a new verification code has been sent."}
 
 
 # ---------------------------------------------------------------------------
