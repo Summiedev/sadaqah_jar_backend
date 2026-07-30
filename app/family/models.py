@@ -50,20 +50,20 @@ class InvitationStatus(PyEnum):
     CANCELLED = "cancelled"
 
 
-class PrayerResponseType(PyEnum):
+class PrayerResponseType(str, PyEnum):
     AMEEN = "ameen"
     GRANT_EASE = "grant_ease"
     ACCEPT = "accept"
 
 
-class EncouragementType(PyEnum):
+class EncouragementType(str, PyEnum):
     MAY_ALLAH_ACCEPT = "may_allah_accept"
     AMEEN = "ameen"
     BARAKALLAHU_FEEK = "barakallahu_feek"
     MAY_ALLAH_INCREASE = "may_allah_increase"
 
 
-class EventType(PyEnum):
+class EventType(str, PyEnum):
     FAMILY_CREATED = "family.created"
     MEMBER_JOINED = "member.joined"
     MEMBER_LEFT = "member.left"
@@ -223,6 +223,9 @@ class FamilyGoal(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     family = relationship("Family", back_populates="goals")
+    milestones = relationship(
+        "FamilyGoalMilestone", back_populates="goal", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("ix_family_goals_active", "family_id", "is_archived", "deleted_at"),
@@ -431,3 +434,35 @@ class FamilySettings(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     family = relationship("Family", back_populates="settings")
+
+
+# ---------------------------------------------------------------------------
+# FamilyGoalMilestone
+# ---------------------------------------------------------------------------
+
+
+class FamilyGoalMilestone(Base):
+    __tablename__ = "family_goal_milestones"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    goal_id: Mapped[int] = mapped_column(
+        ForeignKey("family_goals.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_value: Mapped[int] = mapped_column(Integer, nullable=False)
+    current_value: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_achieved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    achieved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+
+    goal = relationship("FamilyGoal", back_populates="milestones")
+
+    __table_args__ = (
+        Index("ix_family_goal_milestones_goal", "goal_id", "sort_order"),
+    )

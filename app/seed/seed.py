@@ -33,6 +33,7 @@ from app.db.session import SessionLocal
 # Legacy models
 from app.models.badge import Badge
 from app.models.charity import Charity
+from app.models.donation_intent import DonationIntent
 from app.models.evidence import Evidence
 from app.models.jar import Jar
 from app.models.sadaqah_act import SadaqahAct, SadaqahCategory
@@ -54,6 +55,7 @@ from app.family.models import (
     Family,
     FamilyMember,
     FamilyGoal,
+    FamilyGoalMilestone,
     PrayerRequest,
     PrayerRequestResponse,
     FamilyReflection,
@@ -70,8 +72,9 @@ from app.journey.models import (
     JourneyReflection,
     JourneyAdhkarProgress,
     JourneyAdhkarFavorite,
+    JourneyReadingProgress,
 )
-from app.notifications.models import Notification, NotificationTemplate, SchedulingStrategy
+from app.notifications.models import Notification, NotificationTemplate, ScheduledNotification, SchedulingStrategy
 from app.books.models import Book, BookChapter
 
 
@@ -90,6 +93,7 @@ class DatabaseSeeder:
     # ------------------------------------------------------------------
     def clear_all(self) -> None:
         tables = [
+            FamilyGoalMilestone,
             ReflectionEncouragement,  # family
             PrayerRequestResponse,
             FamilyActivity,
@@ -379,9 +383,11 @@ class DatabaseSeeder:
     # ------------------------------------------------------------------
     # New activity completions
     # ------------------------------------------------------------------
-    def seed_activity_completions(self, users: list[User]) -> None:
+    def seed_activity_completions(self, users: list[User], family_id: int | None = None) -> None:
         act_types = list(ActivityType)
-        contexts = list(ActivityContext)
+        contexts = [ActivityContext.PERSONAL]
+        if family_id:
+            contexts.extend([ActivityContext.FAMILY, ActivityContext.BOTH])
         total = 0
         for user in users:
             for _ in range(random.randint(8, 30)):
@@ -393,7 +399,7 @@ class DatabaseSeeder:
                     activity_type=act_type,
                     context=context,
                     note=None,
-                    family_id=None,
+                    family_id=family_id if context in (ActivityContext.FAMILY, ActivityContext.BOTH) else None,
                     completed_at=completed,
                     stars_earned=random.randint(1, 3),
                     friday_boost=(completed.weekday() == 4),
@@ -407,22 +413,26 @@ class DatabaseSeeder:
     # ------------------------------------------------------------------
     # New activity sessions (continuous acts)
     # ------------------------------------------------------------------
-    def seed_activity_sessions(self, users: list[User]) -> None:
+    def seed_activity_sessions(self, users: list[User], family_id: int | None = None) -> None:
         continuous = [ActivityType.PRAYER, ActivityType.DHIKR, ActivityType.TIME]
+        contexts = [ActivityContext.PERSONAL]
+        if family_id:
+            contexts.extend([ActivityContext.FAMILY, ActivityContext.BOTH])
         total = 0
         for user in users:
             for _ in range(random.randint(2, 8)):
                 act_type = random.choice(continuous)
                 started = _utcnow() - timedelta(days=random.randint(0, 30), hours=random.randint(0, 12))
                 duration = random.randint(300, 3600)
+                context = random.choice(contexts)
                 session = ActivitySession(
                     user_id=user.id,
                     activity_type=act_type,
                     started_at=started,
                     ended_at=started + timedelta(seconds=duration),
                     duration_seconds=duration,
-                    context=random.choice(list(ActivityContext)),
-                    family_id=None,
+                    context=context,
+                    family_id=family_id if context in (ActivityContext.FAMILY, ActivityContext.BOTH) else None,
                 )
                 self.db.add(session)
                 total += 1
@@ -432,7 +442,7 @@ class DatabaseSeeder:
     # ------------------------------------------------------------------
     # Family domain
     # ------------------------------------------------------------------
-    def seed_families(self, users: list[User]) -> None:
+    def seed_families(self, users: list[User]) -> list[Family]:
         # Active family: users[0] (admin) + users[1] + users[2]
         active_family = Family(
             name="Al-Rahman Family",
@@ -467,6 +477,40 @@ class DatabaseSeeder:
             version=1,
         )
         self.db.add(goal)
+        self.db.flush()
+
+        milestones = [
+            FamilyGoalMilestone(
+                goal_id=goal.id,
+                title="First 25 acts",
+                description="Reach 25 family sadaqah acts",
+                target_value=25,
+                current_value=25,
+                is_achieved=True,
+                achieved_at=_utcnow() - timedelta(days=20),
+                sort_order=0,
+            ),
+            FamilyGoalMilestone(
+                goal_id=goal.id,
+                title="Halfway there",
+                description="Reach 50 family sadaqah acts",
+                target_value=50,
+                current_value=34,
+                is_achieved=False,
+                sort_order=1,
+            ),
+            FamilyGoalMilestone(
+                goal_id=goal.id,
+                title="Goal complete",
+                description="Reach 100 family sadaqah acts",
+                target_value=100,
+                current_value=34,
+                is_achieved=False,
+                sort_order=2,
+            ),
+        ]
+        for m in milestones:
+            self.db.add(m)
 
         # Prayer request
         pr = PrayerRequest(
@@ -531,6 +575,7 @@ class DatabaseSeeder:
 
         self.db.commit()
         print("[OK] Created families with members, goals, prayers, reflections")
+        return [active_family, archived]
 
     # ------------------------------------------------------------------
     # Journey reflections
@@ -564,6 +609,69 @@ class DatabaseSeeder:
                 self.db.add(JourneyAdhkarProgress(user_id=user.id, adhkar_id=aid, count=random.randint(0, 33)))
         self.db.commit()
         print("[OK] Created adhkar favorites and progress")
+
+    # ------------------------------------------------------------------
+    # Journey reading progress
+    # ------------------------------------------------------------------
+    def seed_journey_reading_progress(self, users: list[User], books: list[Book] | None = None) -> None:
+        if not books:
+            books = self.db.query(Book).filter(Book.published == True).all()
+        if not books:
+            return
+        for user in users[:6]:
+            book = random.choice(books)
+            chapter = random.randint(1, 3)
+            last_read = _utcnow() - timedelta(days=random.randint(0, 14))
+            self.db.add(
+                JourneyReadingProgress(
+                    user_id=user.id,
+                    book_id=book.id,
+                    chapter_number=chapter,
+                    last_read_at=last_read,
+                )
+            )
+        self.db.commit()
+        print("[OK] Created reading progress")
+
+    # ------------------------------------------------------------------
+    # Donation intents
+    # ------------------------------------------------------------------
+    def seed_donation_intents(self, users: list[User], charities: list[Charity] | None = None) -> None:
+        if not charities:
+            charities = self.db.query(Charity).filter(Charity.is_active == True).all()
+        if not charities:
+            return
+        for user in users[:5]:
+            for _ in range(random.randint(1, 3)):
+                self.db.add(
+                    DonationIntent(
+                        user_id=user.id,
+                        charity_id=random.choice(charities).id,
+                    )
+                )
+        self.db.commit()
+        print("[OK] Created donation intents")
+
+    # ------------------------------------------------------------------
+    # Scheduled notifications
+    # ------------------------------------------------------------------
+    def seed_scheduled_notifications(self, users: list[User]) -> None:
+        templates = self.db.query(NotificationTemplate).filter(NotificationTemplate.enabled == True).all()
+        if not templates:
+            return
+        for user in users:
+            template = random.choice(templates)
+            self.db.add(
+                ScheduledNotification(
+                    user_id=user.id,
+                    template_id=template.id,
+                    local_date=(_utcnow() + timedelta(days=random.randint(0, 7))).strftime("%Y-%m-%d"),
+                    scheduled_for=_utcnow() + timedelta(hours=random.randint(1, 48)),
+                    status="scheduled",
+                )
+            )
+        self.db.commit()
+        print("[OK] Created scheduled notifications")
 
     # ------------------------------------------------------------------
     # Notifications
@@ -760,15 +868,19 @@ class DatabaseSeeder:
             acts = self.seed_acts()
             self.seed_charities()
             self.seed_sadaqah_logs(users, acts)
-            self.seed_activity_completions(users)
-            self.seed_activity_sessions(users)
-            self.seed_families(users)
+            families = self.seed_families(users)
+            active_family_id = families[0].id if families else None
+            self.seed_activity_completions(users, family_id=active_family_id)
+            self.seed_activity_sessions(users, family_id=active_family_id)
             self.seed_journey_reflections(users)
             self.seed_journey_adhkar(users)
+            self.seed_journey_reading_progress(users)
             self.seed_notifications(users)
             self.seed_notification_templates()
+            self.seed_scheduled_notifications(users)
             self.seed_badges(users)
             self.seed_books()
+            self.seed_donation_intents(users)
 
             print("\n[OK] Database seeding completed successfully!\n")
             print("[DATA] Summary:")
@@ -776,9 +888,10 @@ class DatabaseSeeder:
             print("   • Legacy jars: completed (1), mid-progress (1), varied (rest)")
             print("   • Streaks: broken (2), active (multiple), varying lengths")
             print("   • 1 active family (3 members), 1 archived family")
+            print("   • Family goals with milestones seeded")
             print("   • Remaining users: solo mode")
-            print("   • Journey reflections, adhkar favorites/progress seeded")
-            print("   • Notifications, badges, activities, books seeded")
+            print("   • Journey reflections, adhkar favorites/progress, reading progress seeded")
+            print("   • Notifications, badges, activities, books, donation intents seeded")
             print()
 
         except Exception as e:

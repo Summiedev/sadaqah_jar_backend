@@ -15,6 +15,7 @@ from app.family.models import (
     FamilyMember,
     FamilyInvitation,
     FamilyGoal,
+    FamilyGoalMilestone,
     PrayerRequest,
     PrayerComment,
     PrayerRequestResponse,
@@ -378,6 +379,94 @@ def archive_goal(db: Session, goal: FamilyGoal) -> FamilyGoal:
     db.add(goal)
     db.flush()
     return goal
+
+
+# ---------------------------------------------------------------------------
+# FamilyGoalMilestone
+# ---------------------------------------------------------------------------
+
+
+def get_milestone_by_id(db: Session, milestone_id: int) -> FamilyGoalMilestone | None:
+    return db.scalar(
+        select(FamilyGoalMilestone).where(
+            FamilyGoalMilestone.id == milestone_id,
+            FamilyGoalMilestone.deleted_at.is_(None),
+        )
+    )
+
+
+def list_milestones(db: Session, goal_id: int) -> Sequence[FamilyGoalMilestone]:
+    return (
+        db.scalars(
+            select(FamilyGoalMilestone)
+            .where(
+                FamilyGoalMilestone.goal_id == goal_id,
+                FamilyGoalMilestone.deleted_at.is_(None),
+            )
+            .order_by(FamilyGoalMilestone.sort_order.asc(), FamilyGoalMilestone.id.asc())
+        )
+        .all()
+    )
+
+
+def create_milestone(
+    db: Session,
+    *,
+    goal_id: int,
+    title: str,
+    target_value: int,
+    description: str | None = None,
+    sort_order: int = 0,
+) -> FamilyGoalMilestone:
+    milestone = FamilyGoalMilestone(
+        goal_id=goal_id,
+        title=title,
+        description=description,
+        target_value=target_value,
+        sort_order=sort_order,
+    )
+    db.add(milestone)
+    db.flush()
+    return milestone
+
+
+def update_milestone(
+    db: Session,
+    milestone: FamilyGoalMilestone,
+    *,
+    title: str | None = None,
+    description: str | None = None,
+    target_value: int | None = None,
+    current_value: int | None = None,
+    sort_order: int | None = None,
+) -> FamilyGoalMilestone:
+    if title is not None:
+        milestone.title = title
+    if description is not None:
+        milestone.description = description
+    if target_value is not None:
+        milestone.target_value = target_value
+    if current_value is not None:
+        milestone.current_value = current_value
+    if sort_order is not None:
+        milestone.sort_order = sort_order
+    db.add(milestone)
+    db.flush()
+    return milestone
+
+
+def achieve_milestone(db: Session, milestone: FamilyGoalMilestone) -> FamilyGoalMilestone:
+    milestone.is_achieved = True
+    milestone.achieved_at = _utcnow()
+    db.add(milestone)
+    db.flush()
+    return milestone
+
+
+def soft_delete_milestone(db: Session, milestone: FamilyGoalMilestone) -> None:
+    milestone.deleted_at = _utcnow()
+    db.add(milestone)
+    db.flush()
 
 
 def soft_delete_goal(db: Session, goal: FamilyGoal) -> None:

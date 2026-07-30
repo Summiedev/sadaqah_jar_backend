@@ -5,7 +5,7 @@ import secrets
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import BusinessRuleException
+from app.core.exceptions import BusinessRuleException, ResourceNotFoundException
 from app.core.security import create_access_token, hash_password, verify_password
 from app.services.email_service import send_verification_email, send_password_reset_email
 from app.users import repository as repo

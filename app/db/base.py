@@ -11,6 +11,7 @@ import app.models.charity  # noqa: E402,F401
 import app.models.donation_intent  # noqa: E402,F401
 import app.models.evidence  # noqa: E402,F401
 import app.family.models  # noqa: E402,F401
+import app.goals.models  # noqa: E402,F401
 import app.journey.models  # noqa: E402,F401
 import app.books.models  # noqa: E402,F401
 import app.models.jar  # noqa: E402,F401

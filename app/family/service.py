@@ -30,6 +30,7 @@ from app.family.exceptions import (
     InvitationNotFoundException,
     InvalidInviteCodeException,
     MemberNotFoundException,
+    MilestoneNotFoundException,
     PrayerRequestNotFoundException,
     ReflectionNotFoundException,
     SettingsNotFoundException,
@@ -46,6 +47,7 @@ from app.family.models import (
     FamilyInvitation,
     FamilyMember,
     FamilyGoal,
+    FamilyGoalMilestone,
     PrayerRequest,
     PrayerComment,
     FamilyReflection,
@@ -72,6 +74,9 @@ from app.family.schemas import (
     FamilyDetailResponse,
     FamilyMemberResponse,
     FamilyGoalResponse,
+    FamilyGoalMilestoneCreate,
+    FamilyGoalMilestoneUpdate,
+    FamilyGoalMilestoneResponse,
     PrayerRequestResponse,
     ReflectionResponse,
     ActivityResponse,
@@ -725,6 +730,145 @@ def archive_goal(db: Session, family_id: int, goal_id: int, user_id: int) -> Fam
     return goal
 
 
+def delete_goal(db: Session, family_id: int, goal_id: int, user_id: int) -> None:
+    """Soft-delete a goal."""
+    goal = repo.get_goal_by_id(db, goal_id)
+    if not goal or goal.family_id != family_id:
+        raise GoalNotFoundException()
+
+    member = _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)
+    if member.role == FamilyRole.MEMBER and goal.created_by != user_id:
+        raise FamilyPermissionDeniedException("Cannot delete another member's goal")
+
+    repo.soft_delete_goal(db, goal)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Milestones
+# ---------------------------------------------------------------------------
+
+
+def list_milestones(
+    db: Session, family_id: int, goal_id: int, user_id: int
+) -> list[FamilyGoalMilestoneResponse]:
+    """List milestones for a family goal."""
+    _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
+    goal = repo.get_goal_by_id(db, goal_id)
+    if not goal or goal.family_id != family_id:
+        raise GoalNotFoundException()
+
+    milestones = repo.list_milestones(db, goal_id)
+    return [
+        FamilyGoalMilestoneResponse(
+            id=m.id,
+            goal_id=m.goal_id,
+            title=m.title,
+            description=m.description,
+            target_value=m.target_value,
+            current_value=m.current_value,
+            is_achieved=m.is_achieved,
+            achieved_at=m.achieved_at,
+            sort_order=m.sort_order,
+            created_at=m.created_at,
+        )
+        for m in milestones
+    ]
+
+
+def create_milestone(
+    db: Session, family_id: int, goal_id: int, payload: FamilyGoalMilestoneCreate, user_id: int
+) -> FamilyGoalMilestone:
+    """Create a milestone for a family goal."""
+    _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)
+    goal = repo.get_goal_by_id(db, goal_id)
+    if not goal or goal.family_id != family_id:
+        raise GoalNotFoundException()
+
+    milestone = repo.create_milestone(
+        db,
+        goal_id=goal_id,
+        title=payload.title,
+        description=payload.description,
+        target_value=payload.target_value,
+        sort_order=payload.sort_order,
+    )
+    db.commit()
+    db.refresh(milestone)
+    return milestone
+
+
+def update_milestone(
+    db: Session,
+    family_id: int,
+    goal_id: int,
+    milestone_id: int,
+    payload: FamilyGoalMilestoneUpdate,
+    user_id: int,
+) -> FamilyGoalMilestone:
+    """Update a milestone."""
+    _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)
+    goal = repo.get_goal_by_id(db, goal_id)
+    if not goal or goal.family_id != family_id:
+        raise GoalNotFoundException()
+
+    milestone = repo.get_milestone_by_id(db, milestone_id)
+    if not milestone or milestone.goal_id != goal_id:
+        raise MilestoneNotFoundException()
+
+    milestone = repo.update_milestone(
+        db,
+        milestone,
+        title=payload.title,
+        description=payload.description,
+        target_value=payload.target_value,
+        current_value=payload.current_value,
+        sort_order=payload.sort_order,
+    )
+    db.commit()
+    db.refresh(milestone)
+    return milestone
+
+
+def achieve_milestone(
+    db: Session, family_id: int, goal_id: int, milestone_id: int, user_id: int
+) -> FamilyGoalMilestone:
+    """Mark a milestone as achieved."""
+    _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)
+    goal = repo.get_goal_by_id(db, goal_id)
+    if not goal or goal.family_id != family_id:
+        raise GoalNotFoundException()
+
+    milestone = repo.get_milestone_by_id(db, milestone_id)
+    if not milestone or milestone.goal_id != goal_id:
+        raise MilestoneNotFoundException()
+
+    if milestone.is_achieved:
+        raise BusinessRuleException("Milestone is already achieved")
+
+    milestone = repo.achieve_milestone(db, milestone)
+    db.commit()
+    db.refresh(milestone)
+    return milestone
+
+
+def delete_milestone(
+    db: Session, family_id: int, goal_id: int, milestone_id: int, user_id: int
+) -> None:
+    """Soft-delete a milestone."""
+    _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)
+    goal = repo.get_goal_by_id(db, goal_id)
+    if not goal or goal.family_id != family_id:
+        raise GoalNotFoundException()
+
+    milestone = repo.get_milestone_by_id(db, milestone_id)
+    if not milestone or milestone.goal_id != goal_id:
+        raise MilestoneNotFoundException()
+
+    repo.soft_delete_milestone(db, milestone)
+    db.commit()
+
+
 # ---------------------------------------------------------------------------
 # Prayer Requests
 # ---------------------------------------------------------------------------
@@ -994,6 +1138,19 @@ def create_reflection(
     return reflection
 
 
+def delete_reflection(db: Session, family_id: int, reflection_id: int, user_id: int) -> None:
+    """Soft-delete a reflection. Author only."""
+    reflection = repo.get_reflection_by_id(db, reflection_id)
+    if not reflection or reflection.family_id != family_id:
+        raise ReflectionNotFoundException()
+
+    if reflection.author_id != user_id:
+        _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)
+
+    repo.soft_delete_reflection(db, reflection)
+    db.commit()
+
+
 def encourage_reflection(
     db: Session, family_id: int, reflection_id: int, payload: ReflectionEncourage, user_id: int
 ) -> dict[str, int]:
@@ -1100,7 +1257,7 @@ def update_settings(
 
 def leave_family(db: Session, family_id: int, user_id: int) -> None:
     """Self-removal (leave). Reuses remove_member with member_id == user_id."""
-    member = repo.get_member_by_user(db, family_id, user_id)
+    member = repo.get_member(db, family_id, user_id)
     if not member:
         raise MemberNotFoundException()
     remove_member(db, family_id, member.id, user_id)

@@ -37,6 +37,11 @@ class GoalNotFoundException(ResourceNotFoundException):
         super().__init__(message)
 
 
+class MilestoneNotFoundException(ResourceNotFoundException):
+    def __init__(self, message: str = "Milestone not found"):
+        super().__init__(message)
+
+
 class PrayerRequestNotFoundException(ResourceNotFoundException):
     def __init__(self, message: str = "Prayer request not found"):
         super().__init__(message)

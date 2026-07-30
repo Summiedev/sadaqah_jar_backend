@@ -44,8 +44,8 @@ async def jar_ws(websocket: WebSocket, user_id: int, token: str = Query(None)):
         manager.disconnect(user_id, websocket)
 
 
-@router.websocket("/ws/family-jar/{jar_id}")
-async def family_jar_ws(websocket: WebSocket, jar_id: int, token: str = Query(None)):
+@router.websocket("/ws/family-jar/{family_id}")
+async def family_jar_ws(websocket: WebSocket, family_id: int, token: str = Query(None)):
     if not token:
         await websocket.close(code=4001)
         return
@@ -56,7 +56,7 @@ async def family_jar_ws(websocket: WebSocket, jar_id: int, token: str = Query(No
         if user is None:
             await websocket.close(code=4001, reason="Invalid token")
             return
-        member = get_member(db, jar_id, user.id)
+        member = get_member(db, family_id, user.id)
         if not member:
             await websocket.close(code=4403, reason="Family membership required")
             return
@@ -66,9 +66,9 @@ async def family_jar_ws(websocket: WebSocket, jar_id: int, token: str = Query(No
     finally:
         db.close()
 
-    await manager.connect_family(jar_id, websocket)
+    await manager.connect_family(family_id, websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect_family(jar_id, websocket)
+        manager.disconnect_family(family_id, websocket)

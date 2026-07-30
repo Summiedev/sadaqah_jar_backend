@@ -90,8 +90,39 @@ class FamilyGoalResponse(BaseModel):
     completed_at: datetime | None = None
     created_by: int
     created_at: datetime
+    milestones: list["FamilyGoalMilestoneResponse"] = []
 
     model_config = {"from_attributes": True}
+
+
+class FamilyGoalMilestoneResponse(BaseModel):
+    id: int
+    goal_id: int
+    title: str
+    description: str | None = None
+    target_value: int
+    current_value: int = 0
+    is_achieved: bool = False
+    achieved_at: datetime | None = None
+    sort_order: int = 0
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class FamilyGoalMilestoneCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str | None = Field(None, max_length=1000)
+    target_value: int = Field(..., gt=0)
+    sort_order: int = Field(0, ge=0)
+
+
+class FamilyGoalMilestoneUpdate(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = Field(None, max_length=1000)
+    target_value: int | None = Field(None, gt=0)
+    current_value: int | None = Field(None, ge=0)
+    sort_order: int | None = Field(None, ge=0)
 
 
 class FamilyResponse(BaseModel):

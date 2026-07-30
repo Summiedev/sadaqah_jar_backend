@@ -26,22 +26,28 @@ Frontend source of truth — covers every endpoint the frontend app calls:
 - DELETE /family/{family_id}
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.security import create_access_token, hash_password
-from app.db.session import SessionLocal, engine
+from app.db.session import SessionLocal
 from app.main import app
 from app.models.user import User, Role
 from app.family.models import (
     Family,
     FamilyMember,
     FamilyGoal,
+    FamilyGoalMilestone,
     PrayerRequest,
     FamilyReflection,
     FamilySettings,
     ReflectionEncouragement,
     PrayerRequestResponse,
+    FamilyRole,
+    FamilyInvitation,
+    InvitationStatus,
 )
 
 client = TestClient(app)
@@ -53,7 +59,7 @@ def _headers(user_id: int, role: str = "USER") -> dict:
     return {"Authorization": f"Bearer {create_access_token({'sub': str(user_id), 'role': role})}"}
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def db():
     _db = SessionLocal()
     yield _db
@@ -73,8 +79,15 @@ def _create_family(db, owner_id, name="Test Family") -> Family:
     db.add(f)
     db.commit()
     db.refresh(f)
-    db.add(FamilyMember(family_id=f.id, user_id=owner_id, role_name="owner"))
+    db.add(FamilyMember(family_id=f.id, user_id=owner_id, role=FamilyRole.OWNER))
     db.add(FamilySettings(family_id=f.id, notification_preferences={}, version=1))
+    db.add(FamilyInvitation(
+        family_id=f.id,
+        invited_by=owner_id,
+        invite_code="TEST-CODE",
+        status=InvitationStatus.PENDING,
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=7),
+    ))
     db.commit()
     db.refresh(f)
     return f
@@ -89,18 +102,20 @@ def _clean_family(db, family_id):
         db.query(PrayerRequest.id).filter(PrayerRequest.family_id == family_id)
     )).delete(synchronize_session=False)
     db.query(PrayerRequest).filter(PrayerRequest.family_id == family_id).delete(synchronize_session=False)
+    db.query(FamilyGoalMilestone).filter(FamilyGoalMilestone.goal_id.in_(
+        db.query(FamilyGoal.id).filter(FamilyGoal.family_id == family_id)
+    )).delete(synchronize_session=False)
     db.query(FamilyGoal).filter(FamilyGoal.family_id == family_id).delete(synchronize_session=False)
+    db.query(FamilyInvitation).filter(FamilyInvitation.family_id == family_id).delete(synchronize_session=False)
     db.query(FamilyMember).filter(FamilyMember.family_id == family_id).delete(synchronize_session=False)
     db.query(FamilySettings).filter(FamilySettings.family_id == family_id).delete(synchronize_session=False)
     db.query(Family).filter(Family.id == family_id).delete(synchronize_session=False)
     db.commit()
 
 
-# Family domain requires PostgreSQL (JSONB columns); skip on SQLite.
-@pytest.fixture(autouse=True)
-def _skip_on_sqlite():
-    if engine.dialect.name == "sqlite":
-        pytest.skip("Family domain requires PostgreSQL (JSONB columns)")
+# ---------------------------------------------------------------------------
+# Create / Join / List
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +126,7 @@ def _skip_on_sqlite():
 def test_create_family(db):
     owner = _create_user(db, "fam_owner_create", "fam_owner_create@test.com")
     resp = client.post(f"{API}/family/create", params={"name": "My Family"}, headers=_headers(owner.id))
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["name"] == "My Family"
     assert "invite_code" in data
@@ -123,7 +138,7 @@ def test_join_family(db):
     family = _create_family(db, owner.id, name="Joinable")
     member = _create_user(db, "join_member_2", "join_member_2@test.com")
 
-    resp = client.post(f"{API}/family/join", params={"invite_code": family.invite_code}, headers=_headers(member.id))
+    resp = client.post(f"{API}/family/join", json={"invite_code": family.invite_code}, headers=_headers(member.id))
     assert resp.status_code == 200
     assert resp.json()["data"]["id"] == family.id
     _clean_family(db, family.id)
@@ -167,7 +182,7 @@ def test_remove_member(db):
     family = _create_family(db, owner.id, name="Remove Fam")
     member = _create_user(db, "rem_target_2", "rem_target_2@test.com")
 
-    join_resp = client.post(f"{API}/family/join", params={"invite_code": family.invite_code}, headers=_headers(member.id))
+    join_resp = client.post(f"{API}/family/join", json={"invite_code": family.invite_code}, headers=_headers(member.id))
     assert join_resp.status_code == 200
 
     members_resp = client.get(f"{API}/family/{family.id}/members", headers=_headers(owner.id))
@@ -238,8 +253,9 @@ def test_delete_goal(db):
     assert resp.status_code == 200
 
     db.expire_all()
-    gone = db.query(FamilyGoal).filter(FamilyGoal.id == goal_id).first()
-    assert gone is None
+    deleted = db.query(FamilyGoal).filter(FamilyGoal.id == goal_id).first()
+    assert deleted is not None
+    assert deleted.deleted_at is not None
     _clean_family(db, family.id)
 
 
@@ -274,6 +290,105 @@ def test_archive_goal(db):
 
 
 # ---------------------------------------------------------------------------
+# Milestones
+# ---------------------------------------------------------------------------
+
+
+def test_create_and_list_milestones(db):
+    owner = _create_user(db, "mile_owner_2", "mile_owner_2@test.com")
+    family = _create_family(db, owner.id, name="Milestone Fam")
+    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Milestone Goal", acts_target=10)
+    db.add(goal)
+    db.commit()
+    db.refresh(goal)
+
+    create = client.post(
+        f"{API}/family/{family.id}/goals/{goal.id}/milestones",
+        json={"title": "First 5 acts", "target_value": 5},
+        headers=_headers(owner.id),
+    )
+    assert create.status_code == 201
+    milestone_id = create.json()["data"]["id"]
+
+    listed = client.get(f"{API}/family/{family.id}/goals/{goal.id}/milestones", headers=_headers(owner.id))
+    assert listed.status_code == 200
+    assert len(listed.json()["data"]) == 1
+    assert listed.json()["data"][0]["title"] == "First 5 acts"
+    _clean_family(db, family.id)
+
+
+def test_update_milestone(db):
+    owner = _create_user(db, "upd_mile_owner_2", "upd_mile_owner_2@test.com")
+    family = _create_family(db, owner.id, name="Upd Milestone Fam")
+    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Upd Mile Goal", acts_target=10)
+    db.add(goal)
+    db.commit()
+    db.refresh(goal)
+    milestone = FamilyGoalMilestone(goal_id=goal.id, title="Old", target_value=5)
+    db.add(milestone)
+    db.commit()
+    db.refresh(milestone)
+
+    resp = client.patch(
+        f"{API}/family/{family.id}/goals/{goal.id}/milestones/{milestone.id}",
+        json={"title": "New Title", "current_value": 3},
+        headers=_headers(owner.id),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["title"] == "New Title"
+    assert resp.json()["data"]["current_value"] == 3
+    _clean_family(db, family.id)
+
+
+def test_achieve_milestone(db):
+    owner = _create_user(db, "ach_mile_owner_2", "ach_mile_owner_2@test.com")
+    family = _create_family(db, owner.id, name="Achieve Milestone Fam")
+    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Achieve Goal", acts_target=10)
+    db.add(goal)
+    db.commit()
+    db.refresh(goal)
+    milestone = FamilyGoalMilestone(goal_id=goal.id, title="Do it", target_value=5)
+    db.add(milestone)
+    db.commit()
+    db.refresh(milestone)
+
+    resp = client.post(
+        f"{API}/family/{family.id}/goals/{goal.id}/milestones/{milestone.id}/achieve",
+        headers=_headers(owner.id),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["is_achieved"] is True
+    assert resp.json()["data"]["achieved_at"] is not None
+    _clean_family(db, family.id)
+
+
+def test_delete_milestone(db):
+    owner = _create_user(db, "del_mile_owner_2", "del_mile_owner_2@test.com")
+    family = _create_family(db, owner.id, name="Del Milestone Fam")
+    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Del Mile Goal", acts_target=10)
+    db.add(goal)
+    db.commit()
+    db.refresh(goal)
+    milestone = FamilyGoalMilestone(goal_id=goal.id, title="To Delete", target_value=1)
+    db.add(milestone)
+    db.commit()
+    db.refresh(milestone)
+    milestone_id = milestone.id
+
+    resp = client.delete(
+        f"{API}/family/{family.id}/goals/{goal.id}/milestones/{milestone_id}",
+        headers=_headers(owner.id),
+    )
+    assert resp.status_code == 200
+
+    db.expire_all()
+    deleted = db.query(FamilyGoalMilestone).filter(FamilyGoalMilestone.id == milestone_id).first()
+    assert deleted is not None
+    assert deleted.deleted_at is not None
+    _clean_family(db, family.id)
+
+
+# ---------------------------------------------------------------------------
 # Prayers
 # ---------------------------------------------------------------------------
 
@@ -301,7 +416,7 @@ def test_respond_to_prayer(db):
     owner = _create_user(db, "prayer_resp_owner_2", "prayer_resp_owner_2@test.com")
     family = _create_family(db, owner.id, name="PrayerResp Fam")
     member = _create_user(db, "prayer_resp_member_2", "prayer_resp_member_2@test.com")
-    join_resp = client.post(f"{API}/family/join", params={"invite_code": family.invite_code}, headers=_headers(member.id))
+    join_resp = client.post(f"{API}/family/join", json={"invite_code": family.invite_code}, headers=_headers(member.id))
     assert join_resp.status_code == 200
 
     prayer = PrayerRequest(family_id=family.id, author_id=owner.id, text="Heal my heart", is_private=False)
@@ -356,8 +471,9 @@ def test_delete_reflection(db):
     assert resp.status_code == 200
 
     db.expire_all()
-    gone = db.query(FamilyReflection).filter(FamilyReflection.id == refl_id).first()
-    assert gone is None
+    deleted = db.query(FamilyReflection).filter(FamilyReflection.id == refl_id).first()
+    assert deleted is not None
+    assert deleted.deleted_at is not None
     _clean_family(db, family.id)
 
 
@@ -365,7 +481,7 @@ def test_encourage_reflection(db):
     owner = _create_user(db, "enc_refl_owner_2", "enc_refl_owner_2@test.com")
     family = _create_family(db, owner.id, name="Enc Refl Fam")
     member = _create_user(db, "enc_refl_member_2", "enc_refl_member_2@test.com")
-    join_resp = client.post(f"{API}/family/join", params={"invite_code": family.invite_code}, headers=_headers(member.id))
+    join_resp = client.post(f"{API}/family/join", json={"invite_code": family.invite_code}, headers=_headers(member.id))
     assert join_resp.status_code == 200
 
     refl = FamilyReflection(family_id=family.id, author_id=owner.id, text="Beautiful day")
@@ -434,7 +550,8 @@ def test_delete_family(db):
 
     db.expire_all()
     found = db.query(Family).filter(Family.id == family.id).first()
-    assert found is None
+    assert found is not None
+    assert found.deleted_at is not None
 
 
 # ---------------------------------------------------------------------------
@@ -444,7 +561,7 @@ def test_delete_family(db):
 
 def test_family_endpoints_require_auth(db):
     resp = client.get(f"{API}/family/")
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
     resp = client.post(f"{API}/family/create", params={"name": "No Auth"})
-    assert resp.status_code == 403
+    assert resp.status_code == 401

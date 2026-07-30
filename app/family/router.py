@@ -27,6 +27,8 @@ from app.family.schemas import (
     SettingsUpdate,
     MemberRoleUpdate,
     JoinRequest,
+    FamilyGoalMilestoneCreate,
+    FamilyGoalMilestoneUpdate,
 )
 
 router = APIRouter(prefix="/family", tags=["family"])
@@ -111,14 +113,14 @@ def update_family(
 def delete_family(family_id: int, db: DbDep, current_user: CurrentUser):
     """Soft delete a family. Owner only."""
     service.delete_family(db, family_id, current_user.id)
-    return Envelope(message="Family deleted")
+    return Envelope(data=None, message="Family deleted")
 
 
 @router.post("/{family_id}/archive", response_model=Envelope)
 def archive_family(family_id: int, db: DbDep, current_user: CurrentUser):
     """Archive a family. Owner only."""
     service.archive_family(db, family_id, current_user.id)
-    return Envelope(message="Family archived")
+    return Envelope(data=None, message="Family archived")
 
 
 # ---------------------------------------------------------------------------
@@ -162,14 +164,14 @@ def remove_member(
 ):
     """Remove a member. Admin+ or self-removal (leave)."""
     service.remove_member(db, family_id, member_id, current_user.id)
-    return Envelope(message="Member removed")
+    return Envelope(data=None, message="Member removed")
 
 
 @router.post("/{family_id}/leave", response_model=Envelope)
 def leave_family(family_id: int, db: DbDep, current_user: CurrentUser):
     """Leave a family. Self-removal."""
     service.leave_family(db, family_id, current_user.id)
-    return Envelope(message="Left family")
+    return Envelope(data=None, message="Left family")
 
 
 @router.get("/{family_id}/leaderboard", response_model=Envelope)
@@ -232,7 +234,7 @@ def cancel_invitation(
 ):
     """Cancel a pending invitation."""
     service.cancel_invitation(db, family_id, invitation_id, current_user.id)
-    return Envelope(message="Invitation cancelled")
+    return Envelope(data=None, message="Invitation cancelled")
 
 
 @router.post("/join", response_model=Envelope)
@@ -266,7 +268,7 @@ def accept_invitation(code: str, db: DbDep, current_user: CurrentUser):
 def decline_invitation(code: str, db: DbDep, current_user: CurrentUser):
     """Decline an invitation by code."""
     service.decline_invitation(db, code, current_user.id)
-    return Envelope(message="Invitation declined")
+    return Envelope(data=None, message="Invitation declined")
 
 
 # ---------------------------------------------------------------------------
@@ -355,7 +357,114 @@ def archive_goal(
 ):
     """Archive a goal."""
     service.archive_goal(db, family_id, goal_id, current_user.id)
-    return Envelope(message="Goal archived")
+    return Envelope(data=None, message="Goal archived")
+
+
+@router.delete("/{family_id}/goals/{goal_id}", response_model=Envelope)
+def delete_goal(
+    family_id: int,
+    goal_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Soft-delete a goal."""
+    service.delete_goal(db, family_id, goal_id, current_user.id)
+    return Envelope(data=None, message="Goal deleted")
+
+
+# ---------------------------------------------------------------------------
+# Milestones
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{family_id}/goals/{goal_id}/milestones", response_model=Envelope)
+def list_milestones(
+    family_id: int,
+    goal_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """List milestones for a family goal."""
+    milestones = service.list_milestones(db, family_id, goal_id, current_user.id)
+    return Envelope(data=milestones)
+
+
+@router.post("/{family_id}/goals/{goal_id}/milestones", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+def create_milestone(
+    family_id: int,
+    goal_id: int,
+    payload: FamilyGoalMilestoneCreate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Create a milestone for a family goal."""
+    milestone = service.create_milestone(db, family_id, goal_id, payload, current_user.id)
+    return Envelope(
+        data={
+            "id": milestone.id,
+            "goal_id": milestone.goal_id,
+            "title": milestone.title,
+            "target_value": milestone.target_value,
+            "created_at": milestone.created_at.isoformat(),
+        },
+        message="Milestone created",
+    )
+
+
+@router.patch("/{family_id}/goals/{goal_id}/milestones/{milestone_id}", response_model=Envelope)
+def update_milestone(
+    family_id: int,
+    goal_id: int,
+    milestone_id: int,
+    payload: FamilyGoalMilestoneUpdate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Update a milestone."""
+    milestone = service.update_milestone(db, family_id, goal_id, milestone_id, payload, current_user.id)
+    return Envelope(
+        data={
+            "id": milestone.id,
+            "title": milestone.title,
+            "current_value": milestone.current_value,
+            "target_value": milestone.target_value,
+        },
+        message="Milestone updated",
+    )
+
+
+@router.post("/{family_id}/goals/{goal_id}/milestones/{milestone_id}/achieve", response_model=Envelope)
+def achieve_milestone(
+    family_id: int,
+    goal_id: int,
+    milestone_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Mark a milestone as achieved."""
+    milestone = service.achieve_milestone(db, family_id, goal_id, milestone_id, current_user.id)
+    return Envelope(
+        data={
+            "id": milestone.id,
+            "title": milestone.title,
+            "is_achieved": milestone.is_achieved,
+            "achieved_at": milestone.achieved_at.isoformat() if milestone.achieved_at else None,
+        },
+        message="Milestone achieved",
+    )
+
+
+@router.delete("/{family_id}/goals/{goal_id}/milestones/{milestone_id}", response_model=Envelope)
+def delete_milestone(
+    family_id: int,
+    goal_id: int,
+    milestone_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Delete a milestone."""
+    service.delete_milestone(db, family_id, goal_id, milestone_id, current_user.id)
+    return Envelope(data=None, message="Milestone deleted")
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +597,7 @@ def delete_prayer_comment(
 ):
     """Delete a comment. Author only."""
     service.delete_prayer_comment(db, family_id, prayer_id, comment_id, current_user.id)
-    return Envelope(message="Comment deleted")
+    return Envelope(data=None, message="Comment deleted")
 
 
 @router.post("/{family_id}/prayers/{prayer_id}/answer", response_model=Envelope)
@@ -549,6 +658,18 @@ def create_reflection(
         },
         message="Reflection shared",
     )
+
+
+@router.delete("/{family_id}/reflections/{reflection_id}", response_model=Envelope)
+def delete_reflection(
+    family_id: int,
+    reflection_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Delete a reflection. Author only."""
+    service.delete_reflection(db, family_id, reflection_id, current_user.id)
+    return Envelope(data=None, message="Reflection deleted")
 
 
 @router.post("/{family_id}/reflections/{reflection_id}/encourage", response_model=Envelope)

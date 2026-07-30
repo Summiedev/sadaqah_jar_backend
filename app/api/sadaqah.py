@@ -219,7 +219,6 @@ def _get_or_create_quick_act(db: Session, act_type: str) -> SadaqahAct:
         )
         db.add(act)
         db.flush()
-        db.commit()
     return act
 
 

@@ -23,6 +23,7 @@ from app.api.dashboard import router as dashboard_router
 from app.family.router import router as family_router
 from app.api.friday import router as friday_router
 from app.books.router import router as books_router
+from app.goals.router import router as goals_router
 from app.api.leaderboard import router as leaderboard_router
 from app.notifications.router import router as notifications_router
 from app.api.sadaqah import router as sadaqah_router
@@ -65,5 +66,6 @@ for router in (
     admin_evidence_router,
     admin_leaderboard_seasons_router,
     journey_router,
+    goals_router,
 ):
     api_router.include_router(router)
