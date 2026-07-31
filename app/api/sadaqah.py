@@ -237,9 +237,9 @@ async def add_star(
     user_id = current_user.id
     request_id = request_id.strip() if request_id else None
 
-    # Rate limit (raise HTTP 429 if exceeded)
-    if not check_rate_limit(user_id, limit=5, period=60):
-        raise HTTPException(status_code=429, detail="Too many requests")
+    # Rate limit — generous limit for adding acts of kindness
+    if not check_rate_limit(user_id, limit=30, period=60):
+        raise HTTPException(status_code=429, detail="Take a moment — you're adding too quickly. Please wait a bit.")
 
     today = datetime.utcnow().date()
 
@@ -263,18 +263,7 @@ async def add_star(
             if not act:
                 raise HTTPException(status_code=404, detail="Act not found")
 
-        # Ensure we haven't already logged this act today for this user.
-        existing = (
-            db.query(SadaqahLog)
-            .filter(
-                SadaqahLog.user_id == user_id,
-                SadaqahLog.act_id == act_id,
-                SadaqahLog.date == today,
-            )
-            .first()
-        )
-        if existing:
-            raise HTTPException(status_code=400, detail="Already added today")
+        # Duplicate acts are allowed — every sincere act counts, even if repeated.
 
         # Compute multiplier.
         multiplier = act.reward_weight or 1

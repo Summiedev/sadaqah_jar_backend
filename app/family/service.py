@@ -1347,3 +1347,47 @@ def get_top_contributor(db: Session, family_id: int, user_id: int) -> dict | Non
         "contribution_count": top.contribution_count,
         "stars_earned": top.stars_earned,
     }
+
+
+def add_family_act(
+    db: Session, family_id: int, user_id: int, act_type: str = "sadaqah"
+) -> dict[str, Any]:
+    """Add an act to the family jar. Increments the active goal's acts_done
+    and logs the activity on the timeline."""
+    _require_permission(db, family_id, user_id, Permission.CREATE_PRAYER)
+    family = repo.get_family_by_id(db, family_id)
+    if not family:
+        raise FamilyNotFoundException()
+
+    goals = repo.list_family_goals(db, family_id)
+    if not goals:
+        raise GoalNotFoundException("No active goals for this family")
+
+    active_goal = None
+    for g in goals:
+        if not g.is_archived and not g.completed_at:
+            active_goal = g
+            break
+
+    if active_goal is None:
+        active_goal = goals[0]
+
+    repo.increment_goal_acts_done(db, active_goal)
+    repo.log_activity(
+        db,
+        family_id=family_id,
+        event_type=EventType.ACT_ADDED,
+        actor_id=user_id,
+        extra={"act_type": act_type, "goal_id": active_goal.id},
+    )
+    db.commit()
+
+    return {
+        "goal_id": active_goal.id,
+        "title": active_goal.title,
+        "acts_done": active_goal.acts_done,
+        "acts_target": active_goal.acts_target,
+        "progress": round(active_goal.acts_done / active_goal.acts_target, 4)
+        if active_goal.acts_target > 0
+        else 0.0,
+    }

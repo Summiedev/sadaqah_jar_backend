@@ -75,6 +75,7 @@ class EventType(str, PyEnum):
     REFLECTION_SHARED = "reflection.shared"
     INVITATION_ACCEPTED = "invitation.accepted"
     INVITATION_DECLINED = "invitation.declined"
+    ACT_ADDED = "act.added"
 
 
 # ---------------------------------------------------------------------------

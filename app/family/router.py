@@ -744,3 +744,14 @@ def update_settings(
         },
         message="Settings updated",
     )
+
+
+@router.post("/{family_id}/add-act", response_model=Envelope)
+def add_family_act(
+    family_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Add an act to the family jar. Increments the active goal's acts_done."""
+    result = service.add_family_act(db, family_id, current_user.id)
+    return Envelope(data=result, message="Act added to family jar")

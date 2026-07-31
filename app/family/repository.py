@@ -469,6 +469,14 @@ def soft_delete_milestone(db: Session, milestone: FamilyGoalMilestone) -> None:
     db.flush()
 
 
+def increment_goal_acts_done(db: Session, goal: FamilyGoal) -> FamilyGoal:
+    goal.acts_done = (goal.acts_done or 0) + 1
+    goal.version += 1
+    db.add(goal)
+    db.flush()
+    return goal
+
+
 def soft_delete_goal(db: Session, goal: FamilyGoal) -> None:
     goal.deleted_at = _utcnow()
     db.add(goal)
