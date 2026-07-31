@@ -26,6 +26,7 @@ Frontend source of truth — covers every endpoint the frontend app calls:
 - DELETE /family/{family_id}
 """
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -55,8 +56,22 @@ client = TestClient(app)
 API = "/api/v1"
 
 
-def _headers(user_id: int, role: str = "USER") -> dict:
-    return {"Authorization": f"Bearer {create_access_token({'sub': str(user_id), 'role': role})}"}
+@pytest.fixture(autouse=True)
+def _ensure_event_loop():
+    original_create_task = asyncio.create_task
+
+    def _create_task(coro, *, name=None, context=None):
+        try:
+            loop = asyncio.get_running_loop()
+            return loop.create_task(coro, name=name, context=context)
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.create_task(coro, name=name, context=context)
+
+    asyncio.create_task = _create_task
+    yield
+    asyncio.create_task = original_create_task
 
 
 @pytest.fixture(scope="function")
@@ -64,6 +79,13 @@ def db():
     _db = SessionLocal()
     yield _db
     _db.close()
+
+
+def _headers(user_id: int, role: str = "USER") -> dict:
+    return {"Authorization": f"Bearer {create_access_token({'sub': str(user_id), 'role': role})}"}
+
+
+_invite_code_counter = 0
 
 
 def _create_user(db, username, email, role=Role.USER) -> User:
@@ -75,7 +97,10 @@ def _create_user(db, username, email, role=Role.USER) -> User:
 
 
 def _create_family(db, owner_id, name="Test Family") -> Family:
-    f = Family(name=name, cover_icon="🌿", invite_code="TEST-CODE", created_by=owner_id)
+    global _invite_code_counter
+    _invite_code_counter += 1
+    invite_code = f"TEST-CODE-{_invite_code_counter}"
+    f = Family(name=name, cover_icon="🌿", invite_code=invite_code, created_by=owner_id)
     db.add(f)
     db.commit()
     db.refresh(f)
@@ -84,7 +109,7 @@ def _create_family(db, owner_id, name="Test Family") -> Family:
     db.add(FamilyInvitation(
         family_id=f.id,
         invited_by=owner_id,
-        invite_code="TEST-CODE",
+        invite_code=invite_code,
         status=InvitationStatus.PENDING,
         expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=7),
     ))
