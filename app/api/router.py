@@ -23,6 +23,7 @@ from app.api.dashboard import router as dashboard_router
 from app.family.router import router as family_router
 from app.api.friday import router as friday_router
 from app.books.router import router as books_router
+from app.books.bookmark_router import router as book_bookmarks_router
 from app.goals.router import router as goals_router
 from app.api.leaderboard import router as leaderboard_router
 from app.notifications.router import router as notifications_router
@@ -52,6 +53,7 @@ for router in (
     family_router,
     friday_router,
     books_router,
+    book_bookmarks_router,
     leaderboard_router,
     notifications_router,
     sadaqah_router,

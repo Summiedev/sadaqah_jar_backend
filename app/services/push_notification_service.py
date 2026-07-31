@@ -34,12 +34,15 @@ def _firebase_messaging():
 
 
 def send_push_notification(
-    db: Session, *, user_id: int, title: str, body: str, data: dict[str, str] | None = None
+    db: Session, *, user_id: int, title: str, body: str, notification_type: str = 'general', data: dict[str, str] | None = None
 ) -> int:
     """Send to every active device token registered for one user."""
     messaging = _firebase_messaging()
     if messaging is None:
         return 0
+    merged_data = {'notification_type': notification_type}
+    if data:
+        merged_data.update(data)
     devices = (
         db.query(UserDevice)
         .filter(UserDevice.user_id == user_id, UserDevice.push_token.is_not(None))
@@ -52,7 +55,7 @@ def send_push_notification(
                 messaging.Message(
                     token=device.push_token,
                     notification=messaging.Notification(title=title, body=body),
-                    data=data or {},
+                    data=merged_data,
                 )
             )
             delivered += 1

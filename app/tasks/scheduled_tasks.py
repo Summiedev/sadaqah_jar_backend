@@ -94,6 +94,20 @@ def schedule_daily_prayer_reminders():
         db.close()
 
 
+def _map_category_to_notification_type(category: str) -> str:
+    mapping = {
+        'charity': 'sadaqah_act',
+        'reflection': 'reflection',
+        'family': 'family_activity',
+        'prayer': 'prayer_request',
+        'adhkar': 'adhkar',
+        'reading': 'reading_progress',
+        'islamic_occasions': 'friday',
+        'journey': 'goal_progress',
+    }
+    return mapping.get(category, 'general')
+
+
 @celery_app.task
 def deliver_scheduled_notification(schedule_id: int):
     """Deliver a persisted reminder once; push transport is added in Stage 2."""
@@ -109,11 +123,13 @@ def deliver_scheduled_notification(schedule_id: int):
             return
         title, message = resolve_reminder_content(db, schedule, template)
         create_notification(db, schedule.user_id, title=title, message=message, category=template.category)
+        notification_type = _map_category_to_notification_type(template.category)
         send_push_notification(
             db,
             user_id=schedule.user_id,
             title=title,
             body=message,
+            notification_type=notification_type,
             data={"category": template.category, "template_key": template.key},
         )
         schedule.status = "delivered"

@@ -18,6 +18,7 @@ These are logged to the activity timeline and prepared for future event bus cons
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
+import asyncio
 import secrets
 
 from app.family.exceptions import (
@@ -54,7 +55,8 @@ from app.family.models import (
     FamilySettings,
 )
 from app.models.sadaqah_log import SadaqahLog
-from app.core.envelope import Meta
+from app.core.events import event_bus, DomainEvent
+from app.core.ws_manager import manager as ws_manager
 from sqlalchemy import func
 from app.family.schemas import (
     FamilyCreate,
@@ -270,6 +272,13 @@ def create_family(
         event_type=EventType.FAMILY_CREATED,
         actor_id=user_id,
         extra={"name": payload.name},
+    )
+
+    asyncio.create_task(
+        ws_manager.send_family_event(
+            family.id,
+            {"event_type": "family.created", "family_id": family.id, "actor_id": user_id},
+        )
     )
 
     return family, event
@@ -570,6 +579,13 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
     db.commit()
 
     family = repo.get_family_by_id(db, invitation.family_id)
+
+    asyncio.create_task(
+        ws_manager.send_family_event(
+            invitation.family_id,
+            {"event_type": "member.joined", "family_id": invitation.family_id, "actor_id": user_id},
+        )
+    )
 
     _log_and_return(
         db,
@@ -1135,6 +1151,13 @@ def create_reflection(
         actor_id=user_id,
     )
 
+    asyncio.create_task(
+        ws_manager.send_family_event(
+            family_id,
+            {"event_type": "reflection.shared", "family_id": family_id, "actor_id": user_id},
+        )
+    )
+
     return reflection
 
 
@@ -1381,6 +1404,13 @@ def add_family_act(
         extra={"act_type": act_type, "goal_id": active_goal.id},
     )
     db.commit()
+
+    asyncio.create_task(
+        ws_manager.send_family_event(
+            family_id,
+            {"event_type": "act.added", "family_id": family_id, "actor_id": user_id},
+        )
+    )
 
     return {
         "goal_id": active_goal.id,

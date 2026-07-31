@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.mixins import SoftDeleteMixin, TimestampMixin
 from app.db.base import Base
+from app.books.bookmark_model import BookBookmark
 
 
 def _utcnow() -> datetime:
@@ -46,6 +47,7 @@ class Book(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     chapters = relationship("BookChapter", back_populates="book", cascade="all, delete-orphan")
+    bookmarks = relationship("BookBookmark", back_populates="book", cascade="all, delete-orphan")
 
 
 # ---------------------------------------------------------------------------
