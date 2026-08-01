@@ -772,7 +772,8 @@ def add_family_act(
     family_id: int,
     db: DbDep,
     current_user: CurrentUser,
+    request_id: str | None = None,
 ):
     """Add an act to the family jar. Increments the active goal's acts_done."""
-    result = service.add_family_act(db, family_id, current_user.id)
+    result = service.add_family_act(db, family_id, current_user.id, request_id=request_id)
     return Envelope(data=result, message="Act added to family jar")

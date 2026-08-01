@@ -74,6 +74,22 @@ def get_reflection(
 def create_reflection(
     db: Session, user_id: int, payload: ReflectionCreate
 ) -> ReflectionResponse:
+    request_id = payload.request_id
+    if request_id:
+        existing = repo.get_reflection_by_request_id(db, user_id, request_id)
+        if existing:
+            return ReflectionResponse(
+                id=existing.id,
+                user_id=existing.user_id,
+                title=existing.title,
+                body=existing.body,
+                mood=existing.mood,
+                is_private=existing.is_private,
+                date=existing.date,
+                created_at=existing.created_at,
+                updated_at=existing.updated_at,
+            )
+
     data = payload.model_dump(exclude_unset=True)
     if data.get("date") is None:
         data["date"] = _utcnow()

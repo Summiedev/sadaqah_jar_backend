@@ -69,10 +69,23 @@ def create_reflection(db: Session, user_id: int, payload: dict) -> JourneyReflec
         mood=payload["mood"],
         is_private=payload.get("is_private", False),
         date=payload.get("date") or _utcnow(),
+        request_id=payload.get("request_id"),
     )
     db.add(reflection)
     db.flush()
     return reflection
+
+
+def get_reflection_by_request_id(
+    db: Session, user_id: int, request_id: str
+) -> JourneyReflection | None:
+    return db.scalar(
+        select(JourneyReflection).where(
+            JourneyReflection.user_id == user_id,
+            JourneyReflection.request_id == request_id,
+            JourneyReflection.deleted_at.is_(None),
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -403,12 +403,14 @@ class FamilyActivity(Base):
         Enum(EventType, native_enum=False), nullable=False, index=True
     )
     extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 
     family = relationship("Family", back_populates="activities")
 
     __table_args__ = (
         Index("ix_family_activities_timeline", "family_id", "created_at", "id"),
+        UniqueConstraint("request_id", name="uq_family_activity_request_id"),
     )
 
 

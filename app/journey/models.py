@@ -35,9 +35,11 @@ class JourneyReflection(Base, TimestampMixin, SoftDeleteMixin):
     mood: Mapped[str] = mapped_column(String(64), nullable=False)
     is_private: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     date: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     __table_args__ = (
         Index("ix_journey_reflections_user_date", "user_id", "date"),
+        UniqueConstraint("user_id", "request_id", name="uq_journey_reflection_request"),
     )
 
 

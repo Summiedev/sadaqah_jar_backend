@@ -806,16 +806,28 @@ def log_activity(
     event_type: EventType,
     actor_id: int | None = None,
     extra: dict | None = None,
+    request_id: str | None = None,
 ) -> FamilyActivity:
     activity = FamilyActivity(
         family_id=family_id,
         actor_id=actor_id,
         event_type=event_type,
         extra=extra,
+        request_id=request_id,
     )
     db.add(activity)
     db.flush()
     return activity
+
+
+def get_family_activity_by_request_id(
+    db: Session, request_id: str
+) -> FamilyActivity | None:
+    return db.scalar(
+        select(FamilyActivity).where(
+            FamilyActivity.request_id == request_id,
+        )
+    )
 
 
 def list_activities(

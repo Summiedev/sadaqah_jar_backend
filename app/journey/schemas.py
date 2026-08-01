@@ -11,6 +11,7 @@ class ReflectionCreate(BaseModel):
     mood: str = Field(..., min_length=1, max_length=64)
     is_private: bool = False
     date: datetime | None = None
+    request_id: str | None = None
 
 
 class ReflectionResponse(BaseModel):
