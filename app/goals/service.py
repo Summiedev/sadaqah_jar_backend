@@ -78,6 +78,27 @@ def list_goals(
     )
 
 
+def update_goal(
+    db: Session,
+    goal_id: int,
+    user_id: int,
+    title: str | None = None,
+    subtitle: str | None = None,
+    acts_target: int | None = None,
+) -> GoalResponse | None:
+    goal = repo.update_goal_fields(
+        db,
+        goal_id,
+        user_id,
+        title=title,
+        subtitle=subtitle,
+        acts_target=acts_target,
+    )
+    if goal is None:
+        return None
+    return _goal_to_response(goal)
+
+
 def update_progress(
     db: Session, goal_id: int, user_id: int, acts_done: int
 ) -> GoalResponse | None:
@@ -93,6 +114,10 @@ def update_status(
     goal = repo.update_goal_status(db, goal_id, user_id, GoalStatus(status))
     if goal is None:
         return None
+    # Notify on goal completion
+    if status == GoalStatus.COMPLETED.value:
+        from app.notifications.event_handlers import on_goal_completed
+        on_goal_completed(user_id, goal_id, goal.title)
     return _goal_to_response(goal)
 
 

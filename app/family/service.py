@@ -241,6 +241,28 @@ def _get_username(db: Session, user_id: int) -> str:
     return user.username if user else "Unknown"
 
 
+def _notify_family_members(
+    db: Session, family_id: int, actor_id: int, activity_type: str
+) -> None:
+    """Notify all family members (except the actor) of new activity.
+
+    Uses the event handler which checks preferences and quiet hours.
+    """
+    from app.notifications.event_handlers import on_family_activity
+
+    members = repo.list_members(db, family_id)
+    actor_name = _get_username(db, actor_id)
+    for member in members:
+        if member.user_id == actor_id:
+            continue
+        on_family_activity(
+            user_id=member.user_id,
+            family_id=family_id,
+            actor_name=actor_name,
+            activity_type=activity_type,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Family CRUD
 # ---------------------------------------------------------------------------
@@ -727,6 +749,9 @@ def complete_goal(db: Session, family_id: int, goal_id: int, user_id: int) -> Fa
         extra={"goal_id": goal.id, "title": goal.title},
     )
 
+    # Notify other family members of the completed goal
+    _notify_family_members(db, family_id, user_id, "goal_completed")
+
     return goal
 
 
@@ -949,6 +974,9 @@ def create_prayer_request(
         actor_id=user_id,
     )
 
+    # Notify other family members of the new prayer request
+    _notify_family_members(db, family_id, user_id, "prayer_request")
+
     return prayer
 
 
@@ -1157,6 +1185,9 @@ def create_reflection(
             {"event_type": "reflection.shared", "family_id": family_id, "actor_id": user_id},
         )
     )
+
+    # Notify other family members of the new reflection
+    _notify_family_members(db, family_id, user_id, "reflection")
 
     return reflection
 

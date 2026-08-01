@@ -108,9 +108,21 @@ def _map_category_to_notification_type(category: str) -> str:
     return mapping.get(category, 'general')
 
 
-@celery_app.task
-def deliver_scheduled_notification(schedule_id: int):
-    """Deliver a persisted reminder once; push transport is added in Stage 2."""
+@celery_app.task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+def deliver_scheduled_notification(self, schedule_id: int):
+    """Deliver a persisted reminder once.
+
+    Idempotency: the schedule row's status is checked before delivery and
+    the notification row carries an idempotency key derived from the
+    schedule id, so retries never create duplicate notifications.
+    """
     db = SessionLocal()
     try:
         schedule = db.get(ScheduledNotification, schedule_id)
@@ -122,7 +134,15 @@ def deliver_scheduled_notification(schedule_id: int):
             db.commit()
             return
         title, message = resolve_reminder_content(db, schedule, template)
-        create_notification(db, schedule.user_id, title=title, message=message, category=template.category)
+        idempotency_key = f"scheduled:{schedule.id}"
+        create_notification(
+            db,
+            schedule.user_id,
+            title=title,
+            message=message,
+            category=template.category,
+            idempotency_key=idempotency_key,
+        )
         notification_type = _map_category_to_notification_type(template.category)
         send_push_notification(
             db,
@@ -135,6 +155,20 @@ def deliver_scheduled_notification(schedule_id: int):
         schedule.status = "delivered"
         schedule.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
+    except Exception as exc:
+        db.rollback()
+        try:
+            self.retry(exc=exc)
+        except Exception:
+            db2 = SessionLocal()
+            try:
+                sched = db2.get(ScheduledNotification, schedule_id)
+                if sched is not None and sched.status == "scheduled":
+                    sched.status = "failed"
+                    db2.commit()
+            finally:
+                db2.close()
+            raise
     finally:
         db.close()
 

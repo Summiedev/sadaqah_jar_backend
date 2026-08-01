@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -46,6 +47,16 @@ class SchedulingStrategy(str, PyEnum):
     TIME_OF_DAY = "time_of_day"
 
 
+class NotificationStatus(str, PyEnum):
+    CREATED = "created"
+    QUEUED = "queued"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 
@@ -64,9 +75,24 @@ class Notification(Base):
         DateTime, default=_utcnow, nullable=False, index=True
     )
 
+    # Delivery tracking (production-readiness)
+    status: Mapped[str] = mapped_column(
+        String(16), default=NotificationStatus.CREATED.value, nullable=False, index=True
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, unique=True, index=True
+    )
+    provider_message_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     __table_args__ = (
         Index("ix_notifications_user_created", "user_id", "created_at"),
         Index("ix_notifications_user_unread", "user_id", "is_read"),
+        Index("ix_notifications_user_status", "user_id", "status"),
     )
 
 

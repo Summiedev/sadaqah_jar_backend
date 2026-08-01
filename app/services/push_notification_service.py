@@ -33,6 +33,45 @@ def _firebase_messaging():
         return None
 
 
+def validate_push_configuration() -> dict:
+    """Validate push delivery configuration at startup.
+
+    Returns a status dict describing whether push delivery is enabled and,
+    if not, why. This never raises: a misconfigured or absent FCM setup must
+    degrade gracefully to a no-op rather than crashing the API. The result
+    is intended to be logged at startup so operators immediately see whether
+    push is live.
+    """
+    if not settings.FCM_SERVICE_ACCOUNT_PATH:
+        logger.warning(
+            "Push delivery DISABLED: FCM_SERVICE_ACCOUNT_PATH is not set. "
+            "In-app notifications will still be created, but no device push "
+            "notifications will be sent."
+        )
+        return {"enabled": False, "reason": "not_configured"}
+
+    credential_path = Path(settings.FCM_SERVICE_ACCOUNT_PATH)
+    if not credential_path.is_file():
+        logger.error(
+            "Push delivery DISABLED: FCM service-account file not found at %s",
+            credential_path,
+        )
+        return {"enabled": False, "reason": "credential_file_missing"}
+
+    messaging = _firebase_messaging()
+    if messaging is None:
+        logger.error(
+            "Push delivery DISABLED: Firebase Admin SDK failed to initialize "
+            "with credentials at %s",
+            credential_path,
+        )
+        return {"enabled": False, "reason": "init_failed"}
+
+    logger.info("Push delivery ENABLED via FCM (%s)", credential_path)
+    return {"enabled": True, "reason": None}
+
+
+
 def send_push_notification(
     db: Session, *, user_id: int, title: str, body: str, notification_type: str = 'general', data: dict[str, str] | None = None
 ) -> int:

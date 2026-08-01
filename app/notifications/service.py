@@ -38,9 +38,11 @@ def create_notification(
     message: str,
     category: str | None = None,
     action: str | None = None,
+    idempotency_key: str | None = None,
 ) -> NotificationResponse:
     notification = repo.create_notification(
-        db, user_id, title=title, message=message, category=category, action=action
+        db, user_id, title=title, message=message, category=category, action=action,
+        idempotency_key=idempotency_key,
     )
     return NotificationResponse(
         id=notification.id,
@@ -50,6 +52,11 @@ def create_notification(
         action=notification.action,
         is_read=notification.is_read,
         created_at=notification.created_at,
+        status=notification.status,
+        retry_count=notification.retry_count,
+        delivered_at=notification.delivered_at,
+        read_at=notification.read_at,
+        dismissed_at=notification.dismissed_at,
     )
 
 

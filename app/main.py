@@ -25,9 +25,19 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Validate push delivery configuration at startup so operators
+    # immediately see whether FCM is live. This never raises: a misconfigured
+    # FCM setup degrades to a no-op rather than blocking API startup.
+    try:
+        from app.services.push_notification_service import validate_push_configuration
+
+        validate_push_configuration()
+    except Exception:
+        logger.exception("Push configuration validation raised unexpectedly")
     logger.info("API startup complete")
     yield
     logger.info("API shutdown")
+
 
 
 app = FastAPI(
@@ -57,4 +67,5 @@ app.include_router(api_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 

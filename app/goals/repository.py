@@ -114,6 +114,29 @@ def update_goal_progress(
     return goal
 
 
+def update_goal_fields(
+    db: Session,
+    goal_id: int,
+    user_id: int,
+    title: str | None = None,
+    subtitle: str | None = None,
+    acts_target: int | None = None,
+) -> UserGoal | None:
+    goal = get_goal(db, goal_id, user_id)
+    if goal is None:
+        return None
+    if title is not None:
+        goal.title = title
+    if subtitle is not None:
+        goal.subtitle = subtitle
+    if acts_target is not None:
+        goal.acts_target = acts_target
+    goal.updated_at = _utcnow()
+    db.commit()
+    db.refresh(goal)
+    return goal
+
+
 def update_goal_status(
     db: Session, goal_id: int, user_id: int, status: GoalStatus
 ) -> UserGoal | None:

@@ -13,6 +13,11 @@ class NotificationResponse(BaseModel):
     action: str | None
     is_read: bool
     created_at: datetime
+    status: str = "created"
+    retry_count: int = 0
+    delivered_at: datetime | None = None
+    read_at: datetime | None = None
+    dismissed_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

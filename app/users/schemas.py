@@ -121,6 +121,7 @@ class UserProfileResponse(BaseModel):
     locale: str | None = None
     evidence_mode: bool = False
     friday_reminder: bool = False
+    general_notifications: bool = False
     last_active: str | None = None
     created_at: str | None = None
 
@@ -170,6 +171,7 @@ class UserPreferencesUpdate(BaseModel):
     timezone: str | None = None
     evidence_mode: bool | None = None
     friday_reminder: bool | None = None
+    general_notifications: bool | None = None
 
 
 class UserPreferencesResponse(BaseModel):

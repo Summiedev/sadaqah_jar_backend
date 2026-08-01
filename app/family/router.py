@@ -193,6 +193,27 @@ def get_top_contributor(family_id: int, db: DbDep, current_user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 
+@router.get("/invitations", response_model=Envelope)
+def list_all_invitations(db: DbDep, current_user: CurrentUser):
+    """List all pending invitations across families the user is a member of."""
+    families = service.list_user_families(db, current_user.id)
+    results = []
+    for family in families:
+        invitations = service.list_invitations(db, family.id, current_user.id)
+        for inv in invitations:
+            if inv.status == InvitationStatus.PENDING:
+                results.append({
+                    "id": inv.id,
+                    "family_id": inv.family_id,
+                    "family_name": family.name,
+                    "invite_code": inv.invite_code,
+                    "status": inv.status.value,
+                    "created_at": inv.created_at.isoformat(),
+                    "expires_at": inv.expires_at.isoformat(),
+                })
+    return Envelope(data=results)
+
+
 @router.post("/{family_id}/invitations", response_model=Envelope, status_code=status.HTTP_201_CREATED)
 def create_invitation(family_id: int, db: DbDep, current_user: CurrentUser):
     """Create a new invitation for the family."""

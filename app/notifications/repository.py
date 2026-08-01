@@ -62,14 +62,22 @@ def create_notification(
     message: str,
     category: str | None = None,
     action: str | None = None,
+    idempotency_key: str | None = None,
     commit: bool = True,
 ) -> Notification:
+    if idempotency_key:
+        existing = db.scalar(
+            select(Notification).where(Notification.idempotency_key == idempotency_key)
+        )
+        if existing is not None:
+            return existing
     notification = Notification(
         user_id=user_id,
         category=category,
         title=title,
         message=message,
         action=action,
+        idempotency_key=idempotency_key,
     )
     db.add(notification)
     if commit:

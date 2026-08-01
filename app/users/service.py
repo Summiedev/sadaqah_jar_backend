@@ -140,6 +140,7 @@ def _profile_response(db: Session, user: User) -> UserProfileResponse:
         locale=prefs.language,
         evidence_mode=bool(notifications.get("evidence_mode", False)),
         friday_reminder=bool(notifications.get("friday_reminder", False)),
+        general_notifications=bool(notifications.get("general_notifications", False)),
         last_active=user.last_active.isoformat() if user.last_active else None,
         created_at=user.created_at.isoformat() if user.created_at else None,
     )
@@ -254,7 +255,13 @@ def update_preferences(
         existing_notifications["friday_reminder"] = payload.friday_reminder
     if getattr(payload, "evidence_mode", None) is not None:
         existing_notifications["evidence_mode"] = payload.evidence_mode
-    if getattr(payload, "friday_reminder", None) is not None or getattr(payload, "evidence_mode", None) is not None:
+    if getattr(payload, "general_notifications", None) is not None:
+        existing_notifications["general_notifications"] = payload.general_notifications
+    if (
+        getattr(payload, "friday_reminder", None) is not None
+        or getattr(payload, "evidence_mode", None) is not None
+        or getattr(payload, "general_notifications", None) is not None
+    ):
         prefs.notification_preferences = _dump(existing_notifications)
     if payload.reminder_preferences is not None:
         prefs.reminder_preferences = _dump(payload.reminder_preferences)

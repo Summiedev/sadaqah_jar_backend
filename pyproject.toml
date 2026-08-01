@@ -44,6 +44,7 @@ dependencies = [
     "firebase-admin==6.6.0",
     "python-multipart==0.0.20",
     "boto3==1.35.0",
+    "psycopg[binary]>=3.3.4",
 ]
 
 [dependency-groups]

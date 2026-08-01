@@ -1,4 +1,8 @@
 import os
+import os
+from dotenv import load_dotenv
+from logging.config import fileConfig
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -9,13 +13,12 @@ from alembic import context
 
 from app.db.base import Base
 
+load_dotenv()
 target_metadata = Base.metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-
-
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

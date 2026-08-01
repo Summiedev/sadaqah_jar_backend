@@ -14,6 +14,7 @@ from app.goals.schemas import (
     GoalCreate,
     GoalProgressUpdate,
     GoalStatusUpdate,
+    GoalUpdate,
     MonthlyReviewCreate,
 )
 
@@ -59,6 +60,27 @@ def get_goal(
 ):
     """Get a specific goal by ID."""
     result = service.get_goal(db, goal_id, current_user.id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    return Envelope(data=result)
+
+
+@router.patch("/{goal_id}", response_model=Envelope)
+def update_goal(
+    goal_id: int,
+    data: GoalUpdate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Update goal fields (title, subtitle, acts_target)."""
+    result = service.update_goal(
+        db,
+        goal_id,
+        current_user.id,
+        title=data.title,
+        subtitle=data.subtitle,
+        acts_target=data.acts_target,
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Goal not found")
     return Envelope(data=result)

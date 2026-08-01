@@ -5,12 +5,37 @@ celery_app = Celery(
     "sadaqah_worker",
     broker="redis://localhost:6379/0",
     backend="redis://localhost:6379/0",
+    # Explicitly import every task module so both beat-dispatched
+    # (scheduled_tasks) and event-driven (notification_tasks) tasks are
+    # registered on every worker. Relying on autodiscover alone is fragile
+    # because the default related_name ("tasks") does not match our module
+    # names, which would leave deliver_event_notification unregistered.
+    include=[
+        "app.tasks.scheduled_tasks",
+        "app.tasks.notification_tasks",
+    ],
 )
+
 
 celery_app.conf.timezone = "UTC"
 celery_app.conf.enable_utc = True
 
+# Worker reliability: retry with exponential backoff, acknowledge on success
+celery_app.conf.task_acks_late = True
+celery_app.conf.task_reject_on_worker_lost = True
+celery_app.conf.worker_prefetch_multiplier = 1
+
+# Default task retry behaviour (individual tasks can override)
+celery_app.conf.task_default_retry_delay = 60
+celery_app.conf.task_default_max_retries = 3
+celery_app.conf.task_time_limit = 300
+celery_app.conf.task_soft_time_limit = 240
+
+# ``include`` above guarantees both task modules are imported by every
+# worker so beat-dispatched and event-driven tasks are registered. We keep
+# autodiscover as a defensive fallback for any future task packages.
 celery_app.autodiscover_tasks(["app.tasks"])
+
 
 
 celery_app.conf.beat_schedule = {
