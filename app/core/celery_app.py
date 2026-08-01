@@ -1,10 +1,12 @@
 from celery import Celery
 from celery.schedules import crontab
 
+from app.core.config import settings
+
 celery_app = Celery(
     "sadaqah_worker",
-    broker="redis://localhost:6379/0",
-    backend="redis://localhost:6379/0",
+    broker=settings.REDIS_URL,
+    backend=settings.REDIS_URL,
     # Explicitly import every task module so both beat-dispatched
     # (scheduled_tasks) and event-driven (notification_tasks) tasks are
     # registered on every worker. Relying on autodiscover alone is fragile
@@ -52,23 +54,6 @@ celery_app.autodiscover_tasks(["app.tasks"])
 from app.tasks import notification_tasks as _notification_tasks  # noqa: E402,F401
 from app.tasks import scheduled_tasks as _scheduled_tasks  # noqa: E402,F401
 
-
-
-
-celery_app.conf.beat_schedule = {
-    "generate-daily-acts": {
-        "task": "app.tasks.scheduled_tasks.generate_daily_acts",
-        "schedule": crontab(hour=0, minute=1),
-    },
-    "schedule-daily-prayer-reminders": {
-        "task": "app.tasks.scheduled_tasks.schedule_daily_prayer_reminders",
-        "schedule": crontab(hour=0, minute=5),
-    },
-    "check-streak": {
-        "task": "app.tasks.scheduled_tasks.check_streak_integrity",
-        "schedule": crontab(hour=2, minute=0),
-    },
-    "weekly-aggregate": {
         "task": "app.tasks.scheduled_tasks.aggregate_weekly_stats",
         "schedule": crontab(hour=0, minute=0, day_of_week=0),
     },
