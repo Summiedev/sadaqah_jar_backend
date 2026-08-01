@@ -21,6 +21,18 @@ from app.emails.base import (
     safety_notice,
 )
 
+# NOTE: your Flutter theme is bronze (kBronze = #8B6842), but base.py's
+# BRAND_EMERALD is what these templates lean on for the code box / accent
+# color. That's a mismatch — the email currently reads "green brand", app
+# reads "bronze brand". Swap BRAND_EMERALD -> a bronze token in base.py
+# (e.g. BRAND_BRONZE = "#8B6842") and these templates will match the app
+# with zero further changes here. Until then I've kept the import name so
+# this drops in without touching base.py, per your ask.
+
+BRAND_ACCENT = BRAND_EMERALD  # swap to a bronze token in base.py when ready
+BRAND_CODE_BG = "#F7F0E7"     # kIvory
+BRAND_CODE_BORDER = "#E8DDD1"  # kLine
+
 
 def _wraps(title: str, inner: str, expiry_text: str) -> str:
     return "".join([
@@ -38,6 +50,18 @@ def _wraps(title: str, inner: str, expiry_text: str) -> str:
     ])
 
 
+def _p(text: str, *, size: int = 16, weight: int = 400, color: str = BRAND_MUTED,
+       margin: str = "0 0 6px", line_height: float = 1.65) -> str:
+    return f"""<p style="
+        font-family: {FONT_BODY};
+        font-size: {size}px;
+        font-weight: {weight};
+        color: {color};
+        margin: {margin};
+        line-height: {line_height};
+    ">{text}</p>"""
+
+
 # ─────────────────────────────────────────────────────────────
 # VERIFICATION EMAIL
 # ─────────────────────────────────────────────────────────────
@@ -48,30 +72,14 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
         <td style="padding: 0 48px;">
-            <p style="
-                font-family: {FONT_BODY};
-                font-size: 16px;
-                font-weight: 400;
-                color: {BRAND_MUTED};
-                margin: 0 0 8px;
-                line-height: 1.65;
-            ">Assalamu alaikum <strong style="color: {BRAND_INK};">{first_name}</strong>,</p>
-            <p style="
-                font-family: {FONT_BODY};
-                font-size: 16px;
-                font-weight: 400;
-                color: {BRAND_MUTED};
-                margin: 0 0 6px;
-                line-height: 1.65;
-            ">So glad you're here.</p>
-            <p style="
-                font-family: {FONT_BODY};
-                font-size: 16px;
-                font-weight: 400;
-                color: {BRAND_MUTED};
-                margin: 0 0 32px;
-                line-height: 1.65;
-            ">Mizan is a quiet space to grow your spiritual life, one small act of goodness at a time. To keep your account safe and yours alone, please verify your email with the code below:</p>
+            {_p(f'Assalamu alaikum <strong style="color: {BRAND_INK};">{first_name}</strong>,', margin="0 0 8px")}
+            {_p("We're really glad you're here.", margin="0 0 6px")}
+            {_p(
+                "Mizan is a quiet space to grow your spiritual life, one small act "
+                "of goodness at a time — and we'd love for it to be yours alone. "
+                "Enter the code below to verify it's really you:",
+                margin="0 0 28px",
+            )}
         </td>
     </tr>
 </table>"""
@@ -79,35 +87,31 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
     below_cta = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
         <td align="center" style="padding: 0 48px;">
+            {_p("Your verification code", size=13, color=BRAND_SUBTLE, margin="28px 0 14px")}
             <p style="
                 font-family: {FONT_BODY};
-                font-size: 13px;
-                color: {BRAND_SUBTLE};
-                margin: 28px 0 20px;
-                line-height: 1.65;
-            ">Your six-digit verification code:</p>
-            <p style="
-                font-family: {FONT_BODY};
-                font-size: 30px;
+                font-size: 32px;
                 font-weight: 700;
-                letter-spacing: 8px;
-                color: {BRAND_EMERALD};
+                letter-spacing: 10px;
+                color: {BRAND_ACCENT};
                 word-break: break-all;
                 margin: 0;
-                background-color: #F7F3EC;
-                padding: 10px 14px;
-                border-radius: 8px;
-                border: 1px solid {BRAND_LINE};
+                background-color: {BRAND_CODE_BG};
+                padding: 16px 20px;
+                border-radius: 12px;
+                border: 1px solid {BRAND_CODE_BORDER};
+                text-align: center;
             ">{token}</p>
+            {_p("Didn't request this? You can safely ignore this email.", size=13, color=BRAND_SUBTLE, margin="18px 0 0")}
         </td>
     </tr>
 </table>"""
 
     post = f"""{below_cta}
 {safety_notice()}
-{expiry_notice("This link expires in <strong>24 hours</strong> for your security.")}"""
+{expiry_notice("This code expires in <strong>24 hours</strong> for your security.")}"""
 
-    title = "Welcome to Mizan — Verify your email"
+    title = "Welcome to Mizan — verify your email"
 
     return _wraps(title, body + post, "This code expires in 24 hours for your security.")
 
@@ -118,61 +122,36 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
 
 def password_reset_email_html(token: str) -> str:
     link = f"{settings.APP_URL}/reset-password?token={token}"
-    
+
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
         <td style="padding: 0 48px;">
-            <p style="
-                font-family: {FONT_BODY};
-                font-size: 16px;
-                font-weight: 400;
-                color: {BRAND_MUTED};
-                margin: 0 0 8px;
-                line-height: 1.65;
-            ">Assalamu alaikum,</p>
-            <p style="
-                font-family: {FONT_BODY};
-                font-size: 16px;
-                font-weight: 400;
-                color: {BRAND_MUTED};
-                margin: 0 0 6px;
-                line-height: 1.65;
-            ">We received a request to reset your Mizan account password.</p>
-            <p style="
-                font-family: {FONT_BODY};
-                font-size: 16px;
-                font-weight: 400;
-                color: {BRAND_MUTED};
-                margin: 0 0 32px;
-                line-height: 1.65;
-            ">Choose a new password below:</p>
+            {_p("Assalamu alaikum,", margin="0 0 8px")}
+            {_p("We got a request to reset your Mizan password.", margin="0 0 6px")}
+            {_p("No worries — it happens. Choose a new one below:", margin="0 0 28px")}
         </td>
     </tr>
 </table>"""
 
     cta = cta_button(link, "Reset password")
-    
+
     below_cta = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
         <td align="center" style="padding: 0 48px;">
-            <p style="
-                font-family: {FONT_BODY};
-                font-size: 13px;
-                color: {BRAND_SUBTLE};
-                margin: 28px 0 20px;
-                line-height: 1.65;
-            ">Or copy and paste this link into your browser:</p>
+            {_p("Or paste this link into your browser:", size=13, color=BRAND_SUBTLE, margin="28px 0 12px")}
             <p style="
                 font-family: {FONT_BODY};
                 font-size: 12px;
-                color: {BRAND_EMERALD};
+                color: {BRAND_ACCENT};
                 word-break: break-all;
                 margin: 0;
-                background-color: #F7F3EC;
-                padding: 10px 14px;
-                border-radius: 8px;
-                border: 1px solid {BRAND_LINE};
+                background-color: {BRAND_CODE_BG};
+                padding: 12px 16px;
+                border-radius: 10px;
+                border: 1px solid {BRAND_CODE_BORDER};
+                text-align: center;
             ">{link}</p>
+            {_p("Didn't request this? Your password is still safe — just ignore this email.", size=13, color=BRAND_SUBTLE, margin="18px 0 0")}
         </td>
     </tr>
 </table>"""
@@ -182,5 +161,5 @@ def password_reset_email_html(token: str) -> str:
 {expiry_notice("This link expires in <strong>1 hour</strong> for your security.")}"""
 
     title = "Reset your password — Mizan"
-    
+
     return _wraps(title, body + cta + post, "This link expires in 1 hour for your security.")
