@@ -7,11 +7,6 @@ celery_app = Celery(
     "sadaqah_worker",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    # Explicitly import every task module so both beat-dispatched
-    # (scheduled_tasks) and event-driven (notification_tasks) tasks are
-    # registered on every worker. Relying on autodiscover alone is fragile
-    # because the default related_name ("tasks") does not match our module
-    # names, which would leave deliver_event_notification unregistered.
     include=[
         "app.tasks.scheduled_tasks",
         "app.tasks.notification_tasks",
@@ -33,6 +28,14 @@ celery_app.conf.task_default_max_retries = 3
 celery_app.conf.task_time_limit = 300
 celery_app.conf.task_soft_time_limit = 240
 
+# Periodic tasks dispatched by Celery beat.
+celery_app.conf.beat_schedule = {
+    "aggregate-weekly-stats": {
+        "task": "app.tasks.scheduled_tasks.aggregate_weekly_stats",
+        "schedule": crontab(hour=0, minute=0, day_of_week=0),
+    },
+}
+
 # ``include`` above guarantees both task modules are imported by every
 # worker so beat-dispatched and event-driven tasks are registered. We keep
 # autodiscover as a defensive fallback for any future task packages.
@@ -53,8 +56,3 @@ celery_app.autodiscover_tasks(["app.tasks"])
 # ``celery_app`` from this module.
 from app.tasks import notification_tasks as _notification_tasks  # noqa: E402,F401
 from app.tasks import scheduled_tasks as _scheduled_tasks  # noqa: E402,F401
-
-        "task": "app.tasks.scheduled_tasks.aggregate_weekly_stats",
-        "schedule": crontab(hour=0, minute=0, day_of_week=0),
-    },
-}
