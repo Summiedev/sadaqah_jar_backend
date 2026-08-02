@@ -223,7 +223,7 @@ def _get_or_create_quick_act(db: Session, act_type: str) -> SadaqahAct:
 
 
 @router.post("/jar/add-star")
-async def add_star(
+def add_star(
     act_id: int = 0,
     type: str | None = None,
     note: str | None = None,
@@ -383,21 +383,20 @@ async def add_star(
     except Exception:
         logger.exception("Failed to update leaderboard caches for user %s", user_id)
 
-    try:
-        await manager.send_user_event(
-            user_id,
-            {
-                "event": "jar_update",
-                "current_stars": active_jar.current_stars,
-                "capacity": active_jar.capacity,
-                "streak": {
-                    "current": streak.current_streak,
-                    "longest": streak.longest_streak,
-                },
+    # Schedule the websocket push onto the main event loop; this handler is
+    # sync (runs on the threadpool) so we cannot await here.
+    manager.send_user_event_threadsafe(
+        user_id,
+        {
+            "event": "jar_update",
+            "current_stars": active_jar.current_stars,
+            "capacity": active_jar.capacity,
+            "streak": {
+                "current": streak.current_streak,
+                "longest": streak.longest_streak,
             },
-        )
-    except Exception:
-        logger.exception("Failed to broadcast jar update for user %s", user_id)
+        },
+    )
 
     if just_completed:
         try:

@@ -1,5 +1,8 @@
+import logging
+
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from jose import JWTError
+
 from app.core.ws_manager import manager
 from app.core.security import decode_access_token
 from app.family.repository import get_member
@@ -8,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 
 router = APIRouter(prefix="/websock", tags=["websocket"])
+logger = logging.getLogger(__name__)
+
 
 
 def get_user_from_token(token: str, db: Session):
@@ -36,12 +41,20 @@ async def jar_ws(websocket: WebSocket, user_id: int, token: str = Query(None)):
     finally:
         db.close()
 
-    await manager.connect(user_id, websocket)
+    if not await manager.connect(user_id, websocket):
+        return
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    except Exception:
+        # Any other error (broken frame, transport reset) must still unregister
+        # the socket so it can't leak in the connection manager.
+        logger.warning("ws jar loop error for user %s", user_id, exc_info=True)
+    finally:
         manager.disconnect(user_id, websocket)
+
 
 
 @router.websocket("/ws/family-jar/{family_id}")
@@ -66,9 +79,18 @@ async def family_jar_ws(websocket: WebSocket, family_id: int, token: str = Query
     finally:
         db.close()
 
-    await manager.connect_family(family_id, websocket)
+    if not await manager.connect_family(family_id, websocket):
+        return
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    except Exception:
+        logger.warning(
+            "ws family loop error for family %s", family_id, exc_info=True
+        )
+    finally:
         manager.disconnect_family(family_id, websocket)
+
+

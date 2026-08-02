@@ -34,7 +34,18 @@ async def lifespan(app: FastAPI):
         validate_push_configuration()
     except Exception:
         logger.exception("Push configuration validation raised unexpectedly")
+
+    # Capture the running event loop so synchronous (threadpool) route handlers
+    # can schedule websocket sends via manager.send_user_event_threadsafe().
+    try:
+        from app.core.ws_manager import manager
+
+        manager.bind_loop()
+    except Exception:
+        logger.exception("Failed to bind websocket event loop at startup")
+
     logger.info("API startup complete")
+
     yield
     logger.info("API shutdown")
 

@@ -18,7 +18,9 @@ from app.core.envelope import Envelope, Meta
 from app.db.deps import get_db
 from app.users.dependencies import get_current_user
 from app.users.models import User
+from app.users.permissions import require_admin
 from app.notifications import service
+
 from app.notifications.schemas import (
     DeviceTokenRequest,
     NotificationTemplateCreate,
@@ -93,25 +95,39 @@ def list_templates(
 
 
 @router.post("/templates", response_model=Envelope, status_code=status.HTTP_201_CREATED)
-def create_template(payload: NotificationTemplateCreate, db: DbDep, current_user: CurrentUser):
+def create_template(
+    payload: NotificationTemplateCreate,
+    db: DbDep,
+    _admin: Annotated[User, Depends(require_admin)],
+):
     template = service.create_template(db, payload.model_dump())
     return Envelope(data=template, message="Template created")
 
 
 @router.patch("/templates/{key}", response_model=Envelope)
-def update_template(key: str, payload: NotificationTemplateCreate, db: DbDep, current_user: CurrentUser):
+def update_template(
+    key: str,
+    payload: NotificationTemplateCreate,
+    db: DbDep,
+    _admin: Annotated[User, Depends(require_admin)],
+):
     template = service.update_template(db, key, payload.model_dump())
     if template is None:
-        return Envelope(message="Template not found")
+        raise HTTPException(status_code=404, detail="Template not found")
     return Envelope(data=template)
 
 
 @router.delete("/templates/{key}", response_model=Envelope)
-def delete_template(key: str, db: DbDep, current_user: CurrentUser):
+def delete_template(
+    key: str,
+    db: DbDep,
+    _admin: Annotated[User, Depends(require_admin)],
+):
     result = service.delete_template(db, key)
     if not result:
-        return Envelope(message="Template not found")
+        raise HTTPException(status_code=404, detail="Template not found")
     return Envelope(message="Template deleted")
+
 
 
 # ---------------------------------------------------------------------------

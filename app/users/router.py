@@ -73,14 +73,31 @@ def logout(payload: RefreshRequest, db: DbDep):
 
 
 @auth_router.get("/verify-email", response_model=TokenResponse)
-def verify_email(db: DbDep, token: str = Query(...)):
+def verify_email(request: Request, db: DbDep, token: str = Query(...)):
+    # Throttle per-IP AND per-code so a 6-digit OTP cannot be brute-forced.
+    # Fails closed (see enforce_auth_rate_limit): a Redis outage denies rather
+    # than opening the whole code space.
+    enforce_auth_rate_limit(
+        request, "verify-email", limit=5, period=900, key_suffix=token
+    )
     tokens = service.verify_email(db, token)
+
     return tokens
 
 
 @auth_router.post("/verify-email", response_model=TokenResponse)
-def verify_email_otp(payload: VerifyEmailOtpRequest, db: DbDep, device_id: DeviceId = None):
+def verify_email_otp(
+    payload: VerifyEmailOtpRequest,
+    request: Request,
+    db: DbDep,
+    device_id: DeviceId = None,
+):
+    # Fail-closed throttle so the 6-digit OTP space cannot be exhausted.
+    enforce_auth_rate_limit(
+        request, "verify-email", limit=5, period=900, key_suffix=payload.code
+    )
     return service.verify_email(db, payload.code, device_id=device_id)
+
 
 
 @auth_router.post("/forgot-password", response_model=ForgotPasswordResponse)

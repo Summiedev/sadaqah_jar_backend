@@ -40,13 +40,31 @@ def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def enforce_auth_rate_limit(request: Request, action: str, limit: int = 20) -> None:
-    """Apply a small, Redis-backed limit to unauthenticated auth operations."""
+def enforce_auth_rate_limit(
+    request: Request,
+    action: str,
+    limit: int = 20,
+    period: int = 60,
+    *,
+    key_suffix: str | None = None,
+) -> None:
+    """Apply a small, Redis-backed limit to sensitive auth operations.
+
+    Fails CLOSED: if Redis is unreachable the request is denied (429) rather
+    than allowed, so an outage cannot silently disable brute-force protection
+    on login/register/verify/reset. ``key_suffix`` lets callers scope the
+    limit to a specific target (e.g. the email/code being verified) in
+    addition to the client IP.
+    """
     host = request.client.host if request.client else "unknown"
-    if not check_rate_limit_key(f"auth:{action}:{host}", limit=limit, period=60):
+    key = f"auth:{action}:{host}"
+    if key_suffix:
+        key = f"{key}:{key_suffix}"
+    if not check_rate_limit_key(key, limit=limit, period=period, fail_open=False):
         from fastapi import HTTPException, status
 
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many authentication attempts. Please try again shortly.",
         )
+
