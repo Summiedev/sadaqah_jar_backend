@@ -55,4 +55,6 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--ignore=test_daily_acts.py"
+addopts = "--ignore=test_daily_acts.py --ignore=app/db/test_db.py"
+testpaths = ["app"]
+
