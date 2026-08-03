@@ -1199,11 +1199,29 @@ def create_reflection(
     return reflection
 
 
+def update_reflection(
+    db: Session, family_id: int, reflection_id: int, payload: ReflectionCreate, user_id: int
+) -> FamilyReflection:
+    """Edit a reflection's text. Author only."""
+    reflection = repo.get_reflection_by_id(db, reflection_id)
+    if not reflection or reflection.family_id != family_id:
+        raise ReflectionNotFoundException()
+
+    if reflection.author_id != user_id:
+        raise FamilyPermissionDeniedException("Only the author can edit this reflection")
+
+    reflection = repo.update_reflection(db, reflection, payload.text)
+    db.commit()
+    db.refresh(reflection)
+    return reflection
+
+
 def delete_reflection(db: Session, family_id: int, reflection_id: int, user_id: int) -> None:
     """Soft-delete a reflection. Author only."""
     reflection = repo.get_reflection_by_id(db, reflection_id)
     if not reflection or reflection.family_id != family_id:
         raise ReflectionNotFoundException()
+
 
     if reflection.author_id != user_id:
         _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)

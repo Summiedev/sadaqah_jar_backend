@@ -681,6 +681,26 @@ def create_reflection(
     )
 
 
+@router.patch("/{family_id}/reflections/{reflection_id}", response_model=Envelope)
+def update_reflection(
+    family_id: int,
+    reflection_id: int,
+    payload: ReflectionCreate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Edit a reflection. Author only."""
+    reflection = service.update_reflection(db, family_id, reflection_id, payload, current_user.id)
+    return Envelope(
+        data={
+            "id": reflection.id,
+            "text": reflection.text,
+            "created_at": reflection.created_at.isoformat(),
+        },
+        message="Reflection updated",
+    )
+
+
 @router.delete("/{family_id}/reflections/{reflection_id}", response_model=Envelope)
 def delete_reflection(
     family_id: int,
@@ -689,6 +709,7 @@ def delete_reflection(
     current_user: CurrentUser,
 ):
     """Delete a reflection. Author only."""
+
     service.delete_reflection(db, family_id, reflection_id, current_user.id)
     return Envelope(data=None, message="Reflection deleted")
 

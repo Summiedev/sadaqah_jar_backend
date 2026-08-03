@@ -740,8 +740,15 @@ def create_reflection(
     return reflection
 
 
+def update_reflection(db: Session, reflection: FamilyReflection, text: str) -> FamilyReflection:
+    reflection.text = text
+    db.flush()
+    return reflection
+
+
 def soft_delete_reflection(db: Session, reflection: FamilyReflection) -> None:
     reflection.deleted_at = _utcnow()
+
     db.add(reflection)
     db.flush()
 
