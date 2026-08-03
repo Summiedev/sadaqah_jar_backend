@@ -296,12 +296,16 @@ def create_family(
         extra={"name": payload.name},
     )
 
-    asyncio.create_task(
-        ws_manager.send_family_event(
-            family.id,
-            {"event_type": "family.created", "family_id": family.id, "actor_id": user_id},
-        )
+    # NOTE: this runs in a sync service invoked from a threadpool worker
+    # (the route handler is `def`, not `async def`), so there is no running
+    # event loop here — asyncio.create_task() would raise "no running event
+    # loop" and 500 the request. Use the threadsafe scheduler, which hands the
+    # coroutine to the main loop captured at startup and never raises.
+    ws_manager.send_family_event_threadsafe(
+        family.id,
+        {"event_type": "family.created", "family_id": family.id, "actor_id": user_id},
     )
+
 
     return family, event
 
@@ -602,12 +606,13 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
 
     family = repo.get_family_by_id(db, invitation.family_id)
 
-    asyncio.create_task(
-        ws_manager.send_family_event(
-            invitation.family_id,
-            {"event_type": "member.joined", "family_id": invitation.family_id, "actor_id": user_id},
-        )
+    # Sync service on the threadpool: schedule onto the main loop (see note in
+    # create_family). asyncio.create_task() here would raise and 500 the join.
+    ws_manager.send_family_event_threadsafe(
+        invitation.family_id,
+        {"event_type": "member.joined", "family_id": invitation.family_id, "actor_id": user_id},
     )
+
 
     _log_and_return(
         db,
@@ -1179,12 +1184,14 @@ def create_reflection(
         actor_id=user_id,
     )
 
-    asyncio.create_task(
-        ws_manager.send_family_event(
-            family_id,
-            {"event_type": "reflection.shared", "family_id": family_id, "actor_id": user_id},
-        )
+    # Sync service on the threadpool: schedule onto the main loop (see note in
+    # create_family). asyncio.create_task() here raises "no running event loop"
+    # and 500s the request — this was the reported production crash.
+    ws_manager.send_family_event_threadsafe(
+        family_id,
+        {"event_type": "reflection.shared", "family_id": family_id, "actor_id": user_id},
     )
+
 
     # Notify other family members of the new reflection
     _notify_family_members(db, family_id, user_id, "reflection")
@@ -1459,12 +1466,13 @@ def add_family_act(
     )
     db.commit()
 
-    asyncio.create_task(
-        ws_manager.send_family_event(
-            family_id,
-            {"event_type": "act.added", "family_id": family_id, "actor_id": user_id},
-        )
+    # Sync service on the threadpool: schedule onto the main loop (see note in
+    # create_family). asyncio.create_task() here would raise and 500 the add.
+    ws_manager.send_family_event_threadsafe(
+        family_id,
+        {"event_type": "act.added", "family_id": family_id, "actor_id": user_id},
     )
+
 
     return {
         "goal_id": active_goal.id,
