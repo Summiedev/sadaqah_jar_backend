@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 from app.models.adhkar import Adhkar, TimeOfDay
 from app.notifications.models import NotificationTemplate, ScheduledNotification
 from app.services.personalization_service import generate_personalized_acts
+from app.services.reminder_library import (
+    get_entries_for_source,
+    get_random_entry,
+)
 
 
 class _FormatValues(defaultdict):
@@ -56,6 +60,15 @@ def resolve_reminder_content(
         messages = config.get("messages", [])
         if isinstance(messages, list) and messages:
             values = {"message": str(messages[schedule.id % len(messages)])}
+    else:
+        # Use the expanded reminder library for random content selection.
+        entry = get_random_entry(source)
+        if entry is not None:
+            values = {
+                "title": entry.title,
+                "message": entry.message,
+                "source": entry.source,
+            }
 
     formatter = _FormatValues(str, values)
     return (

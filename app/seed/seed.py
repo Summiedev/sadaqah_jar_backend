@@ -712,6 +712,24 @@ class DatabaseSeeder:
             ("pre_maghrib", "Approaching Maghrib", "Maghrib is close. Pause your work and turn to Allah.", "prayer", {"anchor": "maghrib", "offset_minutes": -10}),
             ("pre_isha", "Approaching Isha", "Isha is coming. End the day in prayer and quiet reflection.", "prayer", {"anchor": "isha", "offset_minutes": -10}),
             ("pre_sleep_dhikr", "A moment before sleep", "Before you rest, spend a quiet moment with Allah. La ilaha illallah.", "reflection", {"anchor": "isha", "offset_minutes": -15}),
+            # Expanded content library templates
+            ("fajr_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "fajr", "offset_minutes": 0, "content_source": "prayer_fardh"}),
+            ("dhuhr_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "zuhr", "offset_minutes": 0, "content_source": "prayer_fardh"}),
+            ("asr_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "asr", "offset_minutes": 0, "content_source": "prayer_fardh"}),
+            ("maghrib_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "maghrib", "offset_minutes": 0, "content_source": "prayer_fardh"}),
+            ("isha_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "isha", "offset_minutes": 0, "content_source": "prayer_fardh"}),
+            ("tahajjud_reminder", "{title}", "{message}", "prayer_nafl", {"anchor": "fajr", "offset_minutes": -90, "content_source": "prayer_nafl"}),
+            ("duha_reminder", "{title}", "{message}", "prayer_nafl", {"anchor": "duha_start", "offset_minutes": 15, "content_source": "prayer_nafl"}),
+            ("witr_reminder_expanded", "{title}", "{message}", "prayer_nafl", {"anchor": "isha", "offset_minutes": 30, "content_source": "prayer_nafl"}),
+            ("morning_adhkar_expanded", "{title}", "{message}", "adhkar_morning", {"anchor": "fajr", "offset_minutes": 20, "content_source": "adhkar_morning"}),
+            ("evening_adhkar_expanded", "{title}", "{message}", "adhkar_evening", {"anchor": "asr", "offset_minutes": 20, "content_source": "adhkar_evening"}),
+            ("friday_expanded", "{title}", "{message}", "time_based", {"anchor": "zuhr", "offset_minutes": -30, "days_of_week": [4], "content_source": "time_based"}),
+            ("quran_verse", "{title}", "{message}", "quran", {"anchor": "maghrib", "offset_minutes": 15, "content_source": "quran"}),
+            ("hadith_reminder", "{title}", "{message}", "hadith", {"anchor": "duha_start", "offset_minutes": 30, "content_source": "hadith"}),
+            ("reflection_prompt", "{title}", "{message}", "reflection", {"anchor": "isha", "offset_minutes": 15, "content_source": "reflection"}),
+            ("hereafter_reminder", "{title}", "{message}", "hereafter", {"anchor": "isha", "offset_minutes": 30, "content_source": "hereafter"}),
+            ("good_deed_reminder", "{title}", "{message}", "good_deeds", {"anchor": "zuhr", "offset_minutes": 15, "content_source": "good_deeds"}),
+            ("quote_reminder", "{title}", "{message}", "quotes", {"anchor": "duha_start", "offset_minutes": 60, "content_source": "quotes"}),
         ]
         created = 0
         for key, title, message, category, config in templates:

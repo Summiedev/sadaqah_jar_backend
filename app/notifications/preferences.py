@@ -7,6 +7,9 @@ user is in quiet hours.
 Preferences are stored as a JSON document on ``UserPreference.notification_preferences``
 with per-category booleans. Quiet hours are stored in the same document as
 ``{"quiet_hours": {"enabled": true, "start": "22:00", "end": "07:00"}}``.
+
+Frequency is stored as ``{"frequency": "low" | "medium" | "high"}``.
+A master toggle is stored as ``{"all_enabled": true}``.
 """
 
 import json
@@ -16,6 +19,31 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.users.models import User, UserPreference
+
+# All notification categories supported by the system.
+ALL_CATEGORIES = {
+    "prayer_fardh",
+    "prayer_nafl",
+    "adhkar_morning",
+    "adhkar_evening",
+    "time_based",
+    "quran",
+    "hadith",
+    "reflection",
+    "hereafter",
+    "good_deeds",
+    "quotes",
+    "family",
+    "journey",
+    "prayer",
+    "adhkar",
+    "reading",
+    "charity",
+    "islamic_occasions",
+    "announcements",
+    "security",
+    "system",
+}
 
 
 def _load_prefs(prefs: UserPreference | None) -> dict:
@@ -49,6 +77,12 @@ def is_category_enabled(
     if user is None:
         return False
     prefs = _load_prefs(user.preferences)
+
+    # Master toggle — if user disabled all notifications, nothing goes through.
+    if "all_enabled" in prefs and not prefs["all_enabled"]:
+        return False
+
+    # Check per-category toggles
     category_prefs = prefs.get("categories", {})
     if isinstance(category_prefs, dict):
         cat = category_prefs.get(category)
@@ -61,6 +95,18 @@ def is_category_enabled(
     if channel_key in prefs:
         return bool(prefs[channel_key])
     return True
+
+
+def get_frequency(db: Session, user_id: int) -> str:
+    """Return the notification frequency preference: low, medium, or high."""
+    user = db.get(User, user_id)
+    if user is None:
+        return "medium"
+    prefs = _load_prefs(user.preferences)
+    freq = prefs.get("frequency", "medium")
+    if freq not in {"low", "medium", "high"}:
+        return "medium"
+    return freq
 
 
 def get_quiet_hours(db: Session, user_id: int) -> tuple[time | None, time | None]:
@@ -109,3 +155,27 @@ def should_delay_for_quiet_hours(
     if category in {"security", "system"}:
         return False
     return is_in_quiet_hours(db, user_id, now=now)
+
+
+def get_category_state(
+    db: Session, user_id: int
+) -> dict:
+    """Return the full notification preference state for the UI."""
+    user = db.get(User, user_id)
+    if user is None:
+        return {}
+    prefs = _load_prefs(user.preferences)
+    categories = prefs.get("categories", {})
+    if not isinstance(categories, dict):
+        categories = {}
+    # Default all categories to enabled (opt-out model)
+    state = {
+        "all_enabled": prefs.get("all_enabled", True),
+        "frequency": prefs.get("frequency", "medium"),
+        "quiet_hours": prefs.get("quiet_hours", {"enabled": False}),
+        "categories": {
+            category: bool(categories.get(category, True))
+            for category in ALL_CATEGORIES
+        },
+    }
+    return state

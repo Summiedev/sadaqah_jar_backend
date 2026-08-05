@@ -11,6 +11,7 @@ from app.services.analytics_service import compute_weekly_stats
 from app.services.notification_service import create_notification
 from app.services.personalization_service import generate_personalized_acts
 from app.services.push_notification_service import send_push_notification
+from app.notifications.preferences import get_frequency, is_category_enabled
 from app.services.prayer_reminder_service import schedule_prayer_relative_templates
 from app.services.prayer_time_service import PrayerTimeLookupError, get_prayer_times
 from app.services.reminder_content_service import resolve_reminder_content
@@ -80,13 +81,30 @@ def schedule_daily_prayer_reminders():
                 schedules = schedule_prayer_relative_templates(
                     db, user_id=user.id, local_date=local_date, prayer_times=times
                 )
-                db.commit()
+                # Filter schedules by category preference and frequency
+                frequency = get_frequency(db, user.id)
+                filtered = []
                 for schedule in schedules:
+                    template = db.get(NotificationTemplate, schedule.template_id)
+                    if template is None:
+                        continue
+                    if not is_category_enabled(db, user.id, template.category):
+                        continue
+                    # Frequency control: low = skip ~50% of non-essential reminders
+                    if frequency == "low" and template.category not in {
+                        "prayer_fardh", "prayer", "adhkar_morning", "adhkar_evening"
+                    }:
+                        import random
+                        if random.random() < 0.5:
+                            continue
+                    filtered.append(schedule)
+                db.commit()
+                for schedule in filtered:
                     result = deliver_scheduled_notification.apply_async(
                         args=[schedule.id], eta=schedule.scheduled_for.replace(tzinfo=timezone.utc)
                     )
                     schedule.celery_task_id = result.id
-                if schedules:
+                if filtered:
                     db.commit()
             except (PrayerTimeLookupError, ValueError):
                 db.rollback()

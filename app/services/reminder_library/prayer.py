@@ -1,0 +1,179 @@
+"""Prayer-related reminder content (fardh and nafl)."""
+
+from app.services.reminder_library.base import ReminderEntry
+
+PRAYER_FARDH = [
+    ReminderEntry(
+        "Fajr — the light of the day",
+        "The Prophet ﷺ said: 'The two rak'ahs of Fajr are better than the world and everything in it.' (Sahih Muslim). Rise and begin your day with Allah.",
+        "prayer_fardh", "Sahih Muslim 725", ("fajr", "prayer"),
+    ),
+    ReminderEntry(
+        "Fajr is calling",
+        "Before the world wakes, Allah is waiting for you. Pray Fajr and let your first act of the day be obedience to your Lord.",
+        "prayer_fardh", "", ("fajr", "prayer"),
+    ),
+    ReminderEntry(
+        "The promise of Fajr",
+        "Whoever prays Fajr is under the protection of Allah. (Sahih Muslim). Begin your day under His care.",
+        "prayer_fardh", "Sahih Muslim 657", ("fajr", "prayer"),
+    ),
+    ReminderEntry(
+        "Dhuhr — a midday pause",
+        "Step away from the world for a few minutes. Dhuhr is your midday appointment with Allah — never miss it.",
+        "prayer_fardh", "", ("dhuhr", "prayer"),
+    ),
+    ReminderEntry(
+        "Midday reset",
+        "Your soul needs nourishment just as your body does. Pray Dhuhr and reset your heart for the rest of the day.",
+        "prayer_fardh", "", ("dhuhr", "prayer"),
+    ),
+    ReminderEntry(
+        "Dhuhr is near",
+        "The Prophet ﷺ said the gates of heaven are opened at midday. (Sahih Muslim). Do not let this moment pass without prayer.",
+        "prayer_fardh", "", ("dhuhr", "prayer"),
+    ),
+    ReminderEntry(
+        "Asr — the middle prayer",
+        "Allah singled out Asr: 'Guard strictly the prayers, especially the middle prayer.' (Quran 2:238). Protect your Asr today.",
+        "prayer_fardh", "Quran 2:238", ("asr", "prayer"),
+    ),
+    ReminderEntry(
+        "Asr is approaching",
+        "Whoever misses Asr, it is as if he lost his family and wealth. (Sahih al-Bukhari). Don't let the afternoon slip away.",
+        "prayer_fardh", "Sahih al-Bukhari 552", ("asr", "prayer"),
+    ),
+    ReminderEntry(
+        "The afternoon witness",
+        "The angels witness the Asr prayer in shifts — morning and evening angels gather at it. (Sahih al-Bukhari). Pray it with presence.",
+        "prayer_fardh", "Sahih al-Bukhari 555", ("asr", "prayer"),
+    ),
+    ReminderEntry(
+        "Maghrib — the sunset prayer",
+        "As the sun sets, gratitude should rise. Maghrib is a moment to thank Allah for another day of life.",
+        "prayer_fardh", "", ("maghrib", "prayer"),
+    ),
+    ReminderEntry(
+        "Maghrib is near",
+        "The day is ending — don't let it end without bowing to your Creator. Maghrib is the doorway between your day and night.",
+        "prayer_fardh", "", ("maghrib", "prayer"),
+    ),
+    ReminderEntry(
+        "Isha — the night prayer",
+        "Let Isha be the seal of your day. The Prophet ﷺ said whoever prays Isha in congregation, it is as if he prayed half the night. (Sahih Muslim).",
+        "prayer_fardh", "Sahih Muslim 656", ("isha", "prayer"),
+    ),
+    ReminderEntry(
+        "Isha is calling",
+        "End your day with your Lord. Pray Isha and sleep with a heart connected to Allah.",
+        "prayer_fardh", "", ("isha", "prayer"),
+    ),
+    ReminderEntry(
+        "The prayer is the pillar",
+        "The first thing the servant will be asked about on the Day of Resurrection is prayer. (Jami at-Tirmidhi). Build your day on this pillar.",
+        "prayer_fardh", "Jami at-Tirmidhi 413", ("prayer", "accountability"),
+    ),
+    ReminderEntry(
+        "Between you and shirk",
+        "The covenant between us and them is prayer, so whoever abandons it has committed disbelief. (Jami at-Tirmidhi). Pray and protect your faith.",
+        "prayer_fardh", "Jami at-Tirmidhi 2621", ("prayer", "worship"),
+    ),
+    ReminderEntry(
+        "Prayer is light",
+        "The Prophet ﷺ said prayer is a light. (Sahih Muslim). Carry that light through every hour of your day.",
+        "prayer_fardh", "Sahih Muslim 223", ("prayer", "worship"),
+    ),
+    ReminderEntry(
+        "A direct connection",
+        "When you stand for prayer, you are in direct conversation with Allah. Never underestimate those five appointments.",
+        "prayer_fardh", "", ("prayer", "worship"),
+    ),
+    ReminderEntry(
+        "The first question",
+        "On the Day of Judgment, the first question will be about your prayer. Take care of it today, not tomorrow.",
+        "prayer_fardh", "", ("prayer", "accountability"),
+    ),
+    ReminderEntry(
+        "Your daily shield",
+        "Prayer is a shield. (Sahih al-Bukhari 526). It protects you from sin and fills your heart with light.",
+        "prayer_fardh", "Sahih al-Bukhari 526", ("prayer", "protection"),
+    ),
+    ReminderEntry(
+        "The five rivers",
+        "The Prophet ﷺ said the five prayers are like a river flowing at your door — if you bathe in it five times a day, no dirt remains. (Sahih al-Bukhari).",
+        "prayer_fardh", "Sahih al-Bukhari 528", ("prayer", "purification"),
+    ),
+]
+
+PRAYER_NAFL = [
+    ReminderEntry(
+        "Tahajjud — the night prayer",
+        "The Prophet ﷺ said: 'The best prayer after the obligatory prayers is the night prayer.' (Sahih Muslim). Wake for Tahajjud and speak to Allah in the deep silence.",
+        "prayer_nafl", "Sahih Muslim 1163", ("tahajjud", "night"),
+    ),
+    ReminderEntry(
+        "The last third of the night",
+        "Allah descends to the lowest heaven in the last third of the night and asks: 'Who is calling upon Me so I may answer?' (Sahih al-Bukhari). Seize this hour.",
+        "prayer_nafl", "Sahih al-Bukhari 1145", ("tahajjud", "night", "dua"),
+    ),
+    ReminderEntry(
+        "Duha — the morning blessing",
+        "For every joint of the body, give charity each morning — two rak'ahs of Duha suffice. (Sahih Muslim). A small prayer with abundant reward.",
+        "prayer_nafl", "Sahih Muslim 720", ("duha", "morning"),
+    ),
+    ReminderEntry(
+        "The prayer of the awwabeen",
+        "Duha is the prayer of the penitent — recommended after the sun has fully risen. Start your morning with this act of love.",
+        "prayer_nafl", "", ("duha", "morning"),
+    ),
+    ReminderEntry(
+        "Witr — seal your night",
+        "The Prophet ﷺ said: 'Allah has added a prayer for you — the Witr. Pray it, even a single rak'ah.' Don't sleep without it.",
+        "prayer_nafl", "Musnad Ahmad 24069", ("witr", "night"),
+    ),
+    ReminderEntry(
+        "Witr is your guard",
+        "Make Witr your last prayer before sleep. It is a seal of worship for your whole day.",
+        "prayer_nafl", "", ("witr", "night"),
+    ),
+    ReminderEntry(
+        "The odd one",
+        "Allah is odd (single) and loves the odd. (Jami at-Tirmidhi). The Witr prayer is a beautiful way to end your night with Him.",
+        "prayer_nafl", "Jami at-Tirmidhi 453", ("witr", "night"),
+    ),
+    ReminderEntry(
+        "Awwabin — the prayer after Maghrib",
+        "The Prophet ﷺ said that six rak'ahs after Maghrib, in which one speaks only good, equals twelve years of worship. (Jami at-Tirmidhi).",
+        "prayer_nafl", "Jami at-Tirmidhi 435", ("awwabin", "maghrib"),
+    ),
+    ReminderEntry(
+        "Ishraq — the sunrise prayer",
+        "Whoever prays Fajr in congregation, then sits remembering Allah until the sun rises, then prays two rak'ahs, will have a complete Hajj and Umrah reward. (Jami at-Tirmidhi 586).",
+        "prayer_nafl", "Jami at-Tirmidhi 586", ("ishraq", "sunrise"),
+    ),
+    ReminderEntry(
+        "Two rak'ahs of love",
+        "A voluntary prayer is a gift you give to your own soul. The Prophet ﷺ never missed praying two rak'ahs before Fajr.",
+        "prayer_nafl", "", ("nafl", "voluntary"),
+    ),
+    ReminderEntry(
+        "Voluntary prayers build the fortress",
+        "Voluntary prayers fill the gaps in your obligatory prayers. On the Day of Judgment, your nafl will complete what was deficient in your fardh.",
+        "prayer_nafl", "", ("nafl", "voluntary"),
+    ),
+    ReminderEntry(
+        "Four before Asr",
+        "The Prophet ﷺ said: 'May Allah have mercy on the one who prays four rak'ahs before Asr.' (Jami at-Tirmidhi). Grab this mercy.",
+        "prayer_nafl", "Jami at-Tirmidhi 430", ("nafl", "asr"),
+    ),
+    ReminderEntry(
+        "The night is long — use it",
+        "The righteous predecessors would divide their night between prayer, quran, and dua. Begin with even two rak'ahs of Tahajjud tonight.",
+        "prayer_nafl", "", ("tahajjud", "night"),
+    ),
+    ReminderEntry(
+        "A quiet conversation",
+        "Tahajjud is the most intimate conversation you can have. No one is watching except Allah — and that is exactly the point.",
+        "prayer_nafl", "", ("tahajjud", "night"),
+    ),
+]

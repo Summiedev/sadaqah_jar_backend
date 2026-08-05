@@ -1,0 +1,91 @@
+"""Quran verse reminder content with translations and reflections."""
+
+from app.services.reminder_library.base import ReminderEntry
+
+QURAN = [
+    ReminderEntry(
+        "And He found you lost and guided you",
+        "﴾وَوَجَدَكَ ضَالًّا فَهَدَىٰ﴿\n\"And He found you lost and guided [you].\" — Surah Ad-Duha 93:7\n\nReflection: Whatever guidance you have today is pure mercy from Allah. Let that gratitude show in your actions.",
+        "quran", "Quran 93:7", ("quran", "gratitude"),
+    ),
+    ReminderEntry(
+        "With hardship comes ease",
+        "﴾فَإِنَّ مَعَ الْعُسْرِ يُسْرًا﴿\n\"For indeed, with hardship [will be] ease.\" — Surah Ash-Sharh 94:5\n\nReflection: The Prophet ﷺ told us that with every difficulty, ease follows. Hold on — relief is near.",
+        "quran", "Quran 94:5", ("quran", "patience"),
+    ),
+    ReminderEntry(
+        "Allah is with the patient",
+        "﴾إِنَّ اللَّهَ مَعَ الصَّابِرِينَ﴿\n\"Indeed, Allah is with the patient.\" — Surah Al-Baqarah 2:153\n\nReflection: Patience is not weakness. It is standing with Allah when the world pushes you.",
+        "quran", "Quran 2:153", ("quran", "patience"),
+    ),
+    ReminderEntry(
+        "Call upon Me",
+        "﴾ادْعُونِي أَسْتَجِبْ لَكُمْ﴿\n\"Call upon Me; I will respond to you.\" — Surah Ghafir 40:60\n\nReflection: Your dua is never wasted. Every call reaches the One who never sleeps.",
+        "quran", "Quran 40:60", ("quran", "dua"),
+    ),
+    ReminderEntry(
+        "He will replace your fear with security",
+        "﴾وَلَيُبَدِّلَنَّهُم مِّن بَعْدِ خَوْفِهِمْ أَمْنًا﴿\n\"Allah has promised those who believe and do righteous deeds that He will surely grant them succession and replace their fear with security.\" — Surah An-Nur 24:55\n\nReflection: When you hold onto iman and actions, your heart can rest in His promise.",
+        "quran", "Quran 24:55", ("quran", "hope"),
+    ),
+    ReminderEntry(
+        "This world is an enjoyment of delusion",
+        "﴾وَمَا الْحَيَاةُ الدُّنْيَا إِلَّا مَتَاعُ الْغُرُورِ﴿\n\"And the life of this world is nothing but enjoyment of delusion.\" — Surah Al-Imran 3:185\n\nReflection: Don't let the glitter blind you. Build for the life that truly lasts.",
+        "quran", "Quran 3:185", ("quran", "hereafter"),
+    ),
+    ReminderEntry(
+        "Every soul shall taste death",
+        "﴾كُلُّ نَفْسٍ ذَائِقَةُ الْمَوْتِ﴿\n\"Every soul shall taste death.\" — Surah Al-Imran 3:185\n\nReflection: Death is the only certainty. Let it wake you, not paralyze you.",
+        "quran", "Quran 3:185", ("quran", "death"),
+    ),
+    ReminderEntry(
+        "And He found you needy and enriched you",
+        "﴾وَوَجَدَكَ عَائِلًا فَأَغْنَىٰ﴿\n\"And He found you poor and made [you] self-sufficient.\" — Surah Ad-Duha 93:8\n\nReflection: Count how many times Allah has provided for you when you had nothing. Gratitude multiplies blessings.",
+        "quran", "Quran 93:8", ("quran", "gratitude"),
+    ),
+    ReminderEntry(
+        "Allah does not burden a soul beyond its capacity",
+        "﴾لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا﴿\n\"Allah does not burden a soul beyond that it can bear.\" — Surah Al-Baqarah 2:286\n\nReflection: Your trial is sized for your strength. You are stronger than you think — Allah knows.",
+        "quran", "Quran 2:286", ("quran", "reassurance"),
+    ),
+    ReminderEntry(
+        "Turn to Allah sincerely",
+        "﴾إِلَّا مَن تَابَ وَآمَنَ وَعَمِلَ عَمَلًا صَالِحًا﴿\n\"Except those who repent, believe, and do righteous work — for them, Allah will replace their evil deeds with good.\" — Surah Al-Furqan 25:70\n\nReflection: It is never too late. One sincere turn can rewrite your record.",
+        "quran", "Quran 25:70", ("quran", "repentance"),
+    ),
+    ReminderEntry(
+        "The example of charity",
+        "﴾مَّثَلُ الَّذِينَ يُنفِقُونَ أَمْوَالَهُمْ فِي سَبِيلِ اللَّهِ كَمَثَلِ حَبَّةٍ أَنبَتَتْ سَبْعَ سَنَابِلَ﴿\n\"The example of those who spend their wealth in the way of Allah is like a seed that grows seven ears.\" — Surah Al-Baqarah 2:261\n\nReflection: Your sadaqah is never lost. It grows where you cannot see it.",
+        "quran", "Quran 2:261", ("quran", "charity"),
+    ),
+    ReminderEntry(
+        "He is with you wherever you are",
+        "﴾وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ﴿\n\"And He is with you wherever you are.\" — Surah Al-Hadid 57:4\n\nReflection: You are never alone. The One who knows every whisper is always near.",
+        "quran", "Quran 57:4", ("quran", "reassurance"),
+    ),
+    ReminderEntry(
+        "Allah will not change a people until they change themselves",
+        "﴾إِنَّ اللَّهَ لَا يُغَيِّرُ مَا بِقَوْمٍ حَتَّىٰ يُغَيِّرُوا مَا بِأَنفُسِهِمْ﴿\n\"Indeed, Allah will not change the condition of a people until they change what is within themselves.\" — Surah Ar-Ra'd 13:11\n\nReflection: The change you want begins inside you. Start the revolution in your own heart.",
+        "quran", "Quran 13:11", ("quran", "self_improvement"),
+    ),
+    ReminderEntry(
+        "Verily, with remembrance of Allah hearts find rest",
+        "﴾أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ﴿\n\"Verily, in the remembrance of Allah do hearts find rest.\" — Surah Ar-Ra'd 13:28\n\nReflection: Anxious heart? Return to dhikr. The prescription has not changed.",
+        "quran", "Quran 13:28", ("quran", "dhikr"),
+    ),
+    ReminderEntry(
+        "And whoever puts his trust in Allah, He will suffice him",
+        "﴾وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ﴿\n\"And whoever relies upon Allah — He is sufficient for him.\" — Surah At-Talaq 65:3\n\nReflection: Place your affairs in His hands and rest. He has never failed a trusting servant.",
+        "quran", "Quran 65:3", ("quran", "tawakkul"),
+    ),
+    ReminderEntry(
+        "So remember Me; I will remember you",
+        "﴾فَاذْكُرُونِي أَذْكُرْكُمْ﴿\n\"So remember Me; I will remember you.\" — Surah Al-Baqarah 2:152\n\nReflection: Think about that: You mention Allah, and He — the Lord of all worlds — mentions you.",
+        "quran", "Quran 2:152", ("quran", "dhikr"),
+    ),
+    ReminderEntry(
+        "Hold firmly to the rope of Allah",
+        "﴾وَاعْتَصِمُوا بِحَبْلِ اللَّهِ جَمِيعًا وَلَا تَفَرَّقُوا﴿\n\"And hold firmly to the rope of Allah all together and do not become divided.\" — Surah Al-Imran 3:103\n\nReflection: Unity is a divine command. Reconnect a relationship today for Allah.",
+        "quran", "Quran 3:103", ("quran", "unity"),
+    ),
+]

@@ -1,0 +1,81 @@
+"""Good deeds and Sunnah action encouragement content."""
+
+from app.services.reminder_library.base import ReminderEntry
+
+GOOD_DEEDS = [
+    ReminderEntry(
+        "Give charity today",
+        "Even a small sadaqah extinguishes sins like water extinguishes fire. Give what you can today — secretly, if possible.",
+        "good_deeds", "Jami at-Tirmidhi 2616", ("charity", "sadaqah"),
+    ),
+    ReminderEntry(
+        "Make dua for another",
+        "The Prophet ﷺ said: 'The dua of a Muslim for his brother in his absence is answered.' (Sahih Muslim 2732). Pray for someone silently today.",
+        "good_deeds", "Sahih Muslim 2732", ("dua", "brotherhood"),
+    ),
+    ReminderEntry(
+        "Seek forgiveness",
+        "The Prophet ﷺ sought forgiveness more than seventy times a day. (Sahih al-Bukhari 6307). Say 'Astaghfirullah' now and at every lapse.",
+        "good_deeds", "Sahih al-Bukhari 6307", ("istighfar", "repentance"),
+    ),
+    ReminderEntry(
+        "Call a family member",
+        "Ties of kinship are a command from Allah. One call today could matter more than you know.",
+        "good_deeds", "", ("family", "ties"),
+    ),
+    ReminderEntry(
+        "Smile — it's charity",
+        "The Prophet ﷺ said: 'Your smile to your brother is charity.' (Jami at-Tirmidhi 1956). A warm smile costs nothing and earns reward.",
+        "good_deeds", "Jami at-Tirmidhi 1956", ("smile", "charity"),
+    ),
+    ReminderEntry(
+        "Remove harm from the road",
+        "The Prophet ﷺ said removing harm from the path is charity. (Sahih Muslim 1009). If you see something in the way, move it.",
+        "good_deeds", "Sahih Muslim 1009", ("harm", "service"),
+    ),
+    ReminderEntry(
+        "Help someone today",
+        "The Prophet ﷺ said: 'Allah helps the servant as long as the servant helps his brother.' (Sahih Muslim 2699). Be someone's answer today.",
+        "good_deeds", "Sahih Muslim 2699", ("help", "service"),
+    ),
+    ReminderEntry(
+        "Feed someone",
+        "The Prophet ﷺ said: 'Whoever feeds a fasting person gets the same reward.' (Jami at-Tirmidhi 807). Even a small shared meal counts.",
+        "good_deeds", "Jami at-Tirmidhi 807", ("food", "charity"),
+    ),
+    ReminderEntry(
+        "The simplest sadaqah",
+        "The Prophet ﷺ said: 'Every tasbih is sadaqah, every takbir is sadaqah, every tahmid is sadaqah.' (Sahih Muslim 720). Dhikr is charity for your soul.",
+        "good_deeds", "Sahih Muslim 720", ("dhikr", "charity"),
+    ),
+    ReminderEntry(
+        "Speak kindly",
+        "The Prophet ﷺ said: 'Kind speech is sadaqah.' (Sahih al-Bukhari 2989). Choose kind words in every conversation today.",
+        "good_deeds", "Sahih al-Bukhari 2989", ("kindness", "speech"),
+    ),
+    ReminderEntry(
+        "Reconcile two people",
+        "The Prophet ﷺ said: 'Shall I tell you of a degree greater than fasting, prayer, and sadaqah? Reconciling between people.' (Sunan Abi Dawud 4919).",
+        "good_deeds", "Sunan Abi Dawud 4919", ("reconciliation", "peace"),
+    ),
+    ReminderEntry(
+        "Visit the sick",
+        "The Prophet ﷺ said: 'Whoever visits a sick Muslim will continue in the garden of Paradise until he returns.' (Sahih Muslim 2568).",
+        "good_deeds", "Sahih Muslim 2568", ("visiting", "care"),
+    ),
+    ReminderEntry(
+        "Teach something good",
+        "The Prophet ﷺ said: 'Whoever guides someone to goodness has the same reward as the one who does it.' (Sahih Muslim 1893). Share one beneficial thing today.",
+        "good_deeds", "Sahih Muslim 1893", ("knowledge", "teaching"),
+    ),
+    ReminderEntry(
+        "Stand in prayer tonight",
+        "The Prophet ﷺ said: 'Whoever stands in prayer in Ramadan out of faith, his past sins are forgiven.' (Sahih al-Bukhari 37). And voluntary prayer is a door to Allah's love.",
+        "good_deeds", "Sahih al-Bukhari 37", ("prayer", "night"),
+    ),
+    ReminderEntry(
+        "Forgive someone",
+        "The Prophet ﷺ said: 'Charity does not decrease wealth, and Allah increases the servant who forgives in honor.' (Sahih Muslim 2588). Release a grudge today.",
+        "good_deeds", "Sahih Muslim 2588", ("forgiveness", "character"),
+    ),
+]

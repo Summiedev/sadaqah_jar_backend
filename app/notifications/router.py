@@ -21,10 +21,17 @@ from app.users.models import User
 from app.users.permissions import require_admin
 from app.notifications import service
 
+from app.notifications.preference_schemas import (
+    NotificationPreferencesState,
+    NotificationPreferencesUpdate,
+)
+from app.notifications.preferences import get_category_state
 from app.notifications.schemas import (
     DeviceTokenRequest,
     NotificationTemplateCreate,
 )
+from app.users.models import UserPreference
+import json
 
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -128,6 +135,78 @@ def delete_template(
         raise HTTPException(status_code=404, detail="Template not found")
     return Envelope(message="Template deleted")
 
+
+
+# ---------------------------------------------------------------------------
+# Notification preferences
+# ---------------------------------------------------------------------------
+
+CATEGORY_LABELS = {
+    "prayer_fardh": "Daily Prayers",
+    "prayer_nafl": "Nafl Prayers",
+    "adhkar_morning": "Morning Adhkar",
+    "adhkar_evening": "Evening Adhkar",
+    "time_based": "Time-Based Reminders",
+    "quran": "Quran Verses",
+    "hadith": "Hadith",
+    "reflection": "Reflection Prompts",
+    "hereafter": "Hereafter & Accountability",
+    "good_deeds": "Good Deeds & Sunnah",
+    "quotes": "Motivational Quotes",
+    "family": "Family",
+    "journey": "Journey",
+    "prayer": "Prayer",
+    "adhkar": "Adhkar",
+    "reading": "Reading",
+    "charity": "Charity",
+    "islamic_occasions": "Islamic Occasions",
+    "announcements": "Announcements",
+    "security": "Security",
+    "system": "System",
+}
+
+
+@router.get("/preferences", response_model=Envelope)
+def get_notification_preferences(db: DbDep, current_user: CurrentUser):
+    state = get_category_state(db, current_user.id)
+    state["category_labels"] = CATEGORY_LABELS
+    return Envelope(data=state)
+
+
+@router.put("/preferences", response_model=Envelope)
+def update_notification_preferences(
+    payload: NotificationPreferencesUpdate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    pref = db.get(UserPreference, current_user.id)
+    if pref is None:
+        pref = UserPreference(user_id=current_user.id)
+        db.add(pref)
+    try:
+        data = json.loads(pref.notification_preferences or "{}")
+    except (json.JSONDecodeError, TypeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    if payload.all_enabled is not None:
+        data["all_enabled"] = payload.all_enabled
+    if payload.frequency is not None:
+        data["frequency"] = payload.frequency
+    if payload.categories is not None:
+        categories = data.get("categories", {})
+        if not isinstance(categories, dict):
+            categories = {}
+        categories.update(payload.categories)
+        data["categories"] = categories
+    if payload.quiet_hours is not None:
+        data["quiet_hours"] = payload.quiet_hours.model_dump()
+    pref.notification_preferences = json.dumps(data)
+    db.add(pref)
+    db.commit()
+    state = get_category_state(db, current_user.id)
+    state["category_labels"] = CATEGORY_LABELS
+    return Envelope(data=state)
 
 
 # ---------------------------------------------------------------------------
