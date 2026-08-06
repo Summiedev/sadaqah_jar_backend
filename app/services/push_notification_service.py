@@ -79,7 +79,8 @@ def send_push_notification(
     messaging = _firebase_messaging()
     if messaging is None:
         return 0
-    merged_data = {'notification_type': notification_type}
+    # Include both `notification_type` (backwards-compat) and `type` (client expectation)
+    merged_data = {'notification_type': notification_type, 'type': notification_type}
     if data:
         merged_data.update(data)
     devices = (

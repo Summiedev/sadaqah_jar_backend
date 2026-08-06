@@ -312,6 +312,7 @@ def logout_everywhere(db: Session, user: User) -> int:
 
 
 def register_push_token(db: Session, user: User, payload: PushTokenRequest) -> dict:
+    # Persist device-level push token info
     repo.upsert_device(
         db,
         user_id=user.id,
@@ -321,6 +322,26 @@ def register_push_token(db: Session, user: User, payload: PushTokenRequest) -> d
         app_version=payload.app_version,
         push_token=payload.push_token,
     )
+
+    # Persist optional timezone and coordinates on the user's profile/preferences.
+    # The mobile client provides these so the server can schedule timezone-aware
+    # deliveries (prayer reminders, quiet-hours, etc.). We store timezone on the
+    # user's preferences and coordinates on the user record.
+    updated = False
+    if getattr(payload, "timezone", None) is not None:
+        prefs = repo.get_or_create_preferences(db, user)
+        prefs.timezone = payload.timezone.strip() or None
+        db.add(prefs)
+        updated = True
+    if getattr(payload, "latitude", None) is not None:
+        user.latitude = payload.latitude
+        user.longitude = payload.longitude
+        db.add(user)
+        updated = True
+
+    if updated:
+        db.commit()
+
     return {"status": "ok"}
 
 

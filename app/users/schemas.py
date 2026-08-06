@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator, Field
 
 from app.users.models import Role, UserMode
 
@@ -221,6 +221,13 @@ class PushTokenRequest(BaseModel):
     device_name: str | None = None
     app_version: str | None = None
     push_token: str | None = None
+    # Accept both `time_zone` (frontend) and `timezone` here via alias.
+    timezone: str | None = Field(None, alias="time_zone")
+    # Frontend sends coords as {"latitude": xx, "longitude": yy}; accept it
+    # and normalize into latitude/longitude fields.
+    coords: dict | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
     @field_validator("platform")
     @classmethod
@@ -236,6 +243,28 @@ class PushTokenRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("device_id is required")
         return v.strip()
+
+    @model_validator(mode="after")
+    def coordinates_are_complete_and_valid(self):
+        # If coords were provided as a dict, normalize into latitude/longitude.
+        if self.coords is not None and isinstance(self.coords, dict):
+            lat = self.coords.get("latitude") or self.coords.get("lat")
+            lng = self.coords.get("longitude") or self.coords.get("lng")
+            if lat is not None and lng is not None:
+                try:
+                    self.latitude = float(lat)
+                    self.longitude = float(lng)
+                except Exception:
+                    raise ValueError("coords must contain numeric latitude and longitude")
+
+        # If one coordinate is provided, require the other as well.
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude must be provided together")
+        if self.latitude is not None and not -90 <= self.latitude <= 90:
+            raise ValueError("latitude must be between -90 and 90")
+        if self.longitude is not None and not -180 <= self.longitude <= 180:
+            raise ValueError("longitude must be between -180 and 180")
+        return self
 
 
 class DeviceUpdate(BaseModel):

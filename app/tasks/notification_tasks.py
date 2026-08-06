@@ -69,8 +69,9 @@ def deliver_event_notification(
                 category,
             )
 
-        # Create in-app notification (idempotent)
-        create_notification(
+        # Create in-app notification (idempotent) and capture its id so we
+        # can include a deep_link in the push payload for direct routing.
+        notification = create_notification(
             db,
             user_id,
             title=title,
@@ -86,6 +87,11 @@ def deliver_event_notification(
             merged_data = {"notification_type": notification_type}
             if data:
                 merged_data.update(data)
+            # If we created a notification row, include a deep link to it.
+            try:
+                merged_data.setdefault("deep_link", f"/notifications/{notification.id}")
+            except Exception:
+                pass
             send_push_notification(
                 db,
                 user_id=user_id,

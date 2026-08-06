@@ -153,7 +153,7 @@ def deliver_scheduled_notification(self, schedule_id: int):
             return
         title, message = resolve_reminder_content(db, schedule, template)
         idempotency_key = f"scheduled:{schedule.id}"
-        create_notification(
+        notification = create_notification(
             db,
             schedule.user_id,
             title=title,
@@ -168,7 +168,11 @@ def deliver_scheduled_notification(self, schedule_id: int):
             title=title,
             body=message,
             notification_type=notification_type,
-            data={"category": template.category, "template_key": template.key},
+            data={
+                "category": template.category,
+                "template_key": template.key,
+                "deep_link": f"/notifications/{notification.id}",
+            },
         )
         schedule.status = "delivered"
         schedule.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
