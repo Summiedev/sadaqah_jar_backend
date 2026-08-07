@@ -125,7 +125,7 @@ def delete_chapter(db, chapter_id: int) -> None:
 def _serialize(db, book) -> BookRead:
     chapters = repo.list_chapters(db, book.id)
     pages = repo.list_pages(db, book.id)
-    total_time = sum(c.reading_time_minutes for c in chapters)
+    total_time = sum(c.reading_time_minutes or 0 for c in chapters)
     return BookRead(
         id=book.id,
         title=book.title,

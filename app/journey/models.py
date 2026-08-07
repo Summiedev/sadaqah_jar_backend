@@ -88,3 +88,20 @@ class JourneyReadingProgress(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("user_id", "book_id", name="uq_journey_reading_progress"),
     )
+
+
+class JourneyQuranProgress(Base, TimestampMixin):
+    __tablename__ = "journey_quran_progress"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    surah_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    verse_key: Mapped[str] = mapped_column(String(16), nullable=False)
+    page: Mapped[int] = mapped_column(Integer, nullable=False)
+    last_read_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_journey_quran_progress_user"),
+    )

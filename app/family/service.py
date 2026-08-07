@@ -369,6 +369,19 @@ def list_user_families(db: Session, user_id: int) -> list[FamilyResponse]:
         member_count = repo.count_family_members(db, family.id)
         goals = repo.list_family_goals(db, family.id)
         goal_count = len(goals)
+        active_goal = next(
+            (goal for goal in goals if not goal.is_archived and not goal.completed_at),
+            goals[0] if goals else None,
+        )
+        acts_done = active_goal.acts_done if active_goal else 0
+        acts_target = active_goal.acts_target if active_goal else 0
+        progress = (acts_done / acts_target) if acts_target > 0 else 0.0
+        now = datetime.now(timezone.utc)
+        if now.month == 12:
+            next_month = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            next_month = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+        days_remaining = max(0, (next_month.date() - now.date()).days)
 
         # Get last activity
         activities, _ = repo.list_activities(db, family.id, limit=1)
@@ -384,6 +397,11 @@ def list_user_families(db: Session, user_id: int) -> list[FamilyResponse]:
                 invite_code=family.invite_code,
                 member_count=member_count,
                 goal_count=goal_count,
+                goal_label=active_goal.title if active_goal else None,
+                acts_done=acts_done,
+                acts_target=acts_target,
+                progress=round(progress, 4),
+                days_remaining=days_remaining if active_goal else None,
                 last_activity=last_activity,
                 created_by=family.created_by,
                 created_at=family.created_at,

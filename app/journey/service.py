@@ -17,6 +17,8 @@ from app.journey.schemas import (
     ReflectionResponse,
     AdhkarProgressResponse,
     AdhkarFavoriteResponse,
+    QuranProgressPayload,
+    QuranProgressResponse,
 )
 
 
@@ -224,5 +226,42 @@ def get_last_reading(db: Session, user_id: int) -> ReadingProgressResponse | Non
     return ReadingProgressResponse(
         book_id=progress.book_id,
         chapter_number=progress.chapter_number,
+        last_read_at=progress.last_read_at,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Quran Progress
+# ---------------------------------------------------------------------------
+
+
+def save_quran_progress(
+    db: Session, user_id: int, payload: QuranProgressPayload
+) -> QuranProgressResponse:
+    progress = repo.upsert_quran_progress(
+        db,
+        user_id,
+        payload.surah_id,
+        payload.verse_key,
+        payload.page,
+    )
+    db.commit()
+    db.refresh(progress)
+    return QuranProgressResponse(
+        surah_id=progress.surah_id,
+        verse_key=progress.verse_key,
+        page=progress.page,
+        last_read_at=progress.last_read_at,
+    )
+
+
+def get_quran_progress(db: Session, user_id: int) -> QuranProgressResponse | None:
+    progress = repo.get_quran_progress(db, user_id)
+    if not progress:
+        return None
+    return QuranProgressResponse(
+        surah_id=progress.surah_id,
+        verse_key=progress.verse_key,
+        page=progress.page,
         last_read_at=progress.last_read_at,
     )

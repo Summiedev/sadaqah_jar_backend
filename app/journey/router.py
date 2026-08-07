@@ -16,6 +16,7 @@ from app.users.dependencies import get_current_user
 from app.users.models import User
 from app.journey import service
 from app.journey.schemas import (
+    QuranProgressPayload,
     ReadingProgressResponse,
     ReflectionCreate,
 )
@@ -136,4 +137,27 @@ def get_last_reading(db: DbDep, current_user: CurrentUser):
     progress = service.get_last_reading(db, current_user.id)
     if progress is None:
         return Envelope(data=None)
+    return Envelope(data=progress)
+
+
+# ---------------------------------------------------------------------------
+# Quran Progress
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/quran/progress", response_model=Envelope, status_code=status.HTTP_201_CREATED
+)
+def save_quran_progress(
+    payload: QuranProgressPayload,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    progress = service.save_quran_progress(db, current_user.id, payload)
+    return Envelope(data=progress, message="Quran progress saved")
+
+
+@router.get("/quran/progress", response_model=Envelope)
+def get_quran_progress(db: DbDep, current_user: CurrentUser):
+    progress = service.get_quran_progress(db, current_user.id)
     return Envelope(data=progress)

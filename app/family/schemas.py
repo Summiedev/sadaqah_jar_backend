@@ -132,6 +132,11 @@ class FamilyResponse(BaseModel):
     invite_code: str
     member_count: int = 0
     goal_count: int = 0
+    goal_label: str | None = None
+    acts_done: int = 0
+    acts_target: int = 0
+    progress: float = 0.0
+    days_remaining: int | None = None
     last_activity: str | None = None
     created_by: int
     created_at: datetime

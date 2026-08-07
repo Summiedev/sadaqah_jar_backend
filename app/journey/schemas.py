@@ -48,6 +48,18 @@ class AdhkarFavoriteResponse(BaseModel):
 class ReadingProgressResponse(BaseModel):
     book_id: int
     chapter_number: int
+    last_read_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class QuranProgressPayload(BaseModel):
+    surah_id: int = Field(..., ge=1, le=114)
+    verse_key: str = Field(..., min_length=3, max_length=16)
+    page: int = Field(..., ge=1, le=604)
+
+
+class QuranProgressResponse(QuranProgressPayload):
     last_read_at: datetime
 
     model_config = {"from_attributes": True}

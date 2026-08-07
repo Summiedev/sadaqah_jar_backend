@@ -10,6 +10,7 @@ from app.journey.models import (
     JourneyReflection,
     JourneyAdhkarProgress,
     JourneyAdhkarFavorite,
+    JourneyQuranProgress,
     JourneyReadingProgress,
 )
 
@@ -202,5 +203,43 @@ def get_last_reading_progress(
         select(JourneyReadingProgress)
         .where(JourneyReadingProgress.user_id == user_id)
         .order_by(JourneyReadingProgress.last_read_at.desc())
+        .limit(1)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Quran Progress
+# ---------------------------------------------------------------------------
+
+
+def upsert_quran_progress(
+    db: Session, user_id: int, surah_id: int, verse_key: str, page: int
+) -> JourneyQuranProgress:
+    progress = db.scalar(
+        select(JourneyQuranProgress).where(JourneyQuranProgress.user_id == user_id)
+    )
+    now = _utcnow()
+    if progress is None:
+        progress = JourneyQuranProgress(
+            user_id=user_id,
+            surah_id=surah_id,
+            verse_key=verse_key,
+            page=page,
+            last_read_at=now,
+        )
+        db.add(progress)
+    else:
+        progress.surah_id = surah_id
+        progress.verse_key = verse_key
+        progress.page = page
+        progress.last_read_at = now
+    db.flush()
+    return progress
+
+
+def get_quran_progress(db: Session, user_id: int) -> JourneyQuranProgress | None:
+    return db.scalar(
+        select(JourneyQuranProgress)
+        .where(JourneyQuranProgress.user_id == user_id)
         .limit(1)
     )
