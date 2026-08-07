@@ -14,6 +14,7 @@ from app.db.deps import get_db
 from app.users.dependencies import get_current_user
 from app.users.models import User
 from app.family import service
+from app.family.models import InvitationStatus
 from app.family.schemas import (
     FamilyCreate,
     FamilyUpdate,
@@ -73,7 +74,9 @@ def create_family_legacy(
     capacity: int = Query(33, ge=1),
 ):
     """Legacy alias for POST /family/. Accepts query params for frontend compatibility."""
-    family, event = service.create_family(db, FamilyCreate(name=name, cover_icon=None), current_user.id)
+    family, event = service.create_family(
+        db, FamilyCreate(name=name, cover_icon=None), current_user.id
+    )
     return Envelope(
         data={
             "id": family.id,
@@ -144,7 +147,9 @@ def update_member_role(
     current_user: CurrentUser,
 ):
     """Change a member's role. Owner only."""
-    member = service.update_member_role(db, family_id, member_id, payload, current_user.id)
+    member = service.update_member_role(
+        db, family_id, member_id, payload, current_user.id
+    )
     return Envelope(
         data={
             "id": member.id,
@@ -175,7 +180,12 @@ def leave_family(family_id: int, db: DbDep, current_user: CurrentUser):
 
 
 @router.get("/{family_id}/leaderboard", response_model=Envelope)
-def get_leaderboard(family_id: int, db: DbDep, current_user: CurrentUser, limit: int = Query(10, ge=1, le=50)):
+def get_leaderboard(
+    family_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+    limit: int = Query(10, ge=1, le=50),
+):
     """Family leaderboard."""
     data = service.get_leaderboard(db, family_id, current_user.id, limit=limit)
     return Envelope(data=data)
@@ -202,19 +212,25 @@ def list_all_invitations(db: DbDep, current_user: CurrentUser):
         invitations = service.list_invitations(db, family.id, current_user.id)
         for inv in invitations:
             if inv.status == InvitationStatus.PENDING:
-                results.append({
-                    "id": inv.id,
-                    "family_id": inv.family_id,
-                    "family_name": family.name,
-                    "invite_code": inv.invite_code,
-                    "status": inv.status.value,
-                    "created_at": inv.created_at.isoformat(),
-                    "expires_at": inv.expires_at.isoformat(),
-                })
+                results.append(
+                    {
+                        "id": inv.id,
+                        "family_id": inv.family_id,
+                        "family_name": family.name,
+                        "invite_code": inv.invite_code,
+                        "status": inv.status.value,
+                        "created_at": inv.created_at.isoformat(),
+                        "expires_at": inv.expires_at.isoformat(),
+                    }
+                )
     return Envelope(data=results)
 
 
-@router.post("/{family_id}/invitations", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{family_id}/invitations",
+    response_model=Envelope,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_invitation(family_id: int, db: DbDep, current_user: CurrentUser):
     """Create a new invitation for the family."""
     invitation, event = service.create_invitation(db, family_id, current_user.id)
@@ -305,11 +321,15 @@ def list_goals(
     include_archived: bool = Query(False),
 ):
     """List family goals."""
-    goals = service.list_goals(db, family_id, current_user.id, include_archived=include_archived)
+    goals = service.list_goals(
+        db, family_id, current_user.id, include_archived=include_archived
+    )
     return Envelope(data=goals)
 
 
-@router.post("/{family_id}/goals", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{family_id}/goals", response_model=Envelope, status_code=status.HTTP_201_CREATED
+)
 def create_goal(
     family_id: int,
     payload: GoalCreate,
@@ -363,7 +383,9 @@ def complete_goal(
         data={
             "id": goal.id,
             "title": goal.title,
-            "completed_at": goal.completed_at.isoformat() if goal.completed_at else None,
+            "completed_at": goal.completed_at.isoformat()
+            if goal.completed_at
+            else None,
         },
         message="Goal completed",
     )
@@ -410,7 +432,11 @@ def list_milestones(
     return Envelope(data=milestones)
 
 
-@router.post("/{family_id}/goals/{goal_id}/milestones", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{family_id}/goals/{goal_id}/milestones",
+    response_model=Envelope,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_milestone(
     family_id: int,
     goal_id: int,
@@ -419,7 +445,9 @@ def create_milestone(
     current_user: CurrentUser,
 ):
     """Create a milestone for a family goal."""
-    milestone = service.create_milestone(db, family_id, goal_id, payload, current_user.id)
+    milestone = service.create_milestone(
+        db, family_id, goal_id, payload, current_user.id
+    )
     return Envelope(
         data={
             "id": milestone.id,
@@ -432,7 +460,9 @@ def create_milestone(
     )
 
 
-@router.patch("/{family_id}/goals/{goal_id}/milestones/{milestone_id}", response_model=Envelope)
+@router.patch(
+    "/{family_id}/goals/{goal_id}/milestones/{milestone_id}", response_model=Envelope
+)
 def update_milestone(
     family_id: int,
     goal_id: int,
@@ -442,7 +472,9 @@ def update_milestone(
     current_user: CurrentUser,
 ):
     """Update a milestone."""
-    milestone = service.update_milestone(db, family_id, goal_id, milestone_id, payload, current_user.id)
+    milestone = service.update_milestone(
+        db, family_id, goal_id, milestone_id, payload, current_user.id
+    )
     return Envelope(
         data={
             "id": milestone.id,
@@ -454,7 +486,10 @@ def update_milestone(
     )
 
 
-@router.post("/{family_id}/goals/{goal_id}/milestones/{milestone_id}/achieve", response_model=Envelope)
+@router.post(
+    "/{family_id}/goals/{goal_id}/milestones/{milestone_id}/achieve",
+    response_model=Envelope,
+)
 def achieve_milestone(
     family_id: int,
     goal_id: int,
@@ -463,19 +498,25 @@ def achieve_milestone(
     current_user: CurrentUser,
 ):
     """Mark a milestone as achieved."""
-    milestone = service.achieve_milestone(db, family_id, goal_id, milestone_id, current_user.id)
+    milestone = service.achieve_milestone(
+        db, family_id, goal_id, milestone_id, current_user.id
+    )
     return Envelope(
         data={
             "id": milestone.id,
             "title": milestone.title,
             "is_achieved": milestone.is_achieved,
-            "achieved_at": milestone.achieved_at.isoformat() if milestone.achieved_at else None,
+            "achieved_at": milestone.achieved_at.isoformat()
+            if milestone.achieved_at
+            else None,
         },
         message="Milestone achieved",
     )
 
 
-@router.delete("/{family_id}/goals/{goal_id}/milestones/{milestone_id}", response_model=Envelope)
+@router.delete(
+    "/{family_id}/goals/{goal_id}/milestones/{milestone_id}", response_model=Envelope
+)
 def delete_milestone(
     family_id: int,
     goal_id: int,
@@ -504,7 +545,9 @@ def list_prayer_requests(
 ):
     """List prayer requests for the family."""
     prayers, total = service.list_prayer_requests(
-        db, family_id, current_user.id,
+        db,
+        family_id,
+        current_user.id,
         include_answered=include_answered,
         limit=limit,
         offset=offset,
@@ -515,7 +558,9 @@ def list_prayer_requests(
     )
 
 
-@router.post("/{family_id}/prayers", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{family_id}/prayers", response_model=Envelope, status_code=status.HTTP_201_CREATED
+)
 def create_prayer_request(
     family_id: int,
     payload: PrayerRequestCreate,
@@ -544,7 +589,9 @@ def respond_to_prayer(
     current_user: CurrentUser,
 ):
     """Add a response to a prayer request."""
-    counts = service.respond_to_prayer(db, family_id, prayer_id, payload, current_user.id)
+    counts = service.respond_to_prayer(
+        db, family_id, prayer_id, payload, current_user.id
+    )
     return Envelope(data={"response_counts": counts})
 
 
@@ -558,14 +605,20 @@ def list_prayer_comments(
     offset: int = Query(0, ge=0),
 ):
     """List comments for a prayer request."""
-    comments, total = service.list_prayer_comments(db, family_id, prayer_id, current_user.id, limit=limit, offset=offset)
+    comments, total = service.list_prayer_comments(
+        db, family_id, prayer_id, current_user.id, limit=limit, offset=offset
+    )
     return Envelope(
         data=comments,
         meta=Meta(total=total),
     )
 
 
-@router.post("/{family_id}/prayers/{prayer_id}/comments", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{family_id}/prayers/{prayer_id}/comments",
+    response_model=Envelope,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_prayer_comment(
     family_id: int,
     prayer_id: int,
@@ -574,7 +627,9 @@ def create_prayer_comment(
     current_user: CurrentUser,
 ):
     """Add a comment to a prayer request."""
-    comment = service.create_prayer_comment(db, family_id, prayer_id, payload, current_user.id)
+    comment = service.create_prayer_comment(
+        db, family_id, prayer_id, payload, current_user.id
+    )
     return Envelope(
         data={
             "id": comment.id,
@@ -586,7 +641,9 @@ def create_prayer_comment(
     )
 
 
-@router.patch("/{family_id}/prayers/{prayer_id}/comments/{comment_id}", response_model=Envelope)
+@router.patch(
+    "/{family_id}/prayers/{prayer_id}/comments/{comment_id}", response_model=Envelope
+)
 def update_prayer_comment(
     family_id: int,
     prayer_id: int,
@@ -596,7 +653,9 @@ def update_prayer_comment(
     current_user: CurrentUser,
 ):
     """Edit a comment. Author only."""
-    comment = service.update_prayer_comment(db, family_id, prayer_id, comment_id, payload, current_user.id)
+    comment = service.update_prayer_comment(
+        db, family_id, prayer_id, comment_id, payload, current_user.id
+    )
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
     return Envelope(
@@ -608,7 +667,9 @@ def update_prayer_comment(
     )
 
 
-@router.delete("/{family_id}/prayers/{prayer_id}/comments/{comment_id}", response_model=Envelope)
+@router.delete(
+    "/{family_id}/prayers/{prayer_id}/comments/{comment_id}", response_model=Envelope
+)
 def delete_prayer_comment(
     family_id: int,
     prayer_id: int,
@@ -662,7 +723,11 @@ def list_reflections(
     )
 
 
-@router.post("/{family_id}/reflections", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{family_id}/reflections",
+    response_model=Envelope,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_reflection(
     family_id: int,
     payload: ReflectionCreate,
@@ -690,7 +755,9 @@ def update_reflection(
     current_user: CurrentUser,
 ):
     """Edit a reflection. Author only."""
-    reflection = service.update_reflection(db, family_id, reflection_id, payload, current_user.id)
+    reflection = service.update_reflection(
+        db, family_id, reflection_id, payload, current_user.id
+    )
     return Envelope(
         data={
             "id": reflection.id,
@@ -714,7 +781,9 @@ def delete_reflection(
     return Envelope(data=None, message="Reflection deleted")
 
 
-@router.post("/{family_id}/reflections/{reflection_id}/encourage", response_model=Envelope)
+@router.post(
+    "/{family_id}/reflections/{reflection_id}/encourage", response_model=Envelope
+)
 def encourage_reflection(
     family_id: int,
     reflection_id: int,
@@ -743,7 +812,9 @@ def list_activities(
     cursor: str | None = Query(None),
 ):
     """List family activity timeline with cursor-based pagination."""
-    page = service.list_activities(db, family_id, current_user.id, limit=limit, cursor=cursor)
+    page = service.list_activities(
+        db, family_id, current_user.id, limit=limit, cursor=cursor
+    )
     return Envelope(data=page.data, meta=page.meta)
 
 
@@ -796,5 +867,7 @@ def add_family_act(
     request_id: str | None = None,
 ):
     """Add an act to the family jar. Increments the active goal's acts_done."""
-    result = service.add_family_act(db, family_id, current_user.id, request_id=request_id)
+    result = service.add_family_act(
+        db, family_id, current_user.id, request_id=request_id
+    )
     return Envelope(data=result, message="Act added to family jar")

@@ -30,7 +30,9 @@ API = "/api/v1"
 
 
 def _headers(user_id: int, role: str = "USER") -> dict:
-    return {"Authorization": f"Bearer {create_access_token({'sub': str(user_id), 'role': role})}"}
+    return {
+        "Authorization": f"Bearer {create_access_token({'sub': str(user_id), 'role': role})}"
+    }
 
 
 @pytest.fixture(scope="module")
@@ -41,7 +43,12 @@ def db():
 
 
 def _create_user(db, username, email, role=Role.USER) -> User:
-    u = User(username=username, email=email, hashed_password=hash_password("TestPass123"), role=role)
+    u = User(
+        username=username,
+        email=email,
+        hashed_password=hash_password("TestPass123"),
+        role=role,
+    )
     db.add(u)
     db.commit()
     db.refresh(u)
@@ -56,8 +63,20 @@ def _clean_books(db):
 
 def test_list_books_returns_published_only(db):
     _clean_books(db)
-    published = Book(title="Published Book", author="Author", category="faith", published=True, sort_order=1)
-    draft = Book(title="Draft Book", author="Author", category="faith", published=False, sort_order=2)
+    published = Book(
+        title="Published Book",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
+    draft = Book(
+        title="Draft Book",
+        author="Author",
+        category="faith",
+        published=False,
+        sort_order=2,
+    )
     db.add_all([published, draft])
     db.commit()
 
@@ -72,13 +91,31 @@ def test_list_books_returns_published_only(db):
 
 def test_get_book_detail(db):
     _clean_books(db)
-    book = Book(title="Detail Test", author="Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="Detail Test",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
 
-    ch1 = BookChapter(book_id=book.id, chapter_number=1, title="Ch1", content="Content 1", reading_time_minutes=5)
-    ch2 = BookChapter(book_id=book.id, chapter_number=2, title="Ch2", content="Content 2", reading_time_minutes=8)
+    ch1 = BookChapter(
+        book_id=book.id,
+        chapter_number=1,
+        title="Ch1",
+        content="Content 1",
+        reading_time_minutes=5,
+    )
+    ch2 = BookChapter(
+        book_id=book.id,
+        chapter_number=2,
+        title="Ch2",
+        content="Content 2",
+        reading_time_minutes=8,
+    )
     db.add_all([ch1, ch2])
     db.commit()
 
@@ -99,12 +136,24 @@ def test_get_book_404(db):
 
 def test_list_chapters(db):
     _clean_books(db)
-    book = Book(title="Chapter Test", author="Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="Chapter Test",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
 
-    ch1 = BookChapter(book_id=book.id, chapter_number=1, title="Ch1", content="C1", reading_time_minutes=5)
+    ch1 = BookChapter(
+        book_id=book.id,
+        chapter_number=1,
+        title="Ch1",
+        content="C1",
+        reading_time_minutes=5,
+    )
     db.add(ch1)
     db.commit()
 
@@ -116,12 +165,24 @@ def test_list_chapters(db):
 
 def test_get_chapter_by_number(db):
     _clean_books(db)
-    book = Book(title="Single Chapter", author="Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="Single Chapter",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
 
-    ch = BookChapter(book_id=book.id, chapter_number=1, title="Only Chapter", content="Content", reading_time_minutes=3)
+    ch = BookChapter(
+        book_id=book.id,
+        chapter_number=1,
+        title="Only Chapter",
+        content="Content",
+        reading_time_minutes=3,
+    )
     db.add(ch)
     db.commit()
 
@@ -135,7 +196,13 @@ def test_get_chapter_by_number(db):
 
 def test_get_chapter_404(db):
     _clean_books(db)
-    book = Book(title="No Chapters", author="Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="No Chapters",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
@@ -153,8 +220,25 @@ def test_get_chapter_404(db):
 def test_admin_list_books_includes_drafts(db):
     _clean_books(db)
     admin = _create_user(db, "admin_books", "admin_books@test.com", role=Role.ADMIN)
-    published = Book(title="Admin Book", author="Author", category="faith", published=True, sort_order=1)
-    db.add_all([published, Book(title="Draft", author="Author", category="faith", published=False, sort_order=2)])
+    published = Book(
+        title="Admin Book",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
+    db.add_all(
+        [
+            published,
+            Book(
+                title="Draft",
+                author="Author",
+                category="faith",
+                published=False,
+                sort_order=2,
+            ),
+        ]
+    )
     db.commit()
 
     resp = client.get(f"{API}/admin/books/", headers=_headers(admin.id, "ADMIN"))
@@ -174,10 +258,12 @@ def test_admin_create_book(db):
         "description": "A test book",
         "category": "faith",
         "language": "en",
-        "published": True,
+        "published": False,
         "sort_order": 1,
     }
-    resp = client.post(f"{API}/admin/books/", json=payload, headers=_headers(admin.id, "ADMIN"))
+    resp = client.post(
+        f"{API}/admin/books/", json=payload, headers=_headers(admin.id, "ADMIN")
+    )
     assert resp.status_code == 201
     data = resp.json()
     assert data["title"] == "New Admin Book"
@@ -186,10 +272,35 @@ def test_admin_create_book(db):
     _clean_books(db)
 
 
+def test_admin_cannot_publish_empty_book(db):
+    _clean_books(db)
+    admin = _create_user(
+        db, "admin_empty_book", "admin_empty_book@test.com", role=Role.ADMIN
+    )
+    payload = {
+        "title": "Empty Book",
+        "author": "Admin Author",
+        "category": "faith",
+        "published": True,
+    }
+    resp = client.post(
+        f"{API}/admin/books/", json=payload, headers=_headers(admin.id, "ADMIN")
+    )
+    assert resp.status_code == 400
+    assert "readable content" in resp.json()["error"]["message"]
+    _clean_books(db)
+
+
 def test_admin_update_book(db):
     _clean_books(db)
     admin = _create_user(db, "admin_update", "admin_update@test.com", role=Role.ADMIN)
-    book = Book(title="Old Title", author="Old Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="Old Title",
+        author="Old Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
@@ -208,13 +319,21 @@ def test_admin_update_book(db):
 def test_admin_delete_book(db):
     _clean_books(db)
     admin = _create_user(db, "admin_delete", "admin_delete@test.com", role=Role.ADMIN)
-    book = Book(title="To Delete", author="Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="To Delete",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
     book_id = book.id
 
-    resp = client.delete(f"{API}/admin/books/{book_id}", headers=_headers(admin.id, "ADMIN"))
+    resp = client.delete(
+        f"{API}/admin/books/{book_id}", headers=_headers(admin.id, "ADMIN")
+    )
     assert resp.status_code == 200
 
     db.expire_all()
@@ -227,7 +346,13 @@ def test_admin_delete_book(db):
 def test_admin_create_chapter(db):
     _clean_books(db)
     admin = _create_user(db, "admin_chap", "admin_chap@test.com", role=Role.ADMIN)
-    book = Book(title="Book for Chapters", author="Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="Book for Chapters",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
@@ -238,7 +363,11 @@ def test_admin_create_chapter(db):
         "content": "This is chapter one.",
         "reading_time_minutes": 10,
     }
-    resp = client.post(f"{API}/admin/books/{book.id}/chapters", json=payload, headers=_headers(admin.id, "ADMIN"))
+    resp = client.post(
+        f"{API}/admin/books/{book.id}/chapters",
+        json=payload,
+        headers=_headers(admin.id, "ADMIN"),
+    )
     assert resp.status_code == 201
     data = resp.json()
     assert data["title"] == "First Chapter"
@@ -248,17 +377,43 @@ def test_admin_create_chapter(db):
 
 def test_admin_list_chapters(db):
     _clean_books(db)
-    admin = _create_user(db, "admin_listchap", "admin_listchap@test.com", role=Role.ADMIN)
-    book = Book(title="Multi Chapter Book", author="Author", category="faith", published=True, sort_order=1)
+    admin = _create_user(
+        db, "admin_listchap", "admin_listchap@test.com", role=Role.ADMIN
+    )
+    book = Book(
+        title="Multi Chapter Book",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
 
-    db.add(BookChapter(book_id=book.id, chapter_number=1, title="Ch1", content="C1", reading_time_minutes=5))
-    db.add(BookChapter(book_id=book.id, chapter_number=2, title="Ch2", content="C2", reading_time_minutes=8))
+    db.add(
+        BookChapter(
+            book_id=book.id,
+            chapter_number=1,
+            title="Ch1",
+            content="C1",
+            reading_time_minutes=5,
+        )
+    )
+    db.add(
+        BookChapter(
+            book_id=book.id,
+            chapter_number=2,
+            title="Ch2",
+            content="C2",
+            reading_time_minutes=8,
+        )
+    )
     db.commit()
 
-    resp = client.get(f"{API}/admin/books/{book.id}/chapters", headers=_headers(admin.id, "ADMIN"))
+    resp = client.get(
+        f"{API}/admin/books/{book.id}/chapters", headers=_headers(admin.id, "ADMIN")
+    )
     assert resp.status_code == 200
     assert len(resp.json()["data"]) == 2
     _clean_books(db)
@@ -267,19 +422,35 @@ def test_admin_list_chapters(db):
 def test_admin_update_chapter(db):
     _clean_books(db)
     admin = _create_user(db, "admin_updchap", "admin_updchap@test.com", role=Role.ADMIN)
-    book = Book(title="Update Chapter", author="Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="Update Chapter",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
 
-    ch = BookChapter(book_id=book.id, chapter_number=1, title="Old Title", content="Old", reading_time_minutes=5)
+    ch = BookChapter(
+        book_id=book.id,
+        chapter_number=1,
+        title="Old Title",
+        content="Old",
+        reading_time_minutes=5,
+    )
     db.add(ch)
     db.commit()
     db.refresh(ch)
 
     resp = client.patch(
         f"{API}/admin/books/{book.id}/chapters/{ch.id}",
-        json={"title": "New Title", "content": "New Content", "reading_time_minutes": 15},
+        json={
+            "title": "New Title",
+            "content": "New Content",
+            "reading_time_minutes": 15,
+        },
         headers=_headers(admin.id, "ADMIN"),
     )
     assert resp.status_code == 200
@@ -292,18 +463,33 @@ def test_admin_update_chapter(db):
 def test_admin_delete_chapter(db):
     _clean_books(db)
     admin = _create_user(db, "admin_delchap", "admin_delchap@test.com", role=Role.ADMIN)
-    book = Book(title="Delete Chapter", author="Author", category="faith", published=True, sort_order=1)
+    book = Book(
+        title="Delete Chapter",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
     db.add(book)
     db.commit()
     db.refresh(book)
 
-    ch = BookChapter(book_id=book.id, chapter_number=1, title="To Delete", content="C", reading_time_minutes=5)
+    ch = BookChapter(
+        book_id=book.id,
+        chapter_number=1,
+        title="To Delete",
+        content="C",
+        reading_time_minutes=5,
+    )
     db.add(ch)
     db.commit()
     db.refresh(ch)
     ch_id = ch.id
 
-    resp = client.delete(f"{API}/admin/books/{book.id}/chapters/{ch_id}", headers=_headers(admin.id, "ADMIN"))
+    resp = client.delete(
+        f"{API}/admin/books/{book.id}/chapters/{ch_id}",
+        headers=_headers(admin.id, "ADMIN"),
+    )
     assert resp.status_code == 200
 
     db.expire_all()

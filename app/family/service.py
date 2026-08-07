@@ -18,7 +18,6 @@ These are logged to the activity timeline and prepared for future event bus cons
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
-import asyncio
 import secrets
 
 from app.family.exceptions import (
@@ -39,6 +38,7 @@ from app.family.exceptions import (
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.envelope import Meta
 from app.family import repository as repo
 from app.family.models import (
     EventType,
@@ -55,9 +55,7 @@ from app.family.models import (
     FamilySettings,
 )
 from app.models.sadaqah_log import SadaqahLog
-from app.core.events import event_bus, DomainEvent
 from app.core.ws_manager import manager as ws_manager
-from sqlalchemy import func
 from app.family.schemas import (
     FamilyCreate,
     FamilyUpdate,
@@ -96,7 +94,9 @@ class FamilyEvent:
     event_type: EventType
     family_id: int
     actor_id: int | None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    timestamp: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
     extra: dict[str, Any] | None = None
 
 
@@ -108,15 +108,15 @@ class FamilyEvent:
 class Permission:
     """Granular permissions mapped to roles."""
 
-    MANAGE_FAMILY = "manage_family"          # update name, cover, delete
-    MANAGE_MEMBERS = "manage_members"        # remove members
-    MANAGE_ROLES = "manage_roles"            # change member roles
+    MANAGE_FAMILY = "manage_family"  # update name, cover, delete
+    MANAGE_MEMBERS = "manage_members"  # remove members
+    MANAGE_ROLES = "manage_roles"  # change member roles
     CREATE_INVITATION = "create_invitation"
     CANCEL_INVITATION = "cancel_invitation"
-    MANAGE_GOALS = "manage_goals"            # create, update, archive any goal
-    MANAGE_OWN_GOALS = "manage_own_goals"    # update/archive own goal
+    MANAGE_GOALS = "manage_goals"  # create, update, archive any goal
+    MANAGE_OWN_GOALS = "manage_own_goals"  # update/archive own goal
     CREATE_PRAYER = "create_prayer"
-    ANSWER_PRAYER = "answer_prayer"          # mark own prayer as answered
+    ANSWER_PRAYER = "answer_prayer"  # mark own prayer as answered
     CREATE_REFLECTION = "create_reflection"
     MANAGE_SETTINGS = "manage_settings"
     VIEW_ACTIVITY = "view_activity"
@@ -190,9 +190,7 @@ def _require_permission(
     return member
 
 
-def _require_family_access(
-    db: Session, family_id: int, user_id: int
-) -> Family:
+def _require_family_access(db: Session, family_id: int, user_id: int) -> Family:
     """Verify the user is a member of the family. Returns the family."""
     family = repo.get_family_by_id(db, family_id)
     if not family:
@@ -237,6 +235,7 @@ def _generate_invite_code() -> str:
 def _get_username(db: Session, user_id: int) -> str:
     """Get username for a user ID."""
     from app.users.models import User
+
     user = db.get(User, user_id)
     return user.username if user else "Unknown"
 
@@ -306,11 +305,12 @@ def create_family(
         {"event_type": "family.created", "family_id": family.id, "actor_id": user_id},
     )
 
-
     return family, event
 
 
-def get_family_detail(db: Session, family_id: int, user_id: int) -> FamilyDetailResponse:
+def get_family_detail(
+    db: Session, family_id: int, user_id: int
+) -> FamilyDetailResponse:
     """Get family detail with members and goals."""
     family = _require_family_access(db, family_id, user_id)
 
@@ -440,7 +440,9 @@ def archive_family(db: Session, family_id: int, user_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def list_members(db: Session, family_id: int, user_id: int) -> list[FamilyMemberResponse]:
+def list_members(
+    db: Session, family_id: int, user_id: int
+) -> list[FamilyMemberResponse]:
     """List family members."""
     _require_permission(db, family_id, user_id, Permission.VIEW_MEMBERS)
     members = repo.list_members(db, family_id)
@@ -598,7 +600,11 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
 
         ws_manager.send_family_event_threadsafe(
             family.id,
-            {"event_type": "member.joined", "family_id": family.id, "actor_id": user_id},
+            {
+                "event_type": "member.joined",
+                "family_id": family.id,
+                "actor_id": user_id,
+            },
         )
 
         _log_and_return(
@@ -634,9 +640,12 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
     # create_family). asyncio.create_task() here would raise and 500 the join.
     ws_manager.send_family_event_threadsafe(
         invitation.family_id,
-        {"event_type": "member.joined", "family_id": invitation.family_id, "actor_id": user_id},
+        {
+            "event_type": "member.joined",
+            "family_id": invitation.family_id,
+            "actor_id": user_id,
+        },
     )
-
 
     _log_and_return(
         db,
@@ -669,6 +678,8 @@ def decline_invitation(db: Session, invite_code: str, user_id: int) -> None:
         actor_id=user_id,
     )
     return None
+
+
 # ---------------------------------------------------------------------------
 # Goals
 # ---------------------------------------------------------------------------
@@ -755,7 +766,9 @@ def update_goal(
     return goal
 
 
-def complete_goal(db: Session, family_id: int, goal_id: int, user_id: int) -> FamilyGoal:
+def complete_goal(
+    db: Session, family_id: int, goal_id: int, user_id: int
+) -> FamilyGoal:
     """Mark a goal as completed."""
     goal = repo.get_goal_by_id(db, goal_id)
     if not goal or goal.family_id != family_id:
@@ -847,7 +860,11 @@ def list_milestones(
 
 
 def create_milestone(
-    db: Session, family_id: int, goal_id: int, payload: FamilyGoalMilestoneCreate, user_id: int
+    db: Session,
+    family_id: int,
+    goal_id: int,
+    payload: FamilyGoalMilestoneCreate,
+    user_id: int,
 ) -> FamilyGoalMilestone:
     """Create a milestone for a family goal."""
     _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)
@@ -1045,7 +1062,9 @@ def list_prayer_comments(
     if not prayer or prayer.family_id != family_id:
         raise PrayerRequestNotFoundException()
 
-    comments, total = repo.list_prayer_comments(db, prayer_id, limit=limit, offset=offset)
+    comments, total = repo.list_prayer_comments(
+        db, prayer_id, limit=limit, offset=offset
+    )
 
     results = []
     for c in comments:
@@ -1065,7 +1084,11 @@ def list_prayer_comments(
 
 
 def create_prayer_comment(
-    db: Session, family_id: int, prayer_id: int, payload: PrayerCommentCreate, user_id: int
+    db: Session,
+    family_id: int,
+    prayer_id: int,
+    payload: PrayerCommentCreate,
+    user_id: int,
 ) -> PrayerComment:
     """Add a comment to a prayer request."""
     _require_permission(db, family_id, user_id, Permission.CREATE_PRAYER)
@@ -1087,7 +1110,12 @@ def create_prayer_comment(
 
 
 def update_prayer_comment(
-    db: Session, family_id: int, prayer_id: int, comment_id: int, payload: PrayerCommentCreate, user_id: int
+    db: Session,
+    family_id: int,
+    prayer_id: int,
+    comment_id: int,
+    payload: PrayerCommentCreate,
+    user_id: int,
 ) -> PrayerComment | None:
     """Edit a comment. Author only."""
     _require_permission(db, family_id, user_id, Permission.CREATE_PRAYER)
@@ -1134,7 +1162,9 @@ def answer_prayer(
         raise PrayerRequestNotFoundException()
 
     if prayer.author_id != user_id:
-        raise FamilyPermissionDeniedException("Only the author can mark a prayer as answered")
+        raise FamilyPermissionDeniedException(
+            "Only the author can mark a prayer as answered"
+        )
 
     prayer = repo.mark_prayer_answered(db, prayer)
     db.commit()
@@ -1165,7 +1195,9 @@ def list_reflections(
     """List family reflections."""
     _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
 
-    reflections, total = repo.list_reflections(db, family_id, limit=limit, offset=offset)
+    reflections, total = repo.list_reflections(
+        db, family_id, limit=limit, offset=offset
+    )
 
     results = []
     for r in reflections:
@@ -1213,9 +1245,12 @@ def create_reflection(
     # and 500s the request — this was the reported production crash.
     ws_manager.send_family_event_threadsafe(
         family_id,
-        {"event_type": "reflection.shared", "family_id": family_id, "actor_id": user_id},
+        {
+            "event_type": "reflection.shared",
+            "family_id": family_id,
+            "actor_id": user_id,
+        },
     )
-
 
     # Notify other family members of the new reflection
     _notify_family_members(db, family_id, user_id, "reflection")
@@ -1224,7 +1259,11 @@ def create_reflection(
 
 
 def update_reflection(
-    db: Session, family_id: int, reflection_id: int, payload: ReflectionCreate, user_id: int
+    db: Session,
+    family_id: int,
+    reflection_id: int,
+    payload: ReflectionCreate,
+    user_id: int,
 ) -> FamilyReflection:
     """Edit a reflection's text. Author only."""
     reflection = repo.get_reflection_by_id(db, reflection_id)
@@ -1232,7 +1271,9 @@ def update_reflection(
         raise ReflectionNotFoundException()
 
     if reflection.author_id != user_id:
-        raise FamilyPermissionDeniedException("Only the author can edit this reflection")
+        raise FamilyPermissionDeniedException(
+            "Only the author can edit this reflection"
+        )
 
     reflection = repo.update_reflection(db, reflection, payload.text)
     db.commit()
@@ -1240,12 +1281,13 @@ def update_reflection(
     return reflection
 
 
-def delete_reflection(db: Session, family_id: int, reflection_id: int, user_id: int) -> None:
+def delete_reflection(
+    db: Session, family_id: int, reflection_id: int, user_id: int
+) -> None:
     """Soft-delete a reflection. Author only."""
     reflection = repo.get_reflection_by_id(db, reflection_id)
     if not reflection or reflection.family_id != family_id:
         raise ReflectionNotFoundException()
-
 
     if reflection.author_id != user_id:
         _require_permission(db, family_id, user_id, Permission.MANAGE_GOALS)
@@ -1255,7 +1297,11 @@ def delete_reflection(db: Session, family_id: int, reflection_id: int, user_id: 
 
 
 def encourage_reflection(
-    db: Session, family_id: int, reflection_id: int, payload: ReflectionEncourage, user_id: int
+    db: Session,
+    family_id: int,
+    reflection_id: int,
+    payload: ReflectionEncourage,
+    user_id: int,
 ) -> dict[str, int]:
     """Add encouragement to a reflection."""
     _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
@@ -1366,7 +1412,9 @@ def leave_family(db: Session, family_id: int, user_id: int) -> None:
     remove_member(db, family_id, member.id, user_id)
 
 
-def get_leaderboard(db: Session, family_id: int, user_id: int, limit: int = 10) -> list[dict]:
+def get_leaderboard(
+    db: Session, family_id: int, user_id: int, limit: int = 10
+) -> list[dict]:
     """Return a simple family leaderboard. Frontend compatibility endpoint."""
     _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
     members = repo.list_members(db, family_id, include_deleted=False)
@@ -1386,22 +1434,29 @@ def get_leaderboard(db: Session, family_id: int, user_id: int, limit: int = 10) 
         .all()
     )
 
-    stats_map = {row.user_id: (row.contribution_count, row.stars_earned) for row in stats}
+    stats_map = {
+        row.user_id: (row.contribution_count, row.stars_earned) for row in stats
+    }
 
     results = []
     for m in members:
         from app.users.models import User
+
         member_user = db.get(User, m.user_id)
         if not member_user:
             continue
         contribution_count, stars_earned = stats_map.get(m.user_id, (0, 0))
-        results.append({
-            "user_id": m.user_id,
-            "username": member_user.username,
-            "contribution_count": contribution_count,
-            "stars_earned": stars_earned,
-        }        )
-    results.sort(key=lambda x: (x["contribution_count"], x["stars_earned"]), reverse=True)
+        results.append(
+            {
+                "user_id": m.user_id,
+                "username": member_user.username,
+                "contribution_count": contribution_count,
+                "stars_earned": stars_earned,
+            }
+        )
+    results.sort(
+        key=lambda x: (x["contribution_count"], x["stars_earned"]), reverse=True
+    )
     return results[:limit]
 
 
@@ -1422,13 +1477,16 @@ def get_top_contributor(db: Session, family_id: int, user_id: int) -> dict | Non
         )
         .filter(SadaqahLog.user_id.in_(member_user_ids))
         .group_by(SadaqahLog.user_id)
-        .order_by(func.count(SadaqahLog.id).desc(), func.sum(SadaqahLog.stars_earned).desc())
+        .order_by(
+            func.count(SadaqahLog.id).desc(), func.sum(SadaqahLog.stars_earned).desc()
+        )
         .first()
     )
 
     if not top:
         for m in members:
             from app.users.models import User
+
             member_user = db.get(User, m.user_id)
             if member_user:
                 return {
@@ -1440,6 +1498,7 @@ def get_top_contributor(db: Session, family_id: int, user_id: int) -> dict | Non
         return None
 
     from app.users.models import User
+
     member_user = db.get(User, top.user_id)
     if not member_user:
         return None
@@ -1453,7 +1512,11 @@ def get_top_contributor(db: Session, family_id: int, user_id: int) -> dict | Non
 
 
 def add_family_act(
-    db: Session, family_id: int, user_id: int, act_type: str = "sadaqah", request_id: str | None = None
+    db: Session,
+    family_id: int,
+    user_id: int,
+    act_type: str = "sadaqah",
+    request_id: str | None = None,
 ) -> dict[str, Any]:
     """Add an act to the family jar. Increments the active goal's acts_done
     and logs the activity on the timeline."""
@@ -1479,7 +1542,9 @@ def add_family_act(
                     "title": active_goal.title,
                     "acts_done": active_goal.acts_done,
                     "acts_target": active_goal.acts_target,
-                    "progress": round(active_goal.acts_done / active_goal.acts_target, 4)
+                    "progress": round(
+                        active_goal.acts_done / active_goal.acts_target, 4
+                    )
                     if active_goal.acts_target > 0
                     else 0.0,
                 }
@@ -1498,7 +1563,7 @@ def add_family_act(
         active_goal = goals[0]
 
     repo.increment_goal_acts_done(db, active_goal)
-    activity = repo.log_activity(
+    repo.log_activity(
         db,
         family_id=family_id,
         event_type=EventType.ACT_ADDED,
@@ -1514,7 +1579,6 @@ def add_family_act(
         family_id,
         {"event_type": "act.added", "family_id": family_id, "actor_id": user_id},
     )
-
 
     return {
         "goal_id": active_goal.id,

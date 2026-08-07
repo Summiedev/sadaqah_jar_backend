@@ -75,9 +75,7 @@ class TestTaskRegistration:
             "app.tasks.scheduled_tasks.deliver_scheduled_notification"
             in celery_app.tasks
         )
-        assert (
-            "app.tasks.scheduled_tasks.generate_daily_acts" in celery_app.tasks
-        )
+        assert "app.tasks.scheduled_tasks.generate_daily_acts" in celery_app.tasks
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +228,4 @@ class TestDeliveryIdempotency:
 
         from app.notifications.preferences import is_category_enabled
 
-        assert (
-            is_category_enabled(db, user.id, "journey", channel="in_app") is False
-        )
+        assert is_category_enabled(db, user.id, "journey", channel="in_app") is False

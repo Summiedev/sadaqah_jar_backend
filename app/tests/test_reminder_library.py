@@ -1,7 +1,5 @@
 """Tests for the expanded reminder content library."""
 
-import pytest
-
 from app.services.reminder_library import (
     LIBRARY,
     SOURCE_TO_CATEGORY,

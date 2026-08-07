@@ -1,4 +1,4 @@
-﻿from .sadaqah_act import SadaqahAct
+from .sadaqah_act import SadaqahAct
 from .jar import Jar
 from .sadaqah_log import SadaqahLog
 from .charity import Charity

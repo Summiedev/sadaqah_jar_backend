@@ -11,8 +11,6 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException, status
 
-from app.core.config import settings
-
 
 def _get_s3_client():
     """Create and return an S3 client from environment configuration."""

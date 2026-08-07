@@ -64,13 +64,13 @@ class Notification(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    category: Mapped[str | None] = mapped_column(
-        String(32), nullable=True, index=True
-    )
+    category: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     action: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    is_read: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, nullable=False, index=True
     )
@@ -100,14 +100,20 @@ class NotificationTemplate(Base):
     __tablename__ = "notification_templates"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    key: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True
+    )
     title_template: Mapped[str] = mapped_column(String(255), nullable=False)
     message_template: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     strategy: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     strategy_config: Mapped[str | None] = mapped_column(Text, nullable=True)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
@@ -126,13 +132,22 @@ class ScheduledNotification(Base):
         ForeignKey("notification_templates.id", ondelete="CASCADE"), nullable=False
     )
     local_date: Mapped[str] = mapped_column(String(10), nullable=False)
-    scheduled_for: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    scheduled_for: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True
+    )
     status: Mapped[str] = mapped_column(String(16), default="scheduled", nullable=False)
     celery_task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
 
     __table_args__ = (
-        UniqueConstraint("user_id", "template_id", "local_date", name="uq_scheduled_notification_daily"),
+        UniqueConstraint(
+            "user_id",
+            "template_id",
+            "local_date",
+            name="uq_scheduled_notification_daily",
+        ),
         Index("ix_scheduled_notifications_due", "status", "scheduled_for"),
     )

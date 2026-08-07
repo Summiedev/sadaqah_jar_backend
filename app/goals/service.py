@@ -21,9 +21,7 @@ def _utcnow() -> datetime:
 
 
 def _goal_to_response(goal: UserGoal) -> GoalResponse:
-    progress = (
-        (goal.acts_done / goal.acts_target) if goal.acts_target > 0 else 0.0
-    )
+    progress = (goal.acts_done / goal.acts_target) if goal.acts_target > 0 else 0.0
     return GoalResponse(
         id=goal.id,
         title=goal.title,
@@ -117,6 +115,7 @@ def update_status(
     # Notify on goal completion
     if status == GoalStatus.COMPLETED.value:
         from app.notifications.event_handlers import on_goal_completed
+
         on_goal_completed(user_id, goal_id, goal.title)
     return _goal_to_response(goal)
 
@@ -160,11 +159,7 @@ def check_review_due(db: Session, user_id: int) -> MonthlyReviewCheck:
     # 1. No review exists for this month
     # 2. User has goals with activity
     # 3. At least 7 days into the month
-    due = (
-        existing is None
-        and len(goals) > 0
-        and now.day >= 7
-    )
+    due = existing is None and len(goals) > 0 and now.day >= 7
 
     latest_review = repo.get_latest_monthly_review(db, user_id)
 
@@ -189,7 +184,9 @@ def check_review_due(db: Session, user_id: int) -> MonthlyReviewCheck:
     )
 
 
-def submit_review(db: Session, user_id: int, data: MonthlyReviewCreate) -> MonthlyReviewResponse:
+def submit_review(
+    db: Session, user_id: int, data: MonthlyReviewCreate
+) -> MonthlyReviewResponse:
     now = _utcnow()
     current_month = f"{now.year:04d}-{now.month:02d}"
 

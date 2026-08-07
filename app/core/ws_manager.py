@@ -38,9 +38,7 @@ class ConnectionManager:
             logger.warning("ws loop unavailable; dropping user event for %s", user_id)
             return
         try:
-            asyncio.run_coroutine_threadsafe(
-                self.send_user_event(user_id, data), loop
-            )
+            asyncio.run_coroutine_threadsafe(self.send_user_event(user_id, data), loop)
         except Exception:
             logger.exception("Failed to schedule user event for %s", user_id)
 

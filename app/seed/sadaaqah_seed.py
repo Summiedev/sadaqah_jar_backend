@@ -1,4 +1,4 @@
-﻿"""
+"""
 Seed script for Sadaqah Jar â€” 50+ acts with evidence across 8 categories.
 
 IMPORTANT: This file contains hadith citations. Entries marked with
@@ -18,6 +18,13 @@ from app.db.session import SessionLocal
 from app.models.badge import Badge
 from app.models.charity import Charity
 from app.models.evidence import Evidence
+from app.family.models import (
+    EventType,
+    Family,
+    FamilyActivity,
+    FamilyMember,
+    FamilyRole,
+)
 from app.models.jar import Jar
 from app.models.sadaqah_act import SadaqahAct, SadaqahCategory
 from app.models.sadaqah_log import SadaqahLog
@@ -1129,27 +1136,27 @@ print(f"  Created {len(used_logs)} logs")
 # ---------------------------------------------------------------------------
 
 print("Seeding family jar...")
-family_jar = FamilyJar(
+family_jar = Family(
     name="Test Family Jar",
     invite_code="TEST123",
-    capacity=100,
-    current_stars=0,
     created_by=users[0].id,
 )
 db.add(family_jar)
 db.commit()
 db.refresh(family_jar)
 
-owner_member = FamilyJarMember(
-    family_jar_id=family_jar.id,
+owner_member = FamilyMember(
+    family_id=family_jar.id,
     user_id=users[0].id,
+    role=FamilyRole.OWNER,
 )
 db.add(owner_member)
 
 for user in users[1:5]:
-    member = FamilyJarMember(
-        family_jar_id=family_jar.id,
+    member = FamilyMember(
+        family_id=family_jar.id,
         user_id=user.id,
+        role=FamilyRole.MEMBER,
     )
     db.add(member)
 
@@ -1158,12 +1165,11 @@ db.commit()
 for _ in range(30):
     member = random.choice(users[:5])
     act = random.choice(seeded_acts)
-    log = FamilyJarLog(
-        family_jar_id=family_jar.id,
-        user_id=member.id,
-        act_id=act.id,
-        stars_added=random.randint(1, 3),
-        date=datetime.utcnow().date(),
+    log = FamilyActivity(
+        family_id=family_jar.id,
+        actor_id=member.id,
+        event_type=EventType.ACT_ADDED,
+        extra={"act_id": act.id, "stars_added": random.randint(1, 3)},
     )
     db.add(log)
 
@@ -1231,23 +1237,14 @@ for user in users:
         user_id=user.id,
         current_streak=random.randint(0, 14),
         longest_streak=random.randint(5, 21),
-        last_completed_date=datetime.utcnow().date() - timedelta(days=random.randint(0, 3)),
+        last_completed_date=datetime.utcnow().date()
+        - timedelta(days=random.randint(0, 3)),
     )
     db.add(streak)
 db.commit()
 print("  Created user streaks")
 
-print("Seeding family badges...")
-family_badge = FamilyBadge(
-    family_id=family_jar.id,
-    badge_id=badge.id,
-)
-db.add(family_badge)
-db.commit()
-print("  Created family badge assignment")
 print("\nSEED COMPLETE")
 print(f"Total acts seeded: {len(seeded_acts)}")
 print(f"  - Fully cited with hadith/Quran: {fully_cited_count}")
 print(f"  - Flagged for scholarly review: {flagged_count}")
-
-

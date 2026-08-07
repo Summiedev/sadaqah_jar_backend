@@ -98,11 +98,15 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         request_id=get_request_id(),
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
-    return JSONResponse(status_code=exc.status_code, content={"error": payload.model_dump()})
+    return JSONResponse(
+        status_code=exc.status_code, content={"error": payload.model_dump()}
+    )
 
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
-    status_code = _EXCEPTION_STATUS_MAP.get(exc.code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+    status_code = _EXCEPTION_STATUS_MAP.get(
+        exc.code, status.HTTP_500_INTERNAL_SERVER_ERROR
+    )
     friendly = _friendly_message(exc.code, exc.message)
     payload = ErrorResponse(
         code=exc.code,
@@ -111,7 +115,9 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
         request_id=get_request_id(),
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
-    return JSONResponse(status_code=status_code, content={"error": payload.model_dump()})
+    return JSONResponse(
+        status_code=status_code, content={"error": payload.model_dump()}
+    )
 
 
 async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -130,5 +136,6 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"error": payload.model_dump()}
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"error": payload.model_dump()},
     )

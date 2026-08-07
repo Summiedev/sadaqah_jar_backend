@@ -58,10 +58,13 @@ def _is_friday(d: date) -> bool:
 
 def _is_ramadan(d: date) -> bool:
     from app.services.hijri_service import is_ramadan as hijri_is_ramadan
+
     return hijri_is_ramadan(d)
 
 
-def _calculate_stars(activity_type: ActivityType, completed_at: date) -> tuple[int, bool, bool]:
+def _calculate_stars(
+    activity_type: ActivityType, completed_at: date
+) -> tuple[int, bool, bool]:
     """Calculate stars earned for an activity completion."""
     stars = 1
     friday_boost = _is_friday(completed_at)
@@ -92,7 +95,7 @@ def _compute_streak(completion_dates: list[date]) -> tuple[int, int, Optional[da
 
     # Deduplicate and sort
     unique_dates = sorted(set(completion_dates))
-    
+
     # Find longest streak
     longest = 1
     longest_current = 1
@@ -107,10 +110,10 @@ def _compute_streak(completion_dates: list[date]) -> tuple[int, int, Optional[da
     # Find current streak (ending today or yesterday)
     today = _today()
     yesterday = today - timedelta(days=1)
-    
+
     current = 0
     last_completed = None
-    
+
     # Walk backwards from most recent
     for i in range(len(unique_dates) - 1, -1, -1):
         d = unique_dates[i]
@@ -153,7 +156,10 @@ def create_completion(
         raise ValueError("family_id is required for family/both context")
 
     # Calculate stars
-    stars, friday_boost, ramadan_bonus = _calculate_stars(activity_type, completed_at.date() if isinstance(completed_at, datetime) else completed_at)
+    stars, friday_boost, ramadan_bonus = _calculate_stars(
+        activity_type,
+        completed_at.date() if isinstance(completed_at, datetime) else completed_at,
+    )
 
     completion = repo.ActivityCompletionRepository().create(
         db,
@@ -274,9 +280,7 @@ def list_completions(
 # ---------------------------------------------------------------------------
 
 
-def start_session(
-    db: Session, user_id: int, payload: dict
-) -> ActivitySessionResponse:
+def start_session(db: Session, user_id: int, payload: dict) -> ActivitySessionResponse:
     activity_type = payload["activity_type"]
     context = payload.get("context", ActivityContext.PERSONAL)
     note = validate_note(payload.get("note"))
@@ -287,10 +291,14 @@ def start_session(
         raise ValueError("family_id is required for family/both context")
 
     # End any existing in-progress session for this activity type
-    existing = repo.ActivitySessionRepository().get_in_progress(db, user_id, activity_type)
+    existing = repo.ActivitySessionRepository().get_in_progress(
+        db, user_id, activity_type
+    )
     if existing:
         existing.ended_at = started_at
-        existing.duration_seconds = int((started_at - existing.started_at).total_seconds())
+        existing.duration_seconds = int(
+            (started_at - existing.started_at).total_seconds()
+        )
 
     session = repo.ActivitySessionRepository().create(
         db,
@@ -426,7 +434,9 @@ def list_sessions(
 # ---------------------------------------------------------------------------
 
 
-def _update_streak(db: Session, user_id: int, activity_type: ActivityType, completed_at: datetime) -> ActivityStreak:
+def _update_streak(
+    db: Session, user_id: int, activity_type: ActivityType, completed_at: datetime
+) -> ActivityStreak:
     """Update streak after a completion."""
     # Get all completion dates for this user/type
     completions = db.scalars(
@@ -454,10 +464,14 @@ def _update_streak(db: Session, user_id: int, activity_type: ActivityType, compl
     return streak
 
 
-def get_streak(db: Session, user_id: int, activity_type: ActivityType) -> ActivityStreakResponse:
+def get_streak(
+    db: Session, user_id: int, activity_type: ActivityType
+) -> ActivityStreakResponse:
     streak = repo.ActivityStreakRepository().get(db, user_id, activity_type)
     if not streak:
-        streak = repo.ActivityStreakRepository().get_or_create(db, user_id, activity_type)
+        streak = repo.ActivityStreakRepository().get_or_create(
+            db, user_id, activity_type
+        )
     return ActivityStreakResponse(
         id=streak.id,
         activity_type=streak.activity_type,
@@ -506,31 +520,40 @@ def get_summary(db: Session, user_id: int) -> dict:
     most_common = max(type_counts, key=type_counts.get) if type_counts else None
 
     # Friday and Ramadan counts
-    thirty_days = db.scalar(
-        select(func.count(ActivityCompletion.id)).where(
-            ActivityCompletion.user_id == user_id,
-            ActivityCompletion.completed_at >= thirty_days_ago,
-            ActivityCompletion.deleted_at.is_(None),
-            ActivityCompletion.friday_boost,
+    thirty_days = (
+        db.scalar(
+            select(func.count(ActivityCompletion.id)).where(
+                ActivityCompletion.user_id == user_id,
+                ActivityCompletion.completed_at >= thirty_days_ago,
+                ActivityCompletion.deleted_at.is_(None),
+                ActivityCompletion.friday_boost,
+            )
         )
-    ) or 0
+        or 0
+    )
 
-    ramadan_count = db.scalar(
-        select(func.count(ActivityCompletion.id)).where(
-            ActivityCompletion.user_id == user_id,
-            ActivityCompletion.completed_at >= thirty_days_ago,
-            ActivityCompletion.deleted_at.is_(None),
-            ActivityCompletion.ramadan_bonus,
+    ramadan_count = (
+        db.scalar(
+            select(func.count(ActivityCompletion.id)).where(
+                ActivityCompletion.user_id == user_id,
+                ActivityCompletion.completed_at >= thirty_days_ago,
+                ActivityCompletion.deleted_at.is_(None),
+                ActivityCompletion.ramadan_bonus,
+            )
         )
-    ) or 0
+        or 0
+    )
 
     # Total stars
-    total_stars = db.scalar(
-        select(func.sum(ActivityCompletion.stars_earned)).where(
-            ActivityCompletion.user_id == user_id,
-            ActivityCompletion.deleted_at.is_(None),
+    total_stars = (
+        db.scalar(
+            select(func.sum(ActivityCompletion.stars_earned)).where(
+                ActivityCompletion.user_id == user_id,
+                ActivityCompletion.deleted_at.is_(None),
+            )
         )
-    ) or 0
+        or 0
+    )
 
     # Current streak across all activity types
     streaks = repo.ActivityStreakRepository().list_for_user(db, user_id)
@@ -581,12 +604,14 @@ def get_category_breakdown(db: Session, user_id: int, days: int = 30) -> list[di
             ActivityCompletion.activity_type,
             func.count(ActivityCompletion.id).label("count"),
             func.sum(ActivityCompletion.stars_earned).label("stars"),
-        ).where(
+        )
+        .where(
             ActivityCompletion.user_id == user_id,
             ActivityCompletion.completed_at >= start_date,
             ActivityCompletion.completed_at <= end_date + timedelta(days=1),
             ActivityCompletion.deleted_at.is_(None),
-        ).group_by(ActivityCompletion.activity_type)
+        )
+        .group_by(ActivityCompletion.activity_type)
     ).all()
 
     return [

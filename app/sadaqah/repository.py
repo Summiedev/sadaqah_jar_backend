@@ -24,7 +24,9 @@ class ActivityCompletionRepository:
         db.refresh(completion)
         return completion
 
-    def get(self, db: Session, completion_id: int, user_id: int) -> ActivityCompletion | None:
+    def get(
+        self, db: Session, completion_id: int, user_id: int
+    ) -> ActivityCompletion | None:
         return db.scalar(
             select(ActivityCompletion).where(
                 ActivityCompletion.id == completion_id,
@@ -56,7 +58,9 @@ class ActivityCompletionRepository:
         if start_date is not None:
             query = query.where(ActivityCompletion.completed_at >= start_date)
         if end_date is not None:
-            query = query.where(ActivityCompletion.completed_at <= end_date + timedelta(days=1))
+            query = query.where(
+                ActivityCompletion.completed_at <= end_date + timedelta(days=1)
+            )
 
         total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
 
@@ -73,17 +77,23 @@ class ActivityCompletionRepository:
     ) -> list[ActivityCompletion]:
         return list(
             db.scalars(
-                select(ActivityCompletion).where(
+                select(ActivityCompletion)
+                .where(
                     ActivityCompletion.user_id == user_id,
                     ActivityCompletion.completed_at >= start_date,
                     ActivityCompletion.completed_at < end_date + timedelta(days=1),
                     ActivityCompletion.deleted_at.is_(None),
-                ).order_by(ActivityCompletion.completed_at.desc())
+                )
+                .order_by(ActivityCompletion.completed_at.desc())
             )
         )
 
     def count_by_type(
-        self, db: Session, user_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+        self,
+        db: Session,
+        user_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
     ) -> dict[str, int]:
         query = select(
             ActivityCompletion.activity_type,
@@ -95,7 +105,9 @@ class ActivityCompletionRepository:
         if start_date is not None:
             query = query.where(ActivityCompletion.completed_at >= start_date)
         if end_date is not None:
-            query = query.where(ActivityCompletion.completed_at < end_date + timedelta(days=1))
+            query = query.where(
+                ActivityCompletion.completed_at < end_date + timedelta(days=1)
+            )
 
         query = query.group_by(ActivityCompletion.activity_type)
         rows = db.execute(query).all()
@@ -139,7 +151,9 @@ class ActivitySessionRepository:
         if start_date is not None:
             query = query.where(ActivitySession.started_at >= start_date)
         if end_date is not None:
-            query = query.where(ActivitySession.started_at <= end_date + timedelta(days=1))
+            query = query.where(
+                ActivitySession.started_at <= end_date + timedelta(days=1)
+            )
 
         total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
 
@@ -151,7 +165,9 @@ class ActivitySessionRepository:
 
         return list(rows), total
 
-    def get_in_progress(self, db: Session, user_id: int, activity_type: Optional[ActivityType] = None) -> ActivitySession | None:
+    def get_in_progress(
+        self, db: Session, user_id: int, activity_type: Optional[ActivityType] = None
+    ) -> ActivitySession | None:
         query = select(ActivitySession).where(
             ActivitySession.user_id == user_id,
             ActivitySession.ended_at.is_(None),
@@ -163,7 +179,9 @@ class ActivitySessionRepository:
 
 
 class ActivityStreakRepository:
-    def get(self, db: Session, user_id: int, activity_type: ActivityType) -> ActivityStreak | None:
+    def get(
+        self, db: Session, user_id: int, activity_type: ActivityType
+    ) -> ActivityStreak | None:
         return db.scalar(
             select(ActivityStreak).where(
                 ActivityStreak.user_id == user_id,
@@ -171,7 +189,9 @@ class ActivityStreakRepository:
             )
         )
 
-    def get_or_create(self, db: Session, user_id: int, activity_type: ActivityType) -> ActivityStreak:
+    def get_or_create(
+        self, db: Session, user_id: int, activity_type: ActivityType
+    ) -> ActivityStreak:
         streak = self.get(db, user_id, activity_type)
         if streak is None:
             streak = ActivityStreak(user_id=user_id, activity_type=activity_type)
@@ -180,7 +200,9 @@ class ActivityStreakRepository:
             db.refresh(streak)
         return streak
 
-    def update(self, db: Session, streak: ActivityStreak, payload: dict) -> ActivityStreak:
+    def update(
+        self, db: Session, streak: ActivityStreak, payload: dict
+    ) -> ActivityStreak:
         for key, value in payload.items():
             if hasattr(streak, key):
                 setattr(streak, key, value)

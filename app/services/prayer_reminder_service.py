@@ -57,7 +57,11 @@ def schedule_prayer_relative_templates(
 
         existing = (
             db.query(ScheduledNotification)
-            .filter_by(user_id=user_id, template_id=template.id, local_date=local_date.isoformat())
+            .filter_by(
+                user_id=user_id,
+                template_id=template.id,
+                local_date=local_date.isoformat(),
+            )
             .first()
         )
         if existing is not None:

@@ -41,6 +41,7 @@ def give_user_badge(db: Session, user_id: int, badge_name: str, commit: bool = T
         db.commit()
     # Notify the user they earned a badge (idempotent via badge_id)
     from app.notifications.event_handlers import on_badge_earned
+
     on_badge_earned(user_id, badge.id, badge_name)
 
 

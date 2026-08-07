@@ -91,9 +91,7 @@ class ResendVerificationRequest(BaseModel):
 
 
 class ResendVerificationResponse(BaseModel):
-    message: str = (
-        "If an account with that email exists and is not verified, a new verification code has been sent."
-    )
+    message: str = "If an account with that email exists and is not verified, a new verification code has been sent."
 
 
 class GoogleAuthRequest(BaseModel):
@@ -255,7 +253,9 @@ class PushTokenRequest(BaseModel):
                     self.latitude = float(lat)
                     self.longitude = float(lng)
                 except Exception:
-                    raise ValueError("coords must contain numeric latitude and longitude")
+                    raise ValueError(
+                        "coords must contain numeric latitude and longitude"
+                    )
 
         # If one coordinate is provided, require the other as well.
         if (self.latitude is None) != (self.longitude is None):

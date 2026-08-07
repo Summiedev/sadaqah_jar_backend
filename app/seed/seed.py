@@ -74,7 +74,12 @@ from app.journey.models import (
     JourneyAdhkarFavorite,
     JourneyReadingProgress,
 )
-from app.notifications.models import Notification, NotificationTemplate, ScheduledNotification, SchedulingStrategy
+from app.notifications.models import (
+    Notification,
+    NotificationTemplate,
+    ScheduledNotification,
+    SchedulingStrategy,
+)
 from app.books.models import Book, BookChapter
 
 
@@ -178,7 +183,9 @@ class DatabaseSeeder:
                 user_id=user.id,
                 theme="light",
                 language="en",
-                selected_mode=random.choice([UserMode.PERSONAL, UserMode.FAMILY, UserMode.BOTH]),
+                selected_mode=random.choice(
+                    [UserMode.PERSONAL, UserMode.FAMILY, UserMode.BOTH]
+                ),
                 timezone="UTC",
                 notification_preferences='{"push": true, "email": false}',
                 reminder_preferences='{"friday": true}',
@@ -194,11 +201,11 @@ class DatabaseSeeder:
     # ------------------------------------------------------------------
     def seed_legacy_streaks(self, users: list[User]) -> None:
         streak_configs = [
-            (0, 0, _utcnow() - timedelta(days=45)),        # broken streak
-            (12, 18, _utcnow() - timedelta(days=1)),       # active strong
-            (7, 14, _utcnow() - timedelta(days=0)),        # active medium
-            (3, 10, _utcnow() - timedelta(days=2)),        # active weak
-            (0, 5, _utcnow() - timedelta(days=30)),        # broken
+            (0, 0, _utcnow() - timedelta(days=45)),  # broken streak
+            (12, 18, _utcnow() - timedelta(days=1)),  # active strong
+            (7, 14, _utcnow() - timedelta(days=0)),  # active medium
+            (3, 10, _utcnow() - timedelta(days=2)),  # active weak
+            (0, 5, _utcnow() - timedelta(days=30)),  # broken
         ]
         for idx, user in enumerate(users[:5]):
             current, longest, last = streak_configs[idx]
@@ -216,12 +223,19 @@ class DatabaseSeeder:
     # New activity streaks (activity_streaks table)
     # ------------------------------------------------------------------
     def seed_activity_streaks(self, users: list[User]) -> None:
-        types = [ActivityType.DHIKR, ActivityType.PRAYER, ActivityType.KINDNESS, ActivityType.FOOD]
+        types = [
+            ActivityType.DHIKR,
+            ActivityType.PRAYER,
+            ActivityType.KINDNESS,
+            ActivityType.FOOD,
+        ]
         for user in users:
             for act_type in types:
                 current = random.choice([0, 3, 7, 12, 15])
                 longest = max(current, random.randint(5, 25))
-                last = _utcnow() - timedelta(days=random.randint(0, 20 if current > 0 else 60))
+                last = _utcnow() - timedelta(
+                    days=random.randint(0, 20 if current > 0 else 60)
+                )
                 streak = ActivityStreak(
                     user_id=user.id,
                     activity_type=act_type,
@@ -267,7 +281,11 @@ class DatabaseSeeder:
         # Others: random legacy jars
         for user in users[3:]:
             stars = random.randint(0, 33)
-            completed = _utcnow() - timedelta(days=random.randint(1, 60)) if stars >= 33 else None
+            completed = (
+                _utcnow() - timedelta(days=random.randint(1, 60))
+                if stars >= 33
+                else None
+            )
             jar = Jar(
                 user_id=user.id,
                 current_stars=stars,
@@ -301,20 +319,104 @@ class DatabaseSeeder:
         ]
 
         evidence_data = [
-            ("HADITH", "Sahih Muslim 2693", "Sahih", "SubhanAllah hadith text", "English translation"),
-            ("HADITH", "Sahih Muslim 2692", "Sahih", "Alhamdulillah hadith text", "English translation"),
-            ("QURAN", "Al-Isra 17:24", "Quranic", "Arabic verse", "English translation"),
-            ("HADITH", "Sahih al-Bukhari", "Sahih", "Quran reading hadith", "English translation"),
-            ("HADITH", "Sahih al-Bukhari 6405", "Sahih", "La ilaha hadith", "English translation"),
-            ("QURAN", "Al-Baqarah 2:261", "Quranic", "Charity verse", "English translation"),
-            ("HADITH", "Sahih al-Bukhari", "Sahih", "Feeding poor hadith", "English translation"),
-            ("HADITH", "Jami at-Tirmidhi 1956", "Sahih", "Smile hadith", "English translation"),
-            ("HADITH", "Sahih al-Bukhari 6016", "Sahih", "Neighbor hadith", "English translation"),
-            ("HADITH", "Sahih al-Bukhari 2989", "Sahih", "Remove harm hadith", "English translation"),
-            ("HADITH", "Sahih Muslim", "Sahih", "Nafil prayer hadith", "English translation"),
-            ("HADITH", "Sahih al-Bukhari", "Sahih", "Jumu'ah hadith", "English translation"),
-            ("HADITH", "Sahih al-Bukhari 61", "Sahih", "Teach Islam hadith", "English translation"),
-            ("HADITH", "Sahih al-Bukhari", "Sahih", "Affirmation hadith", "English translation"),
+            (
+                "HADITH",
+                "Sahih Muslim 2693",
+                "Sahih",
+                "SubhanAllah hadith text",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih Muslim 2692",
+                "Sahih",
+                "Alhamdulillah hadith text",
+                "English translation",
+            ),
+            (
+                "QURAN",
+                "Al-Isra 17:24",
+                "Quranic",
+                "Arabic verse",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih al-Bukhari",
+                "Sahih",
+                "Quran reading hadith",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih al-Bukhari 6405",
+                "Sahih",
+                "La ilaha hadith",
+                "English translation",
+            ),
+            (
+                "QURAN",
+                "Al-Baqarah 2:261",
+                "Quranic",
+                "Charity verse",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih al-Bukhari",
+                "Sahih",
+                "Feeding poor hadith",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Jami at-Tirmidhi 1956",
+                "Sahih",
+                "Smile hadith",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih al-Bukhari 6016",
+                "Sahih",
+                "Neighbor hadith",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih al-Bukhari 2989",
+                "Sahih",
+                "Remove harm hadith",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih Muslim",
+                "Sahih",
+                "Nafil prayer hadith",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih al-Bukhari",
+                "Sahih",
+                "Jumu'ah hadith",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih al-Bukhari 61",
+                "Sahih",
+                "Teach Islam hadith",
+                "English translation",
+            ),
+            (
+                "HADITH",
+                "Sahih al-Bukhari",
+                "Sahih",
+                "Affirmation hadith",
+                "English translation",
+            ),
         ]
 
         acts: list[SadaqahAct] = []
@@ -383,7 +485,9 @@ class DatabaseSeeder:
     # ------------------------------------------------------------------
     # New activity completions
     # ------------------------------------------------------------------
-    def seed_activity_completions(self, users: list[User], family_id: int | None = None) -> None:
+    def seed_activity_completions(
+        self, users: list[User], family_id: int | None = None
+    ) -> None:
         act_types = list(ActivityType)
         contexts = [ActivityContext.PERSONAL]
         if family_id:
@@ -393,13 +497,17 @@ class DatabaseSeeder:
             for _ in range(random.randint(8, 30)):
                 act_type = random.choice(act_types)
                 context = random.choice(contexts)
-                completed = _utcnow() - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23))
+                completed = _utcnow() - timedelta(
+                    days=random.randint(0, 60), hours=random.randint(0, 23)
+                )
                 comp = ActivityCompletion(
                     user_id=user.id,
                     activity_type=act_type,
                     context=context,
                     note=None,
-                    family_id=family_id if context in (ActivityContext.FAMILY, ActivityContext.BOTH) else None,
+                    family_id=family_id
+                    if context in (ActivityContext.FAMILY, ActivityContext.BOTH)
+                    else None,
                     completed_at=completed,
                     stars_earned=random.randint(1, 3),
                     friday_boost=(completed.weekday() == 4),
@@ -413,7 +521,9 @@ class DatabaseSeeder:
     # ------------------------------------------------------------------
     # New activity sessions (continuous acts)
     # ------------------------------------------------------------------
-    def seed_activity_sessions(self, users: list[User], family_id: int | None = None) -> None:
+    def seed_activity_sessions(
+        self, users: list[User], family_id: int | None = None
+    ) -> None:
         continuous = [ActivityType.PRAYER, ActivityType.DHIKR, ActivityType.TIME]
         contexts = [ActivityContext.PERSONAL]
         if family_id:
@@ -422,7 +532,9 @@ class DatabaseSeeder:
         for user in users:
             for _ in range(random.randint(2, 8)):
                 act_type = random.choice(continuous)
-                started = _utcnow() - timedelta(days=random.randint(0, 30), hours=random.randint(0, 12))
+                started = _utcnow() - timedelta(
+                    days=random.randint(0, 30), hours=random.randint(0, 12)
+                )
                 duration = random.randint(300, 3600)
                 context = random.choice(contexts)
                 session = ActivitySession(
@@ -432,7 +544,9 @@ class DatabaseSeeder:
                     ended_at=started + timedelta(seconds=duration),
                     duration_seconds=duration,
                     context=context,
-                    family_id=family_id if context in (ActivityContext.FAMILY, ActivityContext.BOTH) else None,
+                    family_id=family_id
+                    if context in (ActivityContext.FAMILY, ActivityContext.BOTH)
+                    else None,
                 )
                 self.db.add(session)
                 total += 1
@@ -455,14 +569,24 @@ class DatabaseSeeder:
         self.db.flush()
 
         members = [
-            FamilyMember(family_id=active_family.id, user_id=users[0].id, role=FamilyRole.OWNER),
-            FamilyMember(family_id=active_family.id, user_id=users[1].id, role=FamilyRole.ADMIN),
-            FamilyMember(family_id=active_family.id, user_id=users[2].id, role=FamilyRole.MEMBER),
+            FamilyMember(
+                family_id=active_family.id, user_id=users[0].id, role=FamilyRole.OWNER
+            ),
+            FamilyMember(
+                family_id=active_family.id, user_id=users[1].id, role=FamilyRole.ADMIN
+            ),
+            FamilyMember(
+                family_id=active_family.id, user_id=users[2].id, role=FamilyRole.MEMBER
+            ),
         ]
         for m in members:
             self.db.add(m)
 
-        self.db.add(FamilySettings(family_id=active_family.id, notification_preferences={}, version=1))
+        self.db.add(
+            FamilySettings(
+                family_id=active_family.id, notification_preferences={}, version=1
+            )
+        )
 
         # Goal
         goal = FamilyGoal(
@@ -586,7 +710,14 @@ class DatabaseSeeder:
             for _ in range(random.randint(1, 3)):
                 refl = JourneyReflection(
                     user_id=user.id,
-                    title=random.choice(["Blessings of today", "A moment of peace", "Lessons from the Quran", "Patience in hardship"]),
+                    title=random.choice(
+                        [
+                            "Blessings of today",
+                            "A moment of peace",
+                            "Lessons from the Quran",
+                            "Patience in hardship",
+                        ]
+                    ),
                     body="A personal reflection on faith, gratitude, and growth.",
                     mood=random.choice(moods),
                     is_private=random.choice([True, False]),
@@ -606,16 +737,22 @@ class DatabaseSeeder:
             for aid in fav_ids:
                 self.db.add(JourneyAdhkarFavorite(user_id=user.id, adhkar_id=aid))
             for aid in random.sample(adhkar_ids, k=random.randint(2, 5)):
-                self.db.add(JourneyAdhkarProgress(user_id=user.id, adhkar_id=aid, count=random.randint(0, 33)))
+                self.db.add(
+                    JourneyAdhkarProgress(
+                        user_id=user.id, adhkar_id=aid, count=random.randint(0, 33)
+                    )
+                )
         self.db.commit()
         print("[OK] Created adhkar favorites and progress")
 
     # ------------------------------------------------------------------
     # Journey reading progress
     # ------------------------------------------------------------------
-    def seed_journey_reading_progress(self, users: list[User], books: list[Book] | None = None) -> None:
+    def seed_journey_reading_progress(
+        self, users: list[User], books: list[Book] | None = None
+    ) -> None:
         if not books:
-            books = self.db.query(Book).filter(Book.published == True).all()
+            books = self.db.query(Book).filter(Book.published.is_(True)).all()
         if not books:
             return
         for user in users[:6]:
@@ -636,9 +773,11 @@ class DatabaseSeeder:
     # ------------------------------------------------------------------
     # Donation intents
     # ------------------------------------------------------------------
-    def seed_donation_intents(self, users: list[User], charities: list[Charity] | None = None) -> None:
+    def seed_donation_intents(
+        self, users: list[User], charities: list[Charity] | None = None
+    ) -> None:
         if not charities:
-            charities = self.db.query(Charity).filter(Charity.is_active == True).all()
+            charities = self.db.query(Charity).filter(Charity.is_active.is_(True)).all()
         if not charities:
             return
         for user in users[:5]:
@@ -656,7 +795,11 @@ class DatabaseSeeder:
     # Scheduled notifications
     # ------------------------------------------------------------------
     def seed_scheduled_notifications(self, users: list[User]) -> None:
-        templates = self.db.query(NotificationTemplate).filter(NotificationTemplate.enabled == True).all()
+        templates = (
+            self.db.query(NotificationTemplate)
+            .filter(NotificationTemplate.enabled.is_(True))
+            .all()
+        )
         if not templates:
             return
         for user in users:
@@ -665,7 +808,9 @@ class DatabaseSeeder:
                 ScheduledNotification(
                     user_id=user.id,
                     template_id=template.id,
-                    local_date=(_utcnow() + timedelta(days=random.randint(0, 7))).strftime("%Y-%m-%d"),
+                    local_date=(
+                        _utcnow() + timedelta(days=random.randint(0, 7))
+                    ).strftime("%Y-%m-%d"),
                     scheduled_for=_utcnow() + timedelta(hours=random.randint(1, 48)),
                     status="scheduled",
                 )
@@ -677,17 +822,36 @@ class DatabaseSeeder:
     # Notifications
     # ------------------------------------------------------------------
     def seed_notifications(self, users: list[User]) -> None:
-        categories = ["family", "journey", "prayer", "adhkar", "reading", "reflection", "charity", "announcements"]
+        categories = [
+            "family",
+            "journey",
+            "prayer",
+            "adhkar",
+            "reading",
+            "reflection",
+            "charity",
+            "announcements",
+        ]
         for user in users:
             for _ in range(random.randint(3, 8)):
                 notif = Notification(
                     user_id=user.id,
                     category=random.choice(categories),
-                    title=random.choice(["Friday reminder", "Family update", "New reflection", "Prayer request"]),
+                    title=random.choice(
+                        [
+                            "Friday reminder",
+                            "Family update",
+                            "New reflection",
+                            "Prayer request",
+                        ]
+                    ),
                     message="A gentle notification for your journey.",
                     action=None,
                     is_read=random.choice([True, False]),
-                    created_at=_utcnow() - timedelta(days=random.randint(0, 10), hours=random.randint(0, 23)),
+                    created_at=_utcnow()
+                    - timedelta(
+                        days=random.randint(0, 10), hours=random.randint(0, 23)
+                    ),
                 )
                 self.db.add(notif)
         self.db.commit()
@@ -696,54 +860,356 @@ class DatabaseSeeder:
     def seed_notification_templates(self) -> None:
         """Seed editable reminder definitions; runtime tasks contain no wording."""
         templates = [
-            ("morning_adhkar", "Morning adhkar", "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×", "adhkar", {"anchor": "fajr", "offset_minutes": 30, "content_source": "morning_adhkar"}),
-            ("evening_adhkar", "Evening adhkar", "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×", "adhkar", {"anchor": "asr", "offset_minutes": 30, "content_source": "evening_adhkar"}),
-            ("salatul_duha", "Salatul Duha", "A gentle two rak'ahs of Duha fit nicely right now.", "prayer", {"anchor": "duha_start", "offset_minutes": 15}),
-            ("witr_reminder", "Remember Witr", "Close the day with Witr before you rest.", "prayer", {"anchor": "isha", "offset_minutes": 45}),
-            ("daily_sadaqah", "Today's sadaqah", "A small goodness for today: {act_title}. {act_description}", "charity", {"anchor": "zuhr", "offset_minutes": 30, "content_source": "personalized_sadaqah"}),
-            ("afternoon_sadaqah", "Afternoon sadaqah", "The afternoon is a wonderful time for a small sadaqah. {act_title}: {act_description}", "charity", {"anchor": "asr", "offset_minutes": -10, "content_source": "personalized_sadaqah"}),
-            ("midday_dhikr", "A moment of dhikr", "Pause and say: La ilaha illallah. A gentle moment of tahlil for your heart.", "reflection", {"anchor": "duha_start", "offset_minutes": 45}),
-            ("evening_tahlil", "Evening tahlil", "A quiet moment of dhikr before the evening settles in. SubhanAllah, Alhamdulillah, Allahu Akbar.", "reflection", {"anchor": "maghrib", "offset_minutes": 15}),
-            ("quran_reminder", "A moment with the Quran", "Open the Quran today, even for a few verses, and let it settle in your heart.", "reading", {"anchor": "maghrib", "offset_minutes": 30}),
-            ("friday_reminder", "Friday reminder", "{message}", "islamic_occasions", {"anchor": "zuhr", "offset_minutes": -30, "days_of_week": [4], "content_source": "rotating_messages", "messages": ["Send abundant salawat upon the Prophet today.", "Read Surah Al-Kahf — it is a light between two Fridays.", "Give charity today — even a little carries extra weight on Jumu'ah.", "Make dua in the last hour after Asr — it is the hour of acceptance.", "Reach out to a relative to strengthen family ties."]}),
-            ("friday_kahf_reminder", "Read Surah Al-Kahf", "It is still Friday. Read Surah Al-Kahf — it is a light between two Fridays and a protection for the week ahead.", "islamic_occasions", {"anchor": "asr", "offset_minutes": 30, "days_of_week": [4], "content_source": "rotating_messages", "messages": ["Read Surah Al-Kahf while it is still Friday.", "Surah Al-Kahf is a light for your heart and a protection for your week."]}),
-            ("pre_fajr", "A few minutes before Fajr", "Fajr is approaching. Wake gently and ready yourself for the day with Allah.", "prayer", {"anchor": "fajr", "offset_minutes": -10}),
-            ("pre_dhuhr", "Approaching Dhuhr", "Dhuhr is near. Clear your mind and step into prayer.", "prayer", {"anchor": "zuhr", "offset_minutes": -10}),
-            ("pre_maghrib", "Approaching Maghrib", "Maghrib is close. Pause your work and turn to Allah.", "prayer", {"anchor": "maghrib", "offset_minutes": -10}),
-            ("pre_isha", "Approaching Isha", "Isha is coming. End the day in prayer and quiet reflection.", "prayer", {"anchor": "isha", "offset_minutes": -10}),
-            ("pre_sleep_dhikr", "A moment before sleep", "Before you rest, spend a quiet moment with Allah. La ilaha illallah.", "reflection", {"anchor": "isha", "offset_minutes": -15}),
+            (
+                "morning_adhkar",
+                "Morning adhkar",
+                "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×",
+                "adhkar",
+                {
+                    "anchor": "fajr",
+                    "offset_minutes": 30,
+                    "content_source": "morning_adhkar",
+                },
+            ),
+            (
+                "evening_adhkar",
+                "Evening adhkar",
+                "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×",
+                "adhkar",
+                {
+                    "anchor": "asr",
+                    "offset_minutes": 30,
+                    "content_source": "evening_adhkar",
+                },
+            ),
+            (
+                "salatul_duha",
+                "Salatul Duha",
+                "A gentle two rak'ahs of Duha fit nicely right now.",
+                "prayer",
+                {"anchor": "duha_start", "offset_minutes": 15},
+            ),
+            (
+                "witr_reminder",
+                "Remember Witr",
+                "Close the day with Witr before you rest.",
+                "prayer",
+                {"anchor": "isha", "offset_minutes": 45},
+            ),
+            (
+                "daily_sadaqah",
+                "Today's sadaqah",
+                "A small goodness for today: {act_title}. {act_description}",
+                "charity",
+                {
+                    "anchor": "zuhr",
+                    "offset_minutes": 30,
+                    "content_source": "personalized_sadaqah",
+                },
+            ),
+            (
+                "afternoon_sadaqah",
+                "Afternoon sadaqah",
+                "The afternoon is a wonderful time for a small sadaqah. {act_title}: {act_description}",
+                "charity",
+                {
+                    "anchor": "asr",
+                    "offset_minutes": -10,
+                    "content_source": "personalized_sadaqah",
+                },
+            ),
+            (
+                "midday_dhikr",
+                "A moment of dhikr",
+                "Pause and say: La ilaha illallah. A gentle moment of tahlil for your heart.",
+                "reflection",
+                {"anchor": "duha_start", "offset_minutes": 45},
+            ),
+            (
+                "evening_tahlil",
+                "Evening tahlil",
+                "A quiet moment of dhikr before the evening settles in. SubhanAllah, Alhamdulillah, Allahu Akbar.",
+                "reflection",
+                {"anchor": "maghrib", "offset_minutes": 15},
+            ),
+            (
+                "quran_reminder",
+                "A moment with the Quran",
+                "Open the Quran today, even for a few verses, and let it settle in your heart.",
+                "reading",
+                {"anchor": "maghrib", "offset_minutes": 30},
+            ),
+            (
+                "friday_reminder",
+                "Friday reminder",
+                "{message}",
+                "islamic_occasions",
+                {
+                    "anchor": "zuhr",
+                    "offset_minutes": -30,
+                    "days_of_week": [4],
+                    "content_source": "rotating_messages",
+                    "messages": [
+                        "Send abundant salawat upon the Prophet today.",
+                        "Read Surah Al-Kahf — it is a light between two Fridays.",
+                        "Give charity today — even a little carries extra weight on Jumu'ah.",
+                        "Make dua in the last hour after Asr — it is the hour of acceptance.",
+                        "Reach out to a relative to strengthen family ties.",
+                    ],
+                },
+            ),
+            (
+                "friday_kahf_reminder",
+                "Read Surah Al-Kahf",
+                "It is still Friday. Read Surah Al-Kahf — it is a light between two Fridays and a protection for the week ahead.",
+                "islamic_occasions",
+                {
+                    "anchor": "asr",
+                    "offset_minutes": 30,
+                    "days_of_week": [4],
+                    "content_source": "rotating_messages",
+                    "messages": [
+                        "Read Surah Al-Kahf while it is still Friday.",
+                        "Surah Al-Kahf is a light for your heart and a protection for your week.",
+                    ],
+                },
+            ),
+            (
+                "pre_fajr",
+                "A few minutes before Fajr",
+                "Fajr is approaching. Wake gently and ready yourself for the day with Allah.",
+                "prayer",
+                {"anchor": "fajr", "offset_minutes": -10},
+            ),
+            (
+                "pre_dhuhr",
+                "Approaching Dhuhr",
+                "Dhuhr is near. Clear your mind and step into prayer.",
+                "prayer",
+                {"anchor": "zuhr", "offset_minutes": -10},
+            ),
+            (
+                "pre_maghrib",
+                "Approaching Maghrib",
+                "Maghrib is close. Pause your work and turn to Allah.",
+                "prayer",
+                {"anchor": "maghrib", "offset_minutes": -10},
+            ),
+            (
+                "pre_isha",
+                "Approaching Isha",
+                "Isha is coming. End the day in prayer and quiet reflection.",
+                "prayer",
+                {"anchor": "isha", "offset_minutes": -10},
+            ),
+            (
+                "pre_sleep_dhikr",
+                "A moment before sleep",
+                "Before you rest, spend a quiet moment with Allah. La ilaha illallah.",
+                "reflection",
+                {"anchor": "isha", "offset_minutes": -15},
+            ),
             # Expanded content library templates
-            ("fajr_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "fajr", "offset_minutes": 0, "content_source": "prayer_fardh"}),
-            ("dhuhr_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "zuhr", "offset_minutes": 0, "content_source": "prayer_fardh"}),
-            ("asr_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "asr", "offset_minutes": 0, "content_source": "prayer_fardh"}),
-            ("maghrib_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "maghrib", "offset_minutes": 0, "content_source": "prayer_fardh"}),
-            ("isha_reminder", "{title}", "{message}", "prayer_fardh", {"anchor": "isha", "offset_minutes": 0, "content_source": "prayer_fardh"}),
-            ("tahajjud_reminder", "{title}", "{message}", "prayer_nafl", {"anchor": "fajr", "offset_minutes": -90, "content_source": "prayer_nafl"}),
-            ("duha_reminder", "{title}", "{message}", "prayer_nafl", {"anchor": "duha_start", "offset_minutes": 15, "content_source": "prayer_nafl"}),
-            ("witr_reminder_expanded", "{title}", "{message}", "prayer_nafl", {"anchor": "isha", "offset_minutes": 30, "content_source": "prayer_nafl"}),
-            ("morning_adhkar_expanded", "{title}", "{message}", "adhkar_morning", {"anchor": "fajr", "offset_minutes": 20, "content_source": "adhkar_morning"}),
-            ("evening_adhkar_expanded", "{title}", "{message}", "adhkar_evening", {"anchor": "asr", "offset_minutes": 20, "content_source": "adhkar_evening"}),
-            ("friday_expanded", "{title}", "{message}", "time_based", {"anchor": "zuhr", "offset_minutes": -30, "days_of_week": [4], "content_source": "time_based"}),
-            ("quran_verse", "{title}", "{message}", "quran", {"anchor": "maghrib", "offset_minutes": 15, "content_source": "quran"}),
-            ("hadith_reminder", "{title}", "{message}", "hadith", {"anchor": "duha_start", "offset_minutes": 30, "content_source": "hadith"}),
-            ("reflection_prompt", "{title}", "{message}", "reflection", {"anchor": "isha", "offset_minutes": 15, "content_source": "reflection"}),
-            ("hereafter_reminder", "{title}", "{message}", "hereafter", {"anchor": "isha", "offset_minutes": 30, "content_source": "hereafter"}),
-            ("good_deed_reminder", "{title}", "{message}", "good_deeds", {"anchor": "zuhr", "offset_minutes": 15, "content_source": "good_deeds"}),
-            ("quote_reminder", "{title}", "{message}", "quotes", {"anchor": "duha_start", "offset_minutes": 60, "content_source": "quotes"}),
+            (
+                "fajr_reminder",
+                "{title}",
+                "{message}",
+                "prayer_fardh",
+                {
+                    "anchor": "fajr",
+                    "offset_minutes": 0,
+                    "content_source": "prayer_fardh",
+                },
+            ),
+            (
+                "dhuhr_reminder",
+                "{title}",
+                "{message}",
+                "prayer_fardh",
+                {
+                    "anchor": "zuhr",
+                    "offset_minutes": 0,
+                    "content_source": "prayer_fardh",
+                },
+            ),
+            (
+                "asr_reminder",
+                "{title}",
+                "{message}",
+                "prayer_fardh",
+                {
+                    "anchor": "asr",
+                    "offset_minutes": 0,
+                    "content_source": "prayer_fardh",
+                },
+            ),
+            (
+                "maghrib_reminder",
+                "{title}",
+                "{message}",
+                "prayer_fardh",
+                {
+                    "anchor": "maghrib",
+                    "offset_minutes": 0,
+                    "content_source": "prayer_fardh",
+                },
+            ),
+            (
+                "isha_reminder",
+                "{title}",
+                "{message}",
+                "prayer_fardh",
+                {
+                    "anchor": "isha",
+                    "offset_minutes": 0,
+                    "content_source": "prayer_fardh",
+                },
+            ),
+            (
+                "tahajjud_reminder",
+                "{title}",
+                "{message}",
+                "prayer_nafl",
+                {
+                    "anchor": "fajr",
+                    "offset_minutes": -90,
+                    "content_source": "prayer_nafl",
+                },
+            ),
+            (
+                "duha_reminder",
+                "{title}",
+                "{message}",
+                "prayer_nafl",
+                {
+                    "anchor": "duha_start",
+                    "offset_minutes": 15,
+                    "content_source": "prayer_nafl",
+                },
+            ),
+            (
+                "witr_reminder_expanded",
+                "{title}",
+                "{message}",
+                "prayer_nafl",
+                {
+                    "anchor": "isha",
+                    "offset_minutes": 30,
+                    "content_source": "prayer_nafl",
+                },
+            ),
+            (
+                "morning_adhkar_expanded",
+                "{title}",
+                "{message}",
+                "adhkar_morning",
+                {
+                    "anchor": "fajr",
+                    "offset_minutes": 20,
+                    "content_source": "adhkar_morning",
+                },
+            ),
+            (
+                "evening_adhkar_expanded",
+                "{title}",
+                "{message}",
+                "adhkar_evening",
+                {
+                    "anchor": "asr",
+                    "offset_minutes": 20,
+                    "content_source": "adhkar_evening",
+                },
+            ),
+            (
+                "friday_expanded",
+                "{title}",
+                "{message}",
+                "time_based",
+                {
+                    "anchor": "zuhr",
+                    "offset_minutes": -30,
+                    "days_of_week": [4],
+                    "content_source": "time_based",
+                },
+            ),
+            (
+                "quran_verse",
+                "{title}",
+                "{message}",
+                "quran",
+                {"anchor": "maghrib", "offset_minutes": 15, "content_source": "quran"},
+            ),
+            (
+                "hadith_reminder",
+                "{title}",
+                "{message}",
+                "hadith",
+                {
+                    "anchor": "duha_start",
+                    "offset_minutes": 30,
+                    "content_source": "hadith",
+                },
+            ),
+            (
+                "reflection_prompt",
+                "{title}",
+                "{message}",
+                "reflection",
+                {
+                    "anchor": "isha",
+                    "offset_minutes": 15,
+                    "content_source": "reflection",
+                },
+            ),
+            (
+                "hereafter_reminder",
+                "{title}",
+                "{message}",
+                "hereafter",
+                {"anchor": "isha", "offset_minutes": 30, "content_source": "hereafter"},
+            ),
+            (
+                "good_deed_reminder",
+                "{title}",
+                "{message}",
+                "good_deeds",
+                {
+                    "anchor": "zuhr",
+                    "offset_minutes": 15,
+                    "content_source": "good_deeds",
+                },
+            ),
+            (
+                "quote_reminder",
+                "{title}",
+                "{message}",
+                "quotes",
+                {
+                    "anchor": "duha_start",
+                    "offset_minutes": 60,
+                    "content_source": "quotes",
+                },
+            ),
         ]
         created = 0
         for key, title, message, category, config in templates:
-            if self.db.query(NotificationTemplate).filter(NotificationTemplate.key == key).first():
+            if (
+                self.db.query(NotificationTemplate)
+                .filter(NotificationTemplate.key == key)
+                .first()
+            ):
                 continue
-            self.db.add(NotificationTemplate(
-                key=key,
-                title_template=title,
-                message_template=message,
-                category=category,
-                strategy=SchedulingStrategy.PRAYER_RELATIVE.value,
-                strategy_config=json.dumps(config),
-                enabled=True,
-            ))
+            self.db.add(
+                NotificationTemplate(
+                    key=key,
+                    title_template=title,
+                    message_template=message,
+                    category=category,
+                    strategy=SchedulingStrategy.PRAYER_RELATIVE.value,
+                    strategy_config=json.dumps(config),
+                    enabled=True,
+                )
+            )
             created += 1
         self.db.commit()
         print(f"[OK] Created {created} notification templates")
@@ -788,9 +1254,24 @@ class DatabaseSeeder:
                 "published": True,
                 "sort_order": 1,
                 "chapters": [
-                    (1, "The Story of Adam (AS)", "In the beginning, Allah created Adam from clay and breathed life into him...", 8),
-                    (2, "The Story of Nuh (AS)", "Nuh called his people to worship Allah alone for 950 years...", 10),
-                    (3, "The Story of Ibrahim (AS)", "Ibrahim broke the idols and called his father and people to the truth...", 12),
+                    (
+                        1,
+                        "The Story of Adam (AS)",
+                        "In the beginning, Allah created Adam from clay and breathed life into him...",
+                        8,
+                    ),
+                    (
+                        2,
+                        "The Story of Nuh (AS)",
+                        "Nuh called his people to worship Allah alone for 950 years...",
+                        10,
+                    ),
+                    (
+                        3,
+                        "The Story of Ibrahim (AS)",
+                        "Ibrahim broke the idols and called his father and people to the truth...",
+                        12,
+                    ),
                 ],
             },
             {
@@ -803,9 +1284,24 @@ class DatabaseSeeder:
                 "published": True,
                 "sort_order": 2,
                 "chapters": [
-                    (1, "The Mirror of the Heart", "The heart is like a mirror — it must be polished to reflect the truth...", 6),
-                    (2, "Envy and Jealousy", "Envy consumes good deeds like fire consumes wood...", 7),
-                    (3, "Anger and Its Cure", "The Prophet (PBUH) taught that the strong person controls their anger...", 8),
+                    (
+                        1,
+                        "The Mirror of the Heart",
+                        "The heart is like a mirror — it must be polished to reflect the truth...",
+                        6,
+                    ),
+                    (
+                        2,
+                        "Envy and Jealousy",
+                        "Envy consumes good deeds like fire consumes wood...",
+                        7,
+                    ),
+                    (
+                        3,
+                        "Anger and Its Cure",
+                        "The Prophet (PBUH) taught that the strong person controls their anger...",
+                        8,
+                    ),
                 ],
             },
             {
@@ -818,9 +1314,24 @@ class DatabaseSeeder:
                 "published": True,
                 "sort_order": 3,
                 "chapters": [
-                    (1, "On the Excellence of Knowledge", "The Prophet (PBUH) said: 'Whoever travels a path seeking knowledge...'", 5),
-                    (2, "On Good Character", "The best of you are those with the best character...", 6),
-                    (3, "On Praying at Night", "The best prayer after the obligatory prayers is prayer at night...", 7),
+                    (
+                        1,
+                        "On the Excellence of Knowledge",
+                        "The Prophet (PBUH) said: 'Whoever travels a path seeking knowledge...'",
+                        5,
+                    ),
+                    (
+                        2,
+                        "On Good Character",
+                        "The best of you are those with the best character...",
+                        6,
+                    ),
+                    (
+                        3,
+                        "On Praying at Night",
+                        "The best prayer after the obligatory prayers is prayer at night...",
+                        7,
+                    ),
                 ],
             },
         ]
@@ -851,20 +1362,54 @@ class DatabaseSeeder:
 
         self.db.commit()
         print("[OK] Created books and chapters")
-        print("[NOTE] No per-user book reading progress table exists yet — 'Continue reading' is UI-only")
+        print(
+            "[NOTE] No per-user book reading progress table exists yet — 'Continue reading' is UI-only"
+        )
 
     # ------------------------------------------------------------------
     # Legacy charities
     # ------------------------------------------------------------------
     def seed_charities(self) -> None:
         charities_data = [
-            ("Islamic Relief", "Providing humanitarian aid globally", "https://www.islamic-relief.org", "humanitarian", True),
-            ("IRUSA", "Supporting Muslim communities in USA", "https://irusa.org", "community", True),
-            ("Muslim Hands", "Emergency relief and development", "https://muslimhands.org.uk", "humanitarian", True),
-            ("Zakat Foundation", "Zakat distribution and social services", "https://www.zakat.org", "zakat", True),
+            (
+                "Islamic Relief",
+                "Providing humanitarian aid globally",
+                "https://www.islamic-relief.org",
+                "humanitarian",
+                True,
+            ),
+            (
+                "IRUSA",
+                "Supporting Muslim communities in USA",
+                "https://irusa.org",
+                "community",
+                True,
+            ),
+            (
+                "Muslim Hands",
+                "Emergency relief and development",
+                "https://muslimhands.org.uk",
+                "humanitarian",
+                True,
+            ),
+            (
+                "Zakat Foundation",
+                "Zakat distribution and social services",
+                "https://www.zakat.org",
+                "zakat",
+                True,
+            ),
         ]
         for name, desc, url, cat, featured in charities_data:
-            c = Charity(name=name, description=desc, website_url=url, category=cat, is_verified=True, is_active=True, is_featured=featured)
+            c = Charity(
+                name=name,
+                description=desc,
+                website_url=url,
+                category=cat,
+                is_verified=True,
+                is_active=True,
+                is_featured=featured,
+            )
             self.db.add(c)
         self.db.commit()
         print("[OK] Created charities")
@@ -908,14 +1453,19 @@ class DatabaseSeeder:
             print("   • 1 active family (3 members), 1 archived family")
             print("   • Family goals with milestones seeded")
             print("   • Remaining users: solo mode")
-            print("   • Journey reflections, adhkar favorites/progress, reading progress seeded")
-            print("   • Notifications, badges, activities, books, donation intents seeded")
+            print(
+                "   • Journey reflections, adhkar favorites/progress, reading progress seeded"
+            )
+            print(
+                "   • Notifications, badges, activities, books, donation intents seeded"
+            )
             print()
 
         except Exception as e:
             print(f"\n[ERROR] Seeding failed: {str(e)}")
             self.db.rollback()
             import traceback
+
             traceback.print_exc()
             sys.exit(1)
         finally:
@@ -924,7 +1474,9 @@ class DatabaseSeeder:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed the Mizan database")
-    parser.add_argument("--clean", action="store_true", help="Clear and reseed the database")
+    parser.add_argument(
+        "--clean", action="store_true", help="Clear and reseed the database"
+    )
     args = parser.parse_args()
 
     db = SessionLocal()

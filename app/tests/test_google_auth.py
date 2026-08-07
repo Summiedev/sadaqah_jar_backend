@@ -1,4 +1,3 @@
-import json
 import os
 from unittest.mock import patch, MagicMock
 
@@ -8,11 +7,12 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 
 from app.core.config import settings
+
 settings.GOOGLE_CLIENT_ID = "test-google-client-id"
 
-from app.main import app
-from app.db.session import SessionLocal
-from app.models.user import User
+from app.main import app  # noqa: E402
+from app.db.session import SessionLocal  # noqa: E402
+from app.models.user import User  # noqa: E402
 
 client = TestClient(app)
 
@@ -38,7 +38,9 @@ def _clean(email: str, username: str):
         db.close()
 
 
-def _mock_tokeninfo_response(email="google-user@example.com", google_id="google-123456789"):
+def _mock_tokeninfo_response(
+    email="google-user@example.com", google_id="google-123456789"
+):
     return {
         "sub": google_id,
         "email": email,

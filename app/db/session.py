@@ -1,4 +1,4 @@
-﻿from urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -30,7 +30,9 @@ else:
             "options": f"-c statement_timeout={statement_timeout_ms}"
         }
 
-engine = create_engine(settings.DATABASE_URL, **_engine_kwargs)  # avoids dead DB connections
+engine = create_engine(
+    settings.DATABASE_URL, **_engine_kwargs
+)  # avoids dead DB connections
 
 """
 A session is:

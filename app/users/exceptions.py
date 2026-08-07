@@ -4,7 +4,6 @@ from app.core.exceptions import (
     AppException,
     AuthenticationException,
     ConflictException,
-    ResourceNotFoundException,
 )
 
 
@@ -42,6 +41,8 @@ class ForbiddenException(AuthenticationException):
 
 
 class GoogleOAuthException(AuthenticationException):
-    def __init__(self, message: str = "Google authentication failed. Please try again."):
+    def __init__(
+        self, message: str = "Google authentication failed. Please try again."
+    ):
         super().__init__(message)
         self.code = "auth.invalid_google_token"

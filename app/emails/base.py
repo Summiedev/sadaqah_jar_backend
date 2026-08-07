@@ -39,6 +39,7 @@ SECTION_GAP = "28px"
 # REUSABLE HTML FRAGMENTS
 # ─────────────────────────────────────────────────────────────
 
+
 def _doctype() -> str:
     return "<!DOCTYPE html>"
 
@@ -109,7 +110,7 @@ def _head(title: str) -> str:
 
 
 def _body_open(body_style: str = "") -> str:
-    background = f'background-color: {BRAND_BG};'
+    background = f"background-color: {BRAND_BG};"
     return f'<body style="{background} {body_style} margin: 0; padding: 0; width: 100%; -webkit-font-smoothing: antialiased;">'
 
 
@@ -160,6 +161,7 @@ def header_section() -> str:
 # CARD WRAPPER
 # ─────────────────────────────────────────────────────────────
 
+
 def card_open(padding_top: str = "40px", padding_bottom: str = "40px") -> str:
     return f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {BRAND_BG};">
     <tr>
@@ -182,6 +184,7 @@ def card_close() -> str:
 # ─────────────────────────────────────────────────────────────
 # BUTTONS
 # ─────────────────────────────────────────────────────────────
+
 
 def cta_button(url: str, text: str) -> str:
     return f"""<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 32px auto;">
@@ -207,8 +210,11 @@ def cta_button(url: str, text: str) -> str:
 # FOOTER
 # ─────────────────────────────────────────────────────────────
 
+
 def footer_section() -> str:
-    support_email = getattr(settings, "FROM_EMAIL", "hello@mizan.app") or "hello@mizan.app"
+    support_email = (
+        getattr(settings, "FROM_EMAIL", "hello@mizan.app") or "hello@mizan.app"
+    )
     return f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {BRAND_CARD};">
     <tr>
         <td align="center" style="padding: 32px 30px 40px;">
@@ -241,6 +247,7 @@ def footer_section() -> str:
 # SAFETY NOTICE (for unintended requests)
 # ─────────────────────────────────────────────────────────────
 
+
 def safety_notice() -> str:
     return f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FDFBF7; border-left: 3px solid {BRAND_GOLD_LIGHT};">
     <tr>
@@ -260,6 +267,7 @@ def safety_notice() -> str:
 # ─────────────────────────────────────────────────────────────
 # EXPIRY NOTICE
 # ─────────────────────────────────────────────────────────────
+
 
 def expiry_notice(expiry_text: str) -> str:
     return f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">

@@ -41,7 +41,9 @@ def _parse_clock(value: str, local_date: date, timezone_name: str) -> datetime:
     return datetime.combine(local_date, parsed, tzinfo=ZoneInfo(timezone_name))
 
 
-def get_prayer_times(latitude: float, longitude: float, local_date: date, timezone_name: str) -> PrayerTimes:
+def get_prayer_times(
+    latitude: float, longitude: float, local_date: date, timezone_name: str
+) -> PrayerTimes:
     """Return location-specific prayer times in the user's local timezone.
 
     Aladhan is keyless; its calculation method remains configurable because
@@ -66,7 +68,9 @@ def get_prayer_times(latitude: float, longitude: float, local_date: date, timezo
         response.raise_for_status()
         timings = response.json()["data"]["timings"]
     except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
-        raise PrayerTimeLookupError("Unable to retrieve prayer times from Aladhan") from exc
+        raise PrayerTimeLookupError(
+            "Unable to retrieve prayer times from Aladhan"
+        ) from exc
 
     fajr = _parse_clock(timings["Fajr"], local_date, timezone_name)
     sunrise = _parse_clock(timings["Sunrise"], local_date, timezone_name)

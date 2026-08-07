@@ -218,7 +218,9 @@ def create_monthly_review(
     return review
 
 
-def get_monthly_review(db: Session, user_id: int, year_month: str) -> MonthlyGoalReview | None:
+def get_monthly_review(
+    db: Session, user_id: int, year_month: str
+) -> MonthlyGoalReview | None:
     return db.scalar(
         select(MonthlyGoalReview).where(
             MonthlyGoalReview.user_id == user_id,

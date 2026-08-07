@@ -38,7 +38,9 @@ def list_reflections(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    reflections, total = service.list_reflections(db, current_user.id, limit=limit, offset=offset)
+    reflections, total = service.list_reflections(
+        db, current_user.id, limit=limit, offset=offset
+    )
     return Envelope(data=reflections, meta=Meta(total=total))
 
 
@@ -48,7 +50,9 @@ def get_reflection(reflection_id: int, db: DbDep, current_user: CurrentUser):
     return Envelope(data=reflection)
 
 
-@router.post("/reflections", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/reflections", response_model=Envelope, status_code=status.HTTP_201_CREATED
+)
 def create_reflection(payload: ReflectionCreate, db: DbDep, current_user: CurrentUser):
     reflection = service.create_reflection(db, current_user.id, payload)
     return Envelope(data=reflection, message="Reflection saved")
@@ -59,7 +63,11 @@ def create_reflection(payload: ReflectionCreate, db: DbDep, current_user: Curren
 # ---------------------------------------------------------------------------
 
 
-@router.post("/adhkar/{adhkar_id}/progress", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/adhkar/{adhkar_id}/progress",
+    response_model=Envelope,
+    status_code=status.HTTP_201_CREATED,
+)
 def increment_adhkar_progress(adhkar_id: int, db: DbDep, current_user: CurrentUser):
     progress = service.increment_adhkar_progress(db, current_user.id, adhkar_id)
     return Envelope(data=progress, message="Progress updated")
@@ -82,7 +90,11 @@ def get_adhkar_item_progress(adhkar_id: int, db: DbDep, current_user: CurrentUse
 # ---------------------------------------------------------------------------
 
 
-@router.post("/adhkar/{adhkar_id}/favorite", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/adhkar/{adhkar_id}/favorite",
+    response_model=Envelope,
+    status_code=status.HTTP_201_CREATED,
+)
 def favorite_adhkar(adhkar_id: int, db: DbDep, current_user: CurrentUser):
     favorite = service.favorite_adhkar(db, current_user.id, adhkar_id)
     return Envelope(data=favorite, message="Added to favorites")
@@ -105,7 +117,9 @@ def list_adhkar_favorites(db: DbDep, current_user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 
-@router.post("/reading/progress", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/reading/progress", response_model=Envelope, status_code=status.HTTP_201_CREATED
+)
 def save_reading_progress(
     payload: ReadingProgressResponse,
     db: DbDep,

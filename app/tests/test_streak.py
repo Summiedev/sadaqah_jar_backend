@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for streak_service.py - targets the exact bugs flagged in the audit:
 
 1. `update_streak()`: first-call initialisation creates streak with current=1,

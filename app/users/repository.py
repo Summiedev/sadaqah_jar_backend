@@ -178,14 +178,11 @@ def revoke_all_sessions(db: Session, user_id: int) -> int:
 
 
 def list_sessions(db: Session, user_id: int) -> Sequence[UserSession]:
-    return (
-        db.scalars(
-            select(UserSession)
-            .where(UserSession.user_id == user_id)
-            .order_by(UserSession.created_at.desc())
-        )
-        .all()
-    )
+    return db.scalars(
+        select(UserSession)
+        .where(UserSession.user_id == user_id)
+        .order_by(UserSession.created_at.desc())
+    ).all()
 
 
 def get_session(db: Session, session_id: int, user_id: int) -> UserSession | None:
@@ -250,14 +247,11 @@ def upsert_device(
 
 
 def list_devices(db: Session, user_id: int) -> Sequence[UserDevice]:
-    return (
-        db.scalars(
-            select(UserDevice)
-            .where(UserDevice.user_id == user_id)
-            .order_by(UserDevice.created_at.desc())
-        )
-        .all()
-    )
+    return db.scalars(
+        select(UserDevice)
+        .where(UserDevice.user_id == user_id)
+        .order_by(UserDevice.created_at.desc())
+    ).all()
 
 
 def update_device(
@@ -415,9 +409,7 @@ def get_pending_email_change_by_token(
     )
 
 
-def confirm_pending_email_change(
-    db: Session, pending: "PendingEmailChange"
-) -> User:
+def confirm_pending_email_change(db: Session, pending: "PendingEmailChange") -> User:
     user = get_user_by_id(db, pending.user_id)
     if user is None:
         return None  # type: ignore[return-value]

@@ -31,7 +31,10 @@ from app.services.streak_service import update_streak
 from app.services.badge_service import check_and_award_badges
 
 from app.services.jumua_service import is_friday
-from app.services.ramadan_service import is_ramadan as ramadan_is_ramadan, is_last_10_nights as ramadan_last10
+from app.services.ramadan_service import (
+    is_ramadan as ramadan_is_ramadan,
+    is_last_10_nights as ramadan_last10,
+)
 from app.services.leaderboard_service import (
     increment_friday,
     increment_global,
@@ -239,7 +242,10 @@ def add_star(
 
     # Rate limit — generous limit for adding acts of kindness
     if not check_rate_limit(user_id, limit=30, period=60):
-        raise HTTPException(status_code=429, detail="Take a moment — you're adding too quickly. Please wait a bit.")
+        raise HTTPException(
+            status_code=429,
+            detail="Take a moment — you're adding too quickly. Please wait a bit.",
+        )
 
     today = datetime.utcnow().date()
 
@@ -349,6 +355,7 @@ def add_star(
 
         try:
             from app.core.cache import cache_user_streak
+
             cache_user_streak(
                 user_id,
                 {

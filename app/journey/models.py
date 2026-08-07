@@ -35,7 +35,9 @@ class JourneyReflection(Base, TimestampMixin, SoftDeleteMixin):
     mood: Mapped[str] = mapped_column(String(64), nullable=False)
     is_private: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     date: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
-    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    request_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
 
     __table_args__ = (
         Index("ix_journey_reflections_user_date", "user_id", "date"),
@@ -54,9 +56,7 @@ class JourneyAdhkarProgress(Base, TimestampMixin):
     count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     __table_args__ = (
-        UniqueConstraint(
-            "user_id", "adhkar_id", name="uq_journey_adhkar_progress"
-        ),
+        UniqueConstraint("user_id", "adhkar_id", name="uq_journey_adhkar_progress"),
     )
 
 
@@ -70,9 +70,7 @@ class JourneyAdhkarFavorite(Base, TimestampMixin):
     adhkar_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
     __table_args__ = (
-        UniqueConstraint(
-            "user_id", "adhkar_id", name="uq_journey_adhkar_favorite"
-        ),
+        UniqueConstraint("user_id", "adhkar_id", name="uq_journey_adhkar_favorite"),
     )
 
 
@@ -88,7 +86,5 @@ class JourneyReadingProgress(Base, TimestampMixin):
     last_read_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
 
     __table_args__ = (
-        UniqueConstraint(
-            "user_id", "book_id", name="uq_journey_reading_progress"
-        ),
+        UniqueConstraint("user_id", "book_id", name="uq_journey_reading_progress"),
     )

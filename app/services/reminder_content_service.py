@@ -10,7 +10,6 @@ from app.models.adhkar import Adhkar, TimeOfDay
 from app.notifications.models import NotificationTemplate, ScheduledNotification
 from app.services.personalization_service import generate_personalized_acts
 from app.services.reminder_library import (
-    get_entries_for_source,
     get_random_entry,
 )
 
@@ -37,7 +36,9 @@ def resolve_reminder_content(
     source = config.get("content_source")
 
     if source in {"morning_adhkar", "evening_adhkar"}:
-        time_of_day = TimeOfDay.morning if source == "morning_adhkar" else TimeOfDay.evening
+        time_of_day = (
+            TimeOfDay.morning if source == "morning_adhkar" else TimeOfDay.evening
+        )
         adhkar = (
             db.query(Adhkar)
             .filter(Adhkar.time_of_day == time_of_day)

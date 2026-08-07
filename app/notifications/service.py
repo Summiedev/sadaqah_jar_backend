@@ -41,7 +41,12 @@ def create_notification(
     idempotency_key: str | None = None,
 ) -> NotificationResponse:
     notification = repo.create_notification(
-        db, user_id, title=title, message=message, category=category, action=action,
+        db,
+        user_id,
+        title=title,
+        message=message,
+        category=category,
+        action=action,
         idempotency_key=idempotency_key,
     )
     return NotificationResponse(
@@ -92,7 +97,9 @@ def list_notifications(
     )
 
 
-def get_notification(db: Session, notification_id: int, user_id: int) -> NotificationResponse:
+def get_notification(
+    db: Session, notification_id: int, user_id: int
+) -> NotificationResponse:
     notification = repo.get_notification(db, notification_id, user_id)
     if not notification:
         raise NotificationNotFoundException("Notification not found")
@@ -107,7 +114,9 @@ def get_notification(db: Session, notification_id: int, user_id: int) -> Notific
     )
 
 
-def mark_read(db: Session, notification_id: int, user_id: int) -> NotificationResponse | None:
+def mark_read(
+    db: Session, notification_id: int, user_id: int
+) -> NotificationResponse | None:
     notification = repo.mark_notification_read(db, notification_id, user_id)
     if notification is None:
         raise NotificationNotFoundException("Notification not found")
@@ -194,7 +203,9 @@ def create_template(db: Session, payload: dict) -> NotificationTemplateResponse:
     )
 
 
-def update_template(db: Session, key: str, payload: dict) -> NotificationTemplateResponse:
+def update_template(
+    db: Session, key: str, payload: dict
+) -> NotificationTemplateResponse:
     template = repo.update_template(db, key, payload)
     if not template:
         raise TemplateNotFoundException("Template not found")

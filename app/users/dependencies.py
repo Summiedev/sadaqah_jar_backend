@@ -67,4 +67,3 @@ def enforce_auth_rate_limit(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many authentication attempts. Please try again shortly.",
         )
-

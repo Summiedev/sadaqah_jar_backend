@@ -14,7 +14,6 @@ router = APIRouter(prefix="/websock", tags=["websocket"])
 logger = logging.getLogger(__name__)
 
 
-
 def get_user_from_token(token: str, db: Session):
     try:
         payload = decode_access_token(token)
@@ -56,7 +55,6 @@ async def jar_ws(websocket: WebSocket, user_id: int, token: str = Query(None)):
         manager.disconnect(user_id, websocket)
 
 
-
 @router.websocket("/ws/family-jar/{family_id}")
 async def family_jar_ws(websocket: WebSocket, family_id: int, token: str = Query(None)):
     if not token:
@@ -87,10 +85,6 @@ async def family_jar_ws(websocket: WebSocket, family_id: int, token: str = Query
     except WebSocketDisconnect:
         pass
     except Exception:
-        logger.warning(
-            "ws family loop error for family %s", family_id, exc_info=True
-        )
+        logger.warning("ws family loop error for family %s", family_id, exc_info=True)
     finally:
         manager.disconnect_family(family_id, websocket)
-
-

@@ -58,7 +58,9 @@ def get_entries_for_source(source: str) -> list[ReminderEntry]:
     return LIBRARY.get(category, [])
 
 
-def get_random_entry(source: str, *, exclude: set[int] | None = None) -> ReminderEntry | None:
+def get_random_entry(
+    source: str, *, exclude: set[int] | None = None
+) -> ReminderEntry | None:
     """Return a random entry for a content source, avoiding excluded indices when possible."""
     entries = get_entries_for_source(source)
     if not entries:

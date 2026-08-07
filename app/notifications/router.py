@@ -22,7 +22,6 @@ from app.users.permissions import require_admin
 from app.notifications import service
 
 from app.notifications.preference_schemas import (
-    NotificationPreferencesState,
     NotificationPreferencesUpdate,
 )
 from app.notifications.preferences import get_category_state
@@ -136,7 +135,6 @@ def delete_template(
     return Envelope(message="Template deleted")
 
 
-
 # ---------------------------------------------------------------------------
 # Notification preferences
 # ---------------------------------------------------------------------------
@@ -215,7 +213,9 @@ def update_notification_preferences(
 
 
 @router.post("/device-token", response_model=Envelope)
-def register_device_token(db: DbDep, current_user: CurrentUser, payload: DeviceTokenRequest):
+def register_device_token(
+    db: DbDep, current_user: CurrentUser, payload: DeviceTokenRequest
+):
     device = service.register_device(
         db,
         current_user.id,

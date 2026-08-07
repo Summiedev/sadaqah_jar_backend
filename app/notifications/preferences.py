@@ -157,9 +157,7 @@ def should_delay_for_quiet_hours(
     return is_in_quiet_hours(db, user_id, now=now)
 
 
-def get_category_state(
-    db: Session, user_id: int
-) -> dict:
+def get_category_state(db: Session, user_id: int) -> dict:
     """Return the full notification preference state for the UI."""
     user = db.get(User, user_id)
     if user is None:

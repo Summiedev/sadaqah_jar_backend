@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select, func
 
-from app.books.models import Book, BookChapter
+from app.books.models import Book, BookChapter, BookPage
 from app.db.session import SessionLocal
 
 
@@ -25,7 +25,9 @@ def _get_db():
 # ---------------------------------------------------------------------------
 
 
-def list_books(db, published_only: bool = True, offset: int = 0, limit: int = 50) -> tuple[list[Book], int]:
+def list_books(
+    db, published_only: bool = True, offset: int = 0, limit: int = 50
+) -> tuple[list[Book], int]:
     query = select(Book).where(Book.deleted_at.is_(None))
     if published_only:
         query = query.where(Book.published.is_(True))
@@ -35,8 +37,11 @@ def list_books(db, published_only: bool = True, offset: int = 0, limit: int = 50
     return list(rows), total or 0
 
 
-def get_book(db, book_id: int) -> Book | None:
-    return db.scalar(select(Book).where(Book.id == book_id, Book.deleted_at.is_(None)))
+def get_book(db, book_id: int, *, published_only: bool = False) -> Book | None:
+    query = select(Book).where(Book.id == book_id, Book.deleted_at.is_(None))
+    if published_only:
+        query = query.where(Book.published.is_(True))
+    return db.scalar(query)
 
 
 def create_book(db, payload: dict) -> Book:
@@ -85,9 +90,31 @@ def get_chapter_by_number(db, book_id: int, chapter_number: int) -> BookChapter 
 def list_chapters(db, book_id: int) -> list[BookChapter]:
     return list(
         db.scalars(
-            select(BookChapter).where(BookChapter.book_id == book_id).order_by(BookChapter.chapter_number.asc())
+            select(BookChapter)
+            .where(BookChapter.book_id == book_id)
+            .order_by(BookChapter.chapter_number.asc())
         ).all()
     )
+
+
+def list_pages(db, book_id: int) -> list[BookPage]:
+    return list(
+        db.scalars(
+            select(BookPage)
+            .where(BookPage.book_id == book_id)
+            .order_by(BookPage.page_number.asc())
+        ).all()
+    )
+
+
+def replace_pages(db, book_id: int, pages: list[dict]) -> list[BookPage]:
+    db.query(BookPage).filter(BookPage.book_id == book_id).delete(
+        synchronize_session=False
+    )
+    rows = [BookPage(book_id=book_id, **page) for page in pages]
+    db.add_all(rows)
+    db.flush()
+    return rows
 
 
 def create_chapter(db, payload: dict) -> BookChapter:

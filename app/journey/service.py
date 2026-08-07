@@ -52,9 +52,7 @@ def list_reflections(
     )
 
 
-def get_reflection(
-    db: Session, reflection_id: int, user_id: int
-) -> ReflectionResponse:
+def get_reflection(db: Session, reflection_id: int, user_id: int) -> ReflectionResponse:
     reflection = repo.get_reflection_by_id(db, reflection_id, user_id)
     if not reflection:
         raise ReflectionNotFoundException("Reflection not found")
@@ -131,7 +129,9 @@ def increment_adhkar_progress(
     )
 
 
-def get_adhkar_progress(db: Session, user_id: int, adhkar_id: int) -> AdhkarProgressResponse:
+def get_adhkar_progress(
+    db: Session, user_id: int, adhkar_id: int
+) -> AdhkarProgressResponse:
     progress = repo.get_adhkar_progress(db, user_id, adhkar_id)
     if not progress:
         raise ProgressNotFoundException("No progress recorded for this adhkar")
@@ -161,7 +161,9 @@ def list_adhkar_progress(db: Session, user_id: int) -> list[AdhkarProgressRespon
 # ---------------------------------------------------------------------------
 
 
-def favorite_adhkar(db: Session, user_id: int, adhkar_id: int) -> AdhkarFavoriteResponse:
+def favorite_adhkar(
+    db: Session, user_id: int, adhkar_id: int
+) -> AdhkarFavoriteResponse:
     existing = repo.get_adhkar_favorite(db, user_id, adhkar_id)
     if existing:
         raise FavoriteConflictException("Already favorited")
@@ -185,9 +187,7 @@ def unfavorite_adhkar(db: Session, user_id: int, adhkar_id: int) -> None:
     db.commit()
 
 
-def list_adhkar_favorites(
-    db: Session, user_id: int
-) -> list[AdhkarFavoriteResponse]:
+def list_adhkar_favorites(db: Session, user_id: int) -> list[AdhkarFavoriteResponse]:
     favorites = repo.list_adhkar_favorites(db, user_id)
     return [
         AdhkarFavoriteResponse(

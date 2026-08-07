@@ -95,11 +95,15 @@ class Family(Base):
     created_by: Mapped[int] = mapped_column(
         ForeignKey("users.id"), nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     members = relationship(
         "FamilyMember", back_populates="family", cascade="all, delete-orphan"
@@ -120,7 +124,10 @@ class Family(Base):
         "FamilyActivity", back_populates="family", cascade="all, delete-orphan"
     )
     settings = relationship(
-        "FamilySettings", back_populates="family", uselist=False, cascade="all, delete-orphan"
+        "FamilySettings",
+        back_populates="family",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 
@@ -142,12 +149,18 @@ class FamilyMember(Base):
     role: Mapped[FamilyRole] = mapped_column(
         Enum(FamilyRole, native_enum=False), default=FamilyRole.MEMBER, nullable=False
     )
-    joined_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     family = relationship("Family", back_populates="members")
 
@@ -181,12 +194,16 @@ class FamilyInvitation(Base):
         nullable=False,
         index=True,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     family = relationship("Family", back_populates="invitations")
 
@@ -215,13 +232,19 @@ class FamilyGoal(Base):
     acts_target: Mapped[int] = mapped_column(Integer, nullable=False)
     acts_done: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     family = relationship("Family", back_populates="goals")
     milestones = relationship(
@@ -249,17 +272,25 @@ class PrayerRequest(Base):
         ForeignKey("users.id"), nullable=False, index=True
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    is_answered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    is_answered: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
     is_private: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     family = relationship("Family", back_populates="prayer_requests")
     responses = relationship(
-        "PrayerRequestResponse", back_populates="prayer_request", cascade="all, delete-orphan"
+        "PrayerRequestResponse",
+        back_populates="prayer_request",
+        cascade="all, delete-orphan",
     )
     comments = relationship(
         "PrayerComment", back_populates="prayer_request", cascade="all, delete-orphan"
@@ -281,11 +312,15 @@ class PrayerComment(Base):
         ForeignKey("users.id"), nullable=False, index=True
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     prayer_request = relationship("PrayerRequest", back_populates="comments")
 
@@ -308,13 +343,17 @@ class PrayerRequestResponse(Base):
     response_type: Mapped[PrayerResponseType] = mapped_column(
         Enum(PrayerResponseType, native_enum=False), nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
 
     prayer_request = relationship("PrayerRequest", back_populates="responses")
 
     __table_args__ = (
         UniqueConstraint(
-            "prayer_request_id", "user_id", "response_type",
+            "prayer_request_id",
+            "user_id",
+            "response_type",
             name="uq_prayer_response",
         ),
     )
@@ -336,11 +375,15 @@ class FamilyReflection(Base):
         ForeignKey("users.id"), nullable=False, index=True
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     family = relationship("Family", back_populates="reflections")
     encouragements = relationship(
@@ -349,9 +392,7 @@ class FamilyReflection(Base):
         cascade="all, delete-orphan",
     )
 
-    __table_args__ = (
-        Index("ix_family_reflections_list", "family_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_family_reflections_list", "family_id", "created_at"),)
 
 
 # ---------------------------------------------------------------------------
@@ -364,7 +405,9 @@ class ReflectionEncouragement(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     reflection_id: Mapped[int] = mapped_column(
-        ForeignKey("family_reflections.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("family_reflections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
@@ -372,13 +415,17 @@ class ReflectionEncouragement(Base):
     encouragement_type: Mapped[EncouragementType] = mapped_column(
         Enum(EncouragementType, native_enum=False), nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
 
     reflection = relationship("FamilyReflection", back_populates="encouragements")
 
     __table_args__ = (
         UniqueConstraint(
-            "reflection_id", "user_id", "encouragement_type",
+            "reflection_id",
+            "user_id",
+            "encouragement_type",
             name="uq_reflection_encouragement",
         ),
     )
@@ -403,8 +450,12 @@ class FamilyActivity(Base):
         Enum(EventType, native_enum=False), nullable=False, index=True
     )
     extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    request_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
 
     family = relationship("Family", back_populates="activities")
 
@@ -424,17 +475,24 @@ class FamilySettings(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     family_id: Mapped[int] = mapped_column(
-        ForeignKey("families.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
+        ForeignKey("families.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
     )
     notification_preferences: Mapped[dict] = mapped_column(
         JSON, default=dict, nullable=False
     )
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     family = relationship("Family", back_populates="settings")
 
@@ -455,17 +513,21 @@ class FamilyGoalMilestone(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     target_value: Mapped[int] = mapped_column(Integer, nullable=False)
     current_value: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    is_achieved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    is_achieved: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
     achieved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     goal = relationship("FamilyGoal", back_populates="milestones")
 
-    __table_args__ = (
-        Index("ix_family_goal_milestones_goal", "goal_id", "sort_order"),
-    )
+    __table_args__ = (Index("ix_family_goal_milestones_goal", "goal_id", "sort_order"),)

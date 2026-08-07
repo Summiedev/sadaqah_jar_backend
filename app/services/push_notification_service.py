@@ -71,16 +71,21 @@ def validate_push_configuration() -> dict:
     return {"enabled": True, "reason": None}
 
 
-
 def send_push_notification(
-    db: Session, *, user_id: int, title: str, body: str, notification_type: str = 'general', data: dict[str, str] | None = None
+    db: Session,
+    *,
+    user_id: int,
+    title: str,
+    body: str,
+    notification_type: str = "general",
+    data: dict[str, str] | None = None,
 ) -> int:
     """Send to every active device token registered for one user."""
     messaging = _firebase_messaging()
     if messaging is None:
         return 0
     # Include both `notification_type` (backwards-compat) and `type` (client expectation)
-    merged_data = {'notification_type': notification_type, 'type': notification_type}
+    merged_data = {"notification_type": notification_type, "type": notification_type}
     if data:
         merged_data.update(data)
     devices = (
@@ -101,7 +106,10 @@ def send_push_notification(
             delivered += 1
         except Exception as exc:
             code = getattr(exc, "code", "")
-            if code in {"registration-token-not-registered", "invalid-registration-token"}:
+            if code in {
+                "registration-token-not-registered",
+                "invalid-registration-token",
+            }:
                 device.push_token = None
             logger.warning("FCM delivery failed for device %s: %s", device.id, exc)
     db.flush()

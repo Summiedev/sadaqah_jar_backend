@@ -8,16 +8,15 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
-    
     model_config = SettingsConfigDict(
-    # Absolute path so settings load regardless of the current working
-    # directory (uvicorn, celery, alembic, or pytest launched from the repo
-    # root all resolve the same file instead of silently finding nothing).
-    env_file=str(BASE_DIR / ".env"),
-    env_file_encoding="utf-8",
-    case_sensitive=True,
-    extra="ignore",
-)
+        # Absolute path so settings load regardless of the current working
+        # directory (uvicorn, celery, alembic, or pytest launched from the repo
+        # root all resolve the same file instead of silently finding nothing).
+        env_file=str(BASE_DIR / ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     APP_NAME: str
     ENV: str

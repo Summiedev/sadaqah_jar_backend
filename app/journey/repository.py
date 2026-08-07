@@ -26,26 +26,26 @@ def _utcnow() -> datetime:
 def list_reflections(
     db: Session, user_id: int, limit: int = 50, offset: int = 0
 ) -> tuple[Sequence[JourneyReflection], int]:
-    total = db.scalar(
-        select(func.count(JourneyReflection.id)).where(
-            JourneyReflection.user_id == user_id,
-            JourneyReflection.deleted_at.is_(None),
-        )
-    ) or 0
-
-    rows = (
-        db.scalars(
-            select(JourneyReflection)
-            .where(
+    total = (
+        db.scalar(
+            select(func.count(JourneyReflection.id)).where(
                 JourneyReflection.user_id == user_id,
                 JourneyReflection.deleted_at.is_(None),
             )
-            .order_by(JourneyReflection.date.desc())
-            .offset(offset)
-            .limit(limit)
         )
-        .all()
+        or 0
     )
+
+    rows = db.scalars(
+        select(JourneyReflection)
+        .where(
+            JourneyReflection.user_id == user_id,
+            JourneyReflection.deleted_at.is_(None),
+        )
+        .order_by(JourneyReflection.date.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
     return rows, total
 
 
@@ -108,9 +108,7 @@ def get_user_adhkar_progress(
     db: Session, user_id: int
 ) -> Sequence[JourneyAdhkarProgress]:
     return db.scalars(
-        select(JourneyAdhkarProgress).where(
-            JourneyAdhkarProgress.user_id == user_id
-        )
+        select(JourneyAdhkarProgress).where(JourneyAdhkarProgress.user_id == user_id)
     ).all()
 
 
@@ -119,9 +117,7 @@ def increment_adhkar_progress(
 ) -> JourneyAdhkarProgress:
     progress = get_adhkar_progress(db, user_id, adhkar_id)
     if progress is None:
-        progress = JourneyAdhkarProgress(
-            user_id=user_id, adhkar_id=adhkar_id, count=1
-        )
+        progress = JourneyAdhkarProgress(user_id=user_id, adhkar_id=adhkar_id, count=1)
         db.add(progress)
     else:
         progress.count += 1
@@ -145,9 +141,7 @@ def get_adhkar_favorite(
     )
 
 
-def list_adhkar_favorites(
-    db: Session, user_id: int
-) -> Sequence[JourneyAdhkarFavorite]:
+def list_adhkar_favorites(db: Session, user_id: int) -> Sequence[JourneyAdhkarFavorite]:
     return db.scalars(
         select(JourneyAdhkarFavorite)
         .where(JourneyAdhkarFavorite.user_id == user_id)

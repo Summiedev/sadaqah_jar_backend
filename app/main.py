@@ -9,7 +9,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.exceptions import AppException
-from app.core.exception_handlers import app_exception_handler, general_exception_handler, http_exception_handler
+from app.core.exception_handlers import (
+    app_exception_handler,
+    general_exception_handler,
+    http_exception_handler,
+)
 from app.core.observability import set_request_id
 from app.core.logger import logger
 
@@ -50,7 +54,6 @@ async def lifespan(app: FastAPI):
     logger.info("API shutdown")
 
 
-
 app = FastAPI(
     title=settings.APP_NAME,
     lifespan=lifespan,
@@ -78,5 +81,3 @@ app.include_router(api_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-

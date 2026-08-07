@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
@@ -147,6 +147,3 @@ def test_near_simultaneous_add_star_completes_once_and_spills_to_new_jar(db):
             synchronize_session=False
         )
         _cleanup_user_state(db, user.id)
-
-
-

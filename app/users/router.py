@@ -64,9 +64,7 @@ def register(
 
 
 @auth_router.post("/login", response_model=TokenResponse)
-def login(
-    payload: UserLogin, request: Request, db: DbDep, device_id: DeviceId = None
-):
+def login(payload: UserLogin, request: Request, db: DbDep, device_id: DeviceId = None):
     enforce_auth_rate_limit(request, "login")
     return service.login(db, payload.email, payload.password, device_id=device_id)
 
@@ -106,7 +104,6 @@ def verify_email_otp(
         request, "verify-email", limit=5, period=900, key_suffix=payload.code
     )
     return service.verify_email(db, payload.code, device_id=device_id)
-
 
 
 @auth_router.post("/forgot-password", response_model=ForgotPasswordResponse)
@@ -198,7 +195,9 @@ def request_email_change(
 ):
     enforce_auth_rate_limit(request, "email-change", limit=5, period=900)
     return service.request_email_change(
-        db, current_user, payload,
+        db,
+        current_user,
+        payload,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
@@ -211,7 +210,9 @@ def confirm_email_change(
     current_user: CurrentUser,
     db: DbDep,
 ):
-    enforce_auth_rate_limit(request, "email-confirm", limit=5, period=900, key_suffix=payload.token)
+    enforce_auth_rate_limit(
+        request, "email-confirm", limit=5, period=900, key_suffix=payload.token
+    )
     access, refresh = service.confirm_email_change(
         db,
         current_user,
@@ -243,11 +244,17 @@ def resend_email_change_verification(
     if pending is None:
         raise ResourceNotFoundException("No pending email change found")
     repo.cancel_pending_email_change(db, current_user.id)
-    raw_code = repo.create_pending_email_change(db, current_user.id, pending.new_email)[0]
+    raw_code = repo.create_pending_email_change(db, current_user.id, pending.new_email)[
+        0
+    ]
     send_email(
         pending.new_email,
         "Verify your new Mizan email",
-        email_change_request_html(raw_code, current_user.first_name or current_user.username, pending.new_email),
+        email_change_request_html(
+            raw_code,
+            current_user.first_name or current_user.username,
+            pending.new_email,
+        ),
     )
 
 
@@ -322,7 +329,12 @@ def update_device(
     device_id: int, payload: DeviceUpdate, current_user: CurrentUser, db: DbDep
 ):
     return service.update_user_device(
-        db, current_user, device_id, payload.device_name, payload.push_token, payload.app_version
+        db,
+        current_user,
+        device_id,
+        payload.device_name,
+        payload.push_token,
+        payload.app_version,
     )
 
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for scheduled_tasks.py - targets audit-flagged bugs:
 
 1. jar_completion_celebration: was called with wrong param (jar.user_id vs user_id).
@@ -128,4 +128,3 @@ class TestGenerateDailyActs:
         generate_daily_acts()
 
         assert mock_personalise.call_count >= 1
-

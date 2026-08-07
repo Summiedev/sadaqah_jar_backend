@@ -61,7 +61,9 @@ class MonthlyReviewResponse(BaseModel):
 
 
 class MonthlyReviewCreate(BaseModel):
-    action_taken: str | None = Field(None, pattern=r"^(continued|modified|replaced|skipped)$")
+    action_taken: str | None = Field(
+        None, pattern=r"^(continued|modified|replaced|skipped)$"
+    )
     notes: str | None = Field(None, max_length=1000)
     goals_completed: int = Field(0, ge=0)
     goals_active: int = Field(0, ge=0)
@@ -71,6 +73,7 @@ class MonthlyReviewCreate(BaseModel):
 
 class MonthlyReviewCheck(BaseModel):
     """Response indicating whether a monthly review is due."""
+
     due: bool
     year_month: str
     last_review: MonthlyReviewResponse | None = None

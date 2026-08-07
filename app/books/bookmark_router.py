@@ -3,11 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.envelope import Envelope, Meta
+from app.core.envelope import Envelope
 from app.db.deps import get_db
 from app.users.dependencies import get_current_user
 from app.users.models import User
-from app.books import service as book_service
 from app.books.bookmark_repository import (
     create_bookmark,
     delete_bookmark,
@@ -26,7 +25,9 @@ DbDep = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-@router.post("/{book_id}/bookmark", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{book_id}/bookmark", response_model=Envelope, status_code=status.HTTP_201_CREATED
+)
 def bookmark_book(
     book_id: int,
     payload: BookmarkCreateRequest,

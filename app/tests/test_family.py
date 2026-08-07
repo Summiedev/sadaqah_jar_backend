@@ -82,14 +82,21 @@ def db():
 
 
 def _headers(user_id: int, role: str = "USER") -> dict:
-    return {"Authorization": f"Bearer {create_access_token({'sub': str(user_id), 'role': role})}"}
+    return {
+        "Authorization": f"Bearer {create_access_token({'sub': str(user_id), 'role': role})}"
+    }
 
 
 _invite_code_counter = 0
 
 
 def _create_user(db, username, email, role=Role.USER) -> User:
-    u = User(username=username, email=email, hashed_password=hash_password("TestPass123"), role=role)
+    u = User(
+        username=username,
+        email=email,
+        hashed_password=hash_password("TestPass123"),
+        role=role,
+    )
     db.add(u)
     db.commit()
     db.refresh(u)
@@ -106,34 +113,57 @@ def _create_family(db, owner_id, name="Test Family") -> Family:
     db.refresh(f)
     db.add(FamilyMember(family_id=f.id, user_id=owner_id, role=FamilyRole.OWNER))
     db.add(FamilySettings(family_id=f.id, notification_preferences={}, version=1))
-    db.add(FamilyInvitation(
-        family_id=f.id,
-        invited_by=owner_id,
-        invite_code=invite_code,
-        status=InvitationStatus.PENDING,
-        expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=7),
-    ))
+    db.add(
+        FamilyInvitation(
+            family_id=f.id,
+            invited_by=owner_id,
+            invite_code=invite_code,
+            status=InvitationStatus.PENDING,
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            + timedelta(days=7),
+        )
+    )
     db.commit()
     db.refresh(f)
     return f
 
 
 def _clean_family(db, family_id):
-    db.query(ReflectionEncouragement).filter(ReflectionEncouragement.reflection_id.in_(
-        db.query(FamilyReflection.id).filter(FamilyReflection.family_id == family_id)
-    )).delete(synchronize_session=False)
-    db.query(FamilyReflection).filter(FamilyReflection.family_id == family_id).delete(synchronize_session=False)
-    db.query(PrayerRequestResponse).filter(PrayerRequestResponse.prayer_request_id.in_(
-        db.query(PrayerRequest.id).filter(PrayerRequest.family_id == family_id)
-    )).delete(synchronize_session=False)
-    db.query(PrayerRequest).filter(PrayerRequest.family_id == family_id).delete(synchronize_session=False)
-    db.query(FamilyGoalMilestone).filter(FamilyGoalMilestone.goal_id.in_(
-        db.query(FamilyGoal.id).filter(FamilyGoal.family_id == family_id)
-    )).delete(synchronize_session=False)
-    db.query(FamilyGoal).filter(FamilyGoal.family_id == family_id).delete(synchronize_session=False)
-    db.query(FamilyInvitation).filter(FamilyInvitation.family_id == family_id).delete(synchronize_session=False)
-    db.query(FamilyMember).filter(FamilyMember.family_id == family_id).delete(synchronize_session=False)
-    db.query(FamilySettings).filter(FamilySettings.family_id == family_id).delete(synchronize_session=False)
+    db.query(ReflectionEncouragement).filter(
+        ReflectionEncouragement.reflection_id.in_(
+            db.query(FamilyReflection.id).filter(
+                FamilyReflection.family_id == family_id
+            )
+        )
+    ).delete(synchronize_session=False)
+    db.query(FamilyReflection).filter(FamilyReflection.family_id == family_id).delete(
+        synchronize_session=False
+    )
+    db.query(PrayerRequestResponse).filter(
+        PrayerRequestResponse.prayer_request_id.in_(
+            db.query(PrayerRequest.id).filter(PrayerRequest.family_id == family_id)
+        )
+    ).delete(synchronize_session=False)
+    db.query(PrayerRequest).filter(PrayerRequest.family_id == family_id).delete(
+        synchronize_session=False
+    )
+    db.query(FamilyGoalMilestone).filter(
+        FamilyGoalMilestone.goal_id.in_(
+            db.query(FamilyGoal.id).filter(FamilyGoal.family_id == family_id)
+        )
+    ).delete(synchronize_session=False)
+    db.query(FamilyGoal).filter(FamilyGoal.family_id == family_id).delete(
+        synchronize_session=False
+    )
+    db.query(FamilyInvitation).filter(FamilyInvitation.family_id == family_id).delete(
+        synchronize_session=False
+    )
+    db.query(FamilyMember).filter(FamilyMember.family_id == family_id).delete(
+        synchronize_session=False
+    )
+    db.query(FamilySettings).filter(FamilySettings.family_id == family_id).delete(
+        synchronize_session=False
+    )
     db.query(Family).filter(Family.id == family_id).delete(synchronize_session=False)
     db.commit()
 
@@ -150,7 +180,9 @@ def _clean_family(db, family_id):
 
 def test_create_family(db):
     owner = _create_user(db, "fam_owner_create", "fam_owner_create@test.com")
-    resp = client.post(f"{API}/family/create", params={"name": "My Family"}, headers=_headers(owner.id))
+    resp = client.post(
+        f"{API}/family/create", params={"name": "My Family"}, headers=_headers(owner.id)
+    )
     assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["name"] == "My Family"
@@ -163,7 +195,11 @@ def test_join_family(db):
     family = _create_family(db, owner.id, name="Joinable")
     member = _create_user(db, "join_member_2", "join_member_2@test.com")
 
-    resp = client.post(f"{API}/family/join", json={"invite_code": family.invite_code}, headers=_headers(member.id))
+    resp = client.post(
+        f"{API}/family/join",
+        json={"invite_code": family.invite_code},
+        headers=_headers(member.id),
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["id"] == family.id
     _clean_family(db, family.id)
@@ -207,12 +243,20 @@ def test_remove_member(db):
     family = _create_family(db, owner.id, name="Remove Fam")
     member = _create_user(db, "rem_target_2", "rem_target_2@test.com")
 
-    join_resp = client.post(f"{API}/family/join", json={"invite_code": family.invite_code}, headers=_headers(member.id))
+    join_resp = client.post(
+        f"{API}/family/join",
+        json={"invite_code": family.invite_code},
+        headers=_headers(member.id),
+    )
     assert join_resp.status_code == 200
 
-    members_resp = client.get(f"{API}/family/{family.id}/members", headers=_headers(owner.id))
+    members_resp = client.get(
+        f"{API}/family/{family.id}/members", headers=_headers(owner.id)
+    )
     assert members_resp.status_code == 200
-    target_member = next(m for m in members_resp.json()["data"] if m["user_id"] == member.id)
+    target_member = next(
+        m for m in members_resp.json()["data"] if m["user_id"] == member.id
+    )
 
     del_resp = client.delete(
         f"{API}/family/{family.id}/members/{target_member['id']}",
@@ -237,7 +281,6 @@ def test_create_and_list_goals(db):
         headers=_headers(owner.id),
     )
     assert create.status_code == 201
-    goal_id = create.json()["data"]["id"]
 
     listed = client.get(f"{API}/family/{family.id}/goals", headers=_headers(owner.id))
     assert listed.status_code == 200
@@ -249,7 +292,13 @@ def test_create_and_list_goals(db):
 def test_update_goal(db):
     owner = _create_user(db, "upd_goal_owner_2", "upd_goal_owner_2@test.com")
     family = _create_family(db, owner.id, name="Upd Goal Fam")
-    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Old", acts_target=5, acts_done=2)
+    goal = FamilyGoal(
+        family_id=family.id,
+        created_by=owner.id,
+        title="Old",
+        acts_target=5,
+        acts_done=2,
+    )
     db.add(goal)
     db.commit()
     db.refresh(goal)
@@ -268,13 +317,17 @@ def test_update_goal(db):
 def test_delete_goal(db):
     owner = _create_user(db, "del_goal_owner_2", "del_goal_owner_2@test.com")
     family = _create_family(db, owner.id, name="Del Goal Fam")
-    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="ToDelete", acts_target=1)
+    goal = FamilyGoal(
+        family_id=family.id, created_by=owner.id, title="ToDelete", acts_target=1
+    )
     db.add(goal)
     db.commit()
     db.refresh(goal)
     goal_id = goal.id
 
-    resp = client.delete(f"{API}/family/{family.id}/goals/{goal_id}", headers=_headers(owner.id))
+    resp = client.delete(
+        f"{API}/family/{family.id}/goals/{goal_id}", headers=_headers(owner.id)
+    )
     assert resp.status_code == 200
 
     db.expire_all()
@@ -287,12 +340,16 @@ def test_delete_goal(db):
 def test_complete_goal(db):
     owner = _create_user(db, "comp_goal_owner_2", "comp_goal_owner_2@test.com")
     family = _create_family(db, owner.id, name="Complete Goal Fam")
-    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Complete Me", acts_target=1)
+    goal = FamilyGoal(
+        family_id=family.id, created_by=owner.id, title="Complete Me", acts_target=1
+    )
     db.add(goal)
     db.commit()
     db.refresh(goal)
 
-    resp = client.post(f"{API}/family/{family.id}/goals/{goal.id}/complete", headers=_headers(owner.id))
+    resp = client.post(
+        f"{API}/family/{family.id}/goals/{goal.id}/complete", headers=_headers(owner.id)
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["completed_at"] is not None
     _clean_family(db, family.id)
@@ -301,12 +358,16 @@ def test_complete_goal(db):
 def test_archive_goal(db):
     owner = _create_user(db, "arch_goal_owner_2", "arch_goal_owner_2@test.com")
     family = _create_family(db, owner.id, name="Archive Goal Fam")
-    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Archive Me", acts_target=1)
+    goal = FamilyGoal(
+        family_id=family.id, created_by=owner.id, title="Archive Me", acts_target=1
+    )
     db.add(goal)
     db.commit()
     db.refresh(goal)
 
-    resp = client.post(f"{API}/family/{family.id}/goals/{goal.id}/archive", headers=_headers(owner.id))
+    resp = client.post(
+        f"{API}/family/{family.id}/goals/{goal.id}/archive", headers=_headers(owner.id)
+    )
     assert resp.status_code == 200
 
     db.expire_all()
@@ -322,7 +383,9 @@ def test_archive_goal(db):
 def test_create_and_list_milestones(db):
     owner = _create_user(db, "mile_owner_2", "mile_owner_2@test.com")
     family = _create_family(db, owner.id, name="Milestone Fam")
-    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Milestone Goal", acts_target=10)
+    goal = FamilyGoal(
+        family_id=family.id, created_by=owner.id, title="Milestone Goal", acts_target=10
+    )
     db.add(goal)
     db.commit()
     db.refresh(goal)
@@ -333,9 +396,11 @@ def test_create_and_list_milestones(db):
         headers=_headers(owner.id),
     )
     assert create.status_code == 201
-    milestone_id = create.json()["data"]["id"]
 
-    listed = client.get(f"{API}/family/{family.id}/goals/{goal.id}/milestones", headers=_headers(owner.id))
+    listed = client.get(
+        f"{API}/family/{family.id}/goals/{goal.id}/milestones",
+        headers=_headers(owner.id),
+    )
     assert listed.status_code == 200
     assert len(listed.json()["data"]) == 1
     assert listed.json()["data"][0]["title"] == "First 5 acts"
@@ -345,7 +410,9 @@ def test_create_and_list_milestones(db):
 def test_update_milestone(db):
     owner = _create_user(db, "upd_mile_owner_2", "upd_mile_owner_2@test.com")
     family = _create_family(db, owner.id, name="Upd Milestone Fam")
-    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Upd Mile Goal", acts_target=10)
+    goal = FamilyGoal(
+        family_id=family.id, created_by=owner.id, title="Upd Mile Goal", acts_target=10
+    )
     db.add(goal)
     db.commit()
     db.refresh(goal)
@@ -368,7 +435,9 @@ def test_update_milestone(db):
 def test_achieve_milestone(db):
     owner = _create_user(db, "ach_mile_owner_2", "ach_mile_owner_2@test.com")
     family = _create_family(db, owner.id, name="Achieve Milestone Fam")
-    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Achieve Goal", acts_target=10)
+    goal = FamilyGoal(
+        family_id=family.id, created_by=owner.id, title="Achieve Goal", acts_target=10
+    )
     db.add(goal)
     db.commit()
     db.refresh(goal)
@@ -390,7 +459,9 @@ def test_achieve_milestone(db):
 def test_delete_milestone(db):
     owner = _create_user(db, "del_mile_owner_2", "del_mile_owner_2@test.com")
     family = _create_family(db, owner.id, name="Del Milestone Fam")
-    goal = FamilyGoal(family_id=family.id, created_by=owner.id, title="Del Mile Goal", acts_target=10)
+    goal = FamilyGoal(
+        family_id=family.id, created_by=owner.id, title="Del Mile Goal", acts_target=10
+    )
     db.add(goal)
     db.commit()
     db.refresh(goal)
@@ -407,7 +478,11 @@ def test_delete_milestone(db):
     assert resp.status_code == 200
 
     db.expire_all()
-    deleted = db.query(FamilyGoalMilestone).filter(FamilyGoalMilestone.id == milestone_id).first()
+    deleted = (
+        db.query(FamilyGoalMilestone)
+        .filter(FamilyGoalMilestone.id == milestone_id)
+        .first()
+    )
     assert deleted is not None
     assert deleted.deleted_at is not None
     _clean_family(db, family.id)
@@ -428,7 +503,6 @@ def test_create_and_list_prayers(db):
         headers=_headers(owner.id),
     )
     assert create.status_code == 201
-    prayer_id = create.json()["data"]["id"]
 
     listed = client.get(f"{API}/family/{family.id}/prayers", headers=_headers(owner.id))
     assert listed.status_code == 200
@@ -441,10 +515,16 @@ def test_respond_to_prayer(db):
     owner = _create_user(db, "prayer_resp_owner_2", "prayer_resp_owner_2@test.com")
     family = _create_family(db, owner.id, name="PrayerResp Fam")
     member = _create_user(db, "prayer_resp_member_2", "prayer_resp_member_2@test.com")
-    join_resp = client.post(f"{API}/family/join", json={"invite_code": family.invite_code}, headers=_headers(member.id))
+    join_resp = client.post(
+        f"{API}/family/join",
+        json={"invite_code": family.invite_code},
+        headers=_headers(member.id),
+    )
     assert join_resp.status_code == 200
 
-    prayer = PrayerRequest(family_id=family.id, author_id=owner.id, text="Heal my heart", is_private=False)
+    prayer = PrayerRequest(
+        family_id=family.id, author_id=owner.id, text="Heal my heart", is_private=False
+    )
     db.add(prayer)
     db.commit()
     db.refresh(prayer)
@@ -474,9 +554,10 @@ def test_create_and_list_reflections(db):
         headers=_headers(owner.id),
     )
     assert create.status_code == 201
-    refl_id = create.json()["data"]["id"]
 
-    listed = client.get(f"{API}/family/{family.id}/reflections", headers=_headers(owner.id))
+    listed = client.get(
+        f"{API}/family/{family.id}/reflections", headers=_headers(owner.id)
+    )
     assert listed.status_code == 200
     assert len(listed.json()["data"]) == 1
     assert listed.json()["data"][0]["text"] == "Alhamdulillah for today"
@@ -486,13 +567,17 @@ def test_create_and_list_reflections(db):
 def test_delete_reflection(db):
     owner = _create_user(db, "del_refl_owner_2", "del_refl_owner_2@test.com")
     family = _create_family(db, owner.id, name="Del Refl Fam")
-    refl = FamilyReflection(family_id=family.id, author_id=owner.id, text="Temp reflection")
+    refl = FamilyReflection(
+        family_id=family.id, author_id=owner.id, text="Temp reflection"
+    )
     db.add(refl)
     db.commit()
     db.refresh(refl)
     refl_id = refl.id
 
-    resp = client.delete(f"{API}/family/{family.id}/reflections/{refl_id}", headers=_headers(owner.id))
+    resp = client.delete(
+        f"{API}/family/{family.id}/reflections/{refl_id}", headers=_headers(owner.id)
+    )
     assert resp.status_code == 200
 
     db.expire_all()
@@ -506,10 +591,16 @@ def test_encourage_reflection(db):
     owner = _create_user(db, "enc_refl_owner_2", "enc_refl_owner_2@test.com")
     family = _create_family(db, owner.id, name="Enc Refl Fam")
     member = _create_user(db, "enc_refl_member_2", "enc_refl_member_2@test.com")
-    join_resp = client.post(f"{API}/family/join", json={"invite_code": family.invite_code}, headers=_headers(member.id))
+    join_resp = client.post(
+        f"{API}/family/join",
+        json={"invite_code": family.invite_code},
+        headers=_headers(member.id),
+    )
     assert join_resp.status_code == 200
 
-    refl = FamilyReflection(family_id=family.id, author_id=owner.id, text="Beautiful day")
+    refl = FamilyReflection(
+        family_id=family.id, author_id=owner.id, text="Beautiful day"
+    )
     db.add(refl)
     db.commit()
     db.refresh(refl)
@@ -533,7 +624,9 @@ def test_get_and_update_settings(db):
     owner = _create_user(db, "settings_owner_2", "settings_owner_2@test.com")
     family = _create_family(db, owner.id, name="Settings Fam")
 
-    get_resp = client.get(f"{API}/family/{family.id}/settings", headers=_headers(owner.id))
+    get_resp = client.get(
+        f"{API}/family/{family.id}/settings", headers=_headers(owner.id)
+    )
     assert get_resp.status_code == 200
     assert "notification_preferences" in get_resp.json()["data"]
 

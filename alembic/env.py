@@ -1,9 +1,7 @@
 import os
-import os
 from dotenv import load_dotenv
 from logging.config import fileConfig
 
-from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool

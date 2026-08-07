@@ -2,7 +2,6 @@ from app.core.config import settings
 from app.emails.base import (
     BRAND_EMERALD,
     BRAND_INK,
-    BRAND_LINE,
     BRAND_MUTED,
     BRAND_SUBTLE,
     FONT_BODY,
@@ -30,28 +29,37 @@ from app.emails.base import (
 # this drops in without touching base.py, per your ask.
 
 BRAND_ACCENT = BRAND_EMERALD
-BRAND_CODE_BG = "#F7F0E7"     # kIvory
+BRAND_CODE_BG = "#F7F0E7"  # kIvory
 BRAND_CODE_BORDER = "#E8DDD1"  # kLine
 
 
 def _wraps(title: str, inner: str, expiry_text: str) -> str:
-    return "".join([
-        _doctype(),
-        _html_open(),
-        _head(title),
-        _body_open(),
-        header_section(),
-        card_open(padding_top="36px", padding_bottom="36px"),
-        inner,
-        card_close(),
-        footer_section(),
-        _body_close(),
-        _html_close(),
-    ])
+    return "".join(
+        [
+            _doctype(),
+            _html_open(),
+            _head(title),
+            _body_open(),
+            header_section(),
+            card_open(padding_top="36px", padding_bottom="36px"),
+            inner,
+            card_close(),
+            footer_section(),
+            _body_close(),
+            _html_close(),
+        ]
+    )
 
 
-def _p(text: str, *, size: int = 16, weight: int = 400, color: str = BRAND_MUTED,
-       margin: str = "0 0 6px", line_height: float = 1.65) -> str:
+def _p(
+    text: str,
+    *,
+    size: int = 16,
+    weight: int = 400,
+    color: str = BRAND_MUTED,
+    margin: str = "0 0 6px",
+    line_height: float = 1.65,
+) -> str:
     return f"""<p style="
         font-family: {FONT_BODY};
         font-size: {size}px;
@@ -66,20 +74,28 @@ def _p(text: str, *, size: int = 16, weight: int = 400, color: str = BRAND_MUTED
 # VERIFICATION EMAIL
 # ─────────────────────────────────────────────────────────────
 
-def verification_email_html(token: str, user_name: str | None = None) -> str:
+
+def _legacy_verification_email_html(token: str, user_name: str | None = None) -> str:
     first_name = user_name.split(" ")[0] if user_name else "friend"
 
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
         <td style="padding: 0 48px;">
-            {_p(f'Assalamu alaikum <strong style="color: {BRAND_INK};">{first_name}</strong>,', margin="0 0 8px")}
+            {
+        _p(
+            f'Assalamu alaikum <strong style="color: {BRAND_INK};">{first_name}</strong>,',
+            margin="0 0 8px",
+        )
+    }
             {_p("We're really glad you're here.", margin="0 0 6px")}
-            {_p(
-                "Mizan is a quiet space to grow your spiritual life, one small act "
-                "of goodness at a time, and we'd love for it to be yours alone. "
-                "Enter the code below to verify it's really you:",
-                margin="0 0 28px",
-            )}
+            {
+        _p(
+            "Mizan is a quiet space to grow your spiritual life, one small act "
+            "of goodness at a time, and we'd love for it to be yours alone. "
+            "Enter the code below to verify it's really you:",
+            margin="0 0 28px",
+        )
+    }
         </td>
     </tr>
 </table>"""
@@ -113,10 +129,14 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
 
     title = "Welcome to Mizan, verify your email"
 
-    return _wraps(title, body + post, "This code expires in 24 hours for your security.")
+    return _wraps(
+        title, body + post, "This code expires in 24 hours for your security."
+    )
 
 
-def email_change_request_html(token: str, user_name: str | None = None, new_email: str = "") -> str:
+def _legacy_email_change_request_html(
+    token: str, user_name: str | None = None, new_email: str = ""
+) -> str:
     first_name = user_name.split(" ")[0] if user_name else "friend"
 
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -160,10 +180,14 @@ def email_change_request_html(token: str, user_name: str | None = None, new_emai
 
     title = "Verify your new Mizan email"
 
-    return _wraps(title, body + post, "This code expires in 24 hours for your security.")
+    return _wraps(
+        title, body + post, "This code expires in 24 hours for your security."
+    )
 
 
-def email_change_notification_html(old_email: str, new_email: str, user_name: str | None = None) -> str:
+def _legacy_email_change_notification_html(
+    old_email: str, new_email: str, user_name: str | None = None
+) -> str:
     first_name = user_name.split(" ")[0] if user_name else "friend"
 
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -186,7 +210,9 @@ def email_change_notification_html(old_email: str, new_email: str, user_name: st
     return _wraps(title, post, "")
 
 
-def email_change_confirmed_html(new_email: str, user_name: str | None = None) -> str:
+def _legacy_email_change_confirmed_html(
+    new_email: str, user_name: str | None = None
+) -> str:
     first_name = user_name.split(" ")[0] if user_name else "friend"
 
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -212,7 +238,8 @@ def email_change_confirmed_html(new_email: str, user_name: str | None = None) ->
 # PASSWORD RESET EMAIL
 # ─────────────────────────────────────────────────────────────
 
-def password_reset_email_html(token: str) -> str:
+
+def _legacy_password_reset_email_html(token: str) -> str:
     link = f"{settings.APP_URL}/reset-password?token={token}"
 
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -254,12 +281,15 @@ def password_reset_email_html(token: str) -> str:
 
     title = "Reset your Mizan password"
 
-    return _wraps(title, body + cta + post, "This link expires in 1 hour for your security.")
+    return _wraps(
+        title, body + cta + post, "This link expires in 1 hour for your security."
+    )
 
 
 # Clean, current templates. These definitions intentionally sit at the end of
 # the module so they replace the older copy above without rewriting legacy
 # mojibake in place.
+
 
 def _code_block(value: str, label: str = "Your code") -> str:
     return f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -300,10 +330,16 @@ def verification_email_html(token: str, user_name: str | None = None) -> str:
 {_p("If this was not you, you can ignore this email. Nothing will change.", size=13, color=BRAND_SUBTLE, margin="18px 48px 0")}
 {safety_notice()}
 {expiry_notice("This code expires in <strong>24 hours</strong> for your security.")}"""
-    return _wraps("Welcome to Mizan, verify your email", body + post, "This code expires in 24 hours for your security.")
+    return _wraps(
+        "Welcome to Mizan, verify your email",
+        body + post,
+        "This code expires in 24 hours for your security.",
+    )
 
 
-def email_change_request_html(token: str, user_name: str | None = None, new_email: str = "") -> str:
+def email_change_request_html(
+    token: str, user_name: str | None = None, new_email: str = ""
+) -> str:
     first_name = user_name.split(" ")[0] if user_name else "friend"
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
@@ -319,10 +355,16 @@ def email_change_request_html(token: str, user_name: str | None = None, new_emai
 {_p("If this was not you, ignore this email and keep using your current address.", size=13, color=BRAND_SUBTLE, margin="18px 48px 0")}
 {safety_notice()}
 {expiry_notice("This code expires in <strong>24 hours</strong> for your security.")}"""
-    return _wraps("Verify your new Mizan email", body + post, "This code expires in 24 hours for your security.")
+    return _wraps(
+        "Verify your new Mizan email",
+        body + post,
+        "This code expires in 24 hours for your security.",
+    )
 
 
-def email_change_notification_html(old_email: str, new_email: str, user_name: str | None = None) -> str:
+def email_change_notification_html(
+    old_email: str, new_email: str, user_name: str | None = None
+) -> str:
     first_name = user_name.split(" ")[0] if user_name else "friend"
     body = f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
@@ -387,4 +429,8 @@ def password_reset_email_html(token: str) -> str:
     post = f"""{link_block}
 {safety_notice()}
 {expiry_notice("This link expires in <strong>1 hour</strong> for your security.")}"""
-    return _wraps("Reset your Mizan password", body + cta_button(link, "Reset password") + post, "This link expires in 1 hour for your security.")
+    return _wraps(
+        "Reset your Mizan password",
+        body + cta_button(link, "Reset password") + post,
+        "This link expires in 1 hour for your security.",
+    )

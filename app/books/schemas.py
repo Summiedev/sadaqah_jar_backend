@@ -10,6 +10,14 @@ class BookChapterRead(BaseModel):
     reading_time_minutes: int
 
 
+class BookPageRead(BaseModel):
+    id: int
+    book_id: int
+    page_number: int
+    image_url: str
+    image_type: str | None = None
+
+
 class BookRead(BaseModel):
     id: int
     title: str
@@ -18,16 +26,19 @@ class BookRead(BaseModel):
     cover_url: str | None = None
     file_url: str | None = None
     file_type: str | None = None
+    file_format: str | None = None
     category: str
     language: str
     published: bool
     sort_order: int
     chapter_count: int = 0
     total_reading_time: int = 0
+    page_count: int = 0
 
 
 class BookDetail(BookRead):
     chapters: list[BookChapterRead] = []
+    pages: list[BookPageRead] = []
 
 
 class BookCreate(BaseModel):
@@ -37,6 +48,7 @@ class BookCreate(BaseModel):
     cover_url: str | None = None
     file_url: str | None = None
     file_type: str | None = None
+    file_format: str | None = None
     category: str
     language: str = "en"
     published: bool = True
@@ -48,6 +60,9 @@ class BookUpdate(BaseModel):
     author: str | None = None
     description: str | None = None
     cover_url: str | None = None
+    file_url: str | None = None
+    file_type: str | None = None
+    file_format: str | None = None
     category: str | None = None
     language: str | None = None
     published: bool | None = None

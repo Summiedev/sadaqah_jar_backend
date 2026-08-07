@@ -32,7 +32,11 @@ def test_register_and_login(db):
     _clean("test2@example.com", "test-user")
     response = client.post(
         f"{API}/auth/register",
-        json={"username": "test-user", "email": "test2@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "test-user",
+            "email": "test2@example.com",
+            "password": "StrongPass123!",
+        },
     )
     assert response.status_code == 200
     data = response.json()
@@ -64,12 +68,20 @@ def test_register_username_taken_returns_409(db):
     _clean("collision2@example.com", "collision-user")
     first = client.post(
         f"{API}/auth/register",
-        json={"username": "collision-user", "email": "collision1@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "collision-user",
+            "email": "collision1@example.com",
+            "password": "StrongPass123!",
+        },
     )
     assert first.status_code == 200
     second = client.post(
         f"{API}/auth/register",
-        json={"username": "collision-user", "email": "collision2@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "collision-user",
+            "email": "collision2@example.com",
+            "password": "StrongPass123!",
+        },
     )
     assert second.status_code == 409
     assert second.json()["error"]["code"] == "auth.username_taken"
@@ -79,10 +91,15 @@ def test_invalid_credentials(db):
     _clean("badlogin@example.com", "badlogin-user")
     client.post(
         f"{API}/auth/register",
-        json={"username": "badlogin-user", "email": "badlogin@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "badlogin-user",
+            "email": "badlogin@example.com",
+            "password": "StrongPass123!",
+        },
     )
     response = client.post(
-        f"{API}/auth/login", json={"email": "badlogin@example.com", "password": "wrongpass"}
+        f"{API}/auth/login",
+        json={"email": "badlogin@example.com", "password": "wrongpass"},
     )
     assert response.status_code == 401
 
@@ -91,7 +108,11 @@ def test_refresh_and_logout_flow(db):
     _clean("flow@example.com", "flow-user")
     reg = client.post(
         f"{API}/auth/register",
-        json={"username": "flow-user", "email": "flow@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "flow-user",
+            "email": "flow@example.com",
+            "password": "StrongPass123!",
+        },
     )
     refresh = reg.json()["refresh_token"]
     token = reg.json()["access_token"]
@@ -119,7 +140,11 @@ def test_mode_sync(db):
     _clean("mode@example.com", "mode-user")
     reg = client.post(
         f"{API}/auth/register",
-        json={"username": "mode-user", "email": "mode@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "mode-user",
+            "email": "mode@example.com",
+            "password": "StrongPass123!",
+        },
     )
     token = reg.json()["access_token"]
     for mode in ("PERSONAL", "FAMILY", "BOTH"):
@@ -134,12 +159,21 @@ def test_preferences_sync(db):
     _clean("prefs@example.com", "prefs-user")
     reg = client.post(
         f"{API}/auth/register",
-        json={"username": "prefs-user", "email": "prefs@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "prefs-user",
+            "email": "prefs@example.com",
+            "password": "StrongPass123!",
+        },
     )
     token = reg.json()["access_token"]
     response = client.patch(
         f"{API}/users/me/preferences",
-        json={"theme": "dark", "language": "ar", "timezone": "Africa/Lagos", "friday_reminder": True},
+        json={
+            "theme": "dark",
+            "language": "ar",
+            "timezone": "Africa/Lagos",
+            "friday_reminder": True,
+        },
         headers=_headers(token),
     )
     assert response.status_code == 200
@@ -154,12 +188,21 @@ def test_devices_and_push_token(db):
     _clean("device@example.com", "device-user")
     reg = client.post(
         f"{API}/auth/register",
-        json={"username": "device-user", "email": "device@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "device-user",
+            "email": "device@example.com",
+            "password": "StrongPass123!",
+        },
     )
     token = reg.json()["access_token"]
     push = client.post(
         f"{API}/users/me/push-token",
-        json={"device_id": "dev-abc", "platform": "ios", "device_name": "iPhone", "push_token": "tok-xyz"},
+        json={
+            "device_id": "dev-abc",
+            "platform": "ios",
+            "device_name": "iPhone",
+            "push_token": "tok-xyz",
+        },
         headers=_headers(token),
     )
     assert push.status_code == 200
@@ -180,7 +223,9 @@ def test_devices_and_push_token(db):
     assert upd.status_code == 200
 
     # delete device
-    delete = client.delete(f"{API}/users/me/devices/{device_record_id}", headers=_headers(token))
+    delete = client.delete(
+        f"{API}/users/me/devices/{device_record_id}", headers=_headers(token)
+    )
     assert delete.status_code == 204
 
 
@@ -188,11 +233,18 @@ def test_logout_all_devices(db):
     _clean("multi@example.com", "multi-user")
     reg = client.post(
         f"{API}/auth/register",
-        json={"username": "multi-user", "email": "multi@example.com", "password": "StrongPass123!"},
+        json={
+            "username": "multi-user",
+            "email": "multi@example.com",
+            "password": "StrongPass123!",
+        },
     )
     token = reg.json()["access_token"]
     # create a second session via another login
-    client.post(f"{API}/auth/login", json={"email": "multi@example.com", "password": "StrongPass123!"})
+    client.post(
+        f"{API}/auth/login",
+        json={"email": "multi@example.com", "password": "StrongPass123!"},
+    )
 
     sessions = client.get(f"{API}/users/me/sessions", headers=_headers(token))
     assert len(sessions.json()) >= 2

@@ -32,7 +32,9 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 # ---------------------------------------------------------------------------
 
 
-@router.post("/completions", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/completions", response_model=Envelope, status_code=status.HTTP_201_CREATED
+)
 def create_completion(
     payload: ActivityCompletionCreate,
     current_user: CurrentUser,
@@ -96,7 +98,9 @@ def start_session(
     db: DbDep,
 ):
     """Start a new activity session."""
-    session = service.start_session(db, current_user.id, payload.model_dump(exclude_unset=True))
+    session = service.start_session(
+        db, current_user.id, payload.model_dump(exclude_unset=True)
+    )
     return Envelope(data=session, message="Session started")
 
 

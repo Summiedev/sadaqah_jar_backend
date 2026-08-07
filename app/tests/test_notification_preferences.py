@@ -59,7 +59,9 @@ class TestCategoryEnabled:
         assert is_category_enabled(db, user.id, "prayer") is False
 
     def test_channel_specific(self, db, user):
-        _set_prefs(db, user, {"categories": {"prayer": {"push": False, "in_app": True}}})
+        _set_prefs(
+            db, user, {"categories": {"prayer": {"push": False, "in_app": True}}}
+        )
         assert is_category_enabled(db, user.id, "prayer", channel="push") is False
         assert is_category_enabled(db, user.id, "prayer", channel="in_app") is True
 
@@ -73,22 +75,38 @@ class TestQuietHours:
         assert is_in_quiet_hours(db, user.id) is False
 
     def test_inside_quiet_hours(self, db, user):
-        _set_prefs(db, user, {"quiet_hours": {"enabled": True, "start": "00:00", "end": "23:59"}})
+        _set_prefs(
+            db,
+            user,
+            {"quiet_hours": {"enabled": True, "start": "00:00", "end": "23:59"}},
+        )
         now = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
         assert is_in_quiet_hours(db, user.id, now=now) is True
 
     def test_outside_quiet_hours(self, db, user):
-        _set_prefs(db, user, {"quiet_hours": {"enabled": True, "start": "22:00", "end": "07:00"}})
+        _set_prefs(
+            db,
+            user,
+            {"quiet_hours": {"enabled": True, "start": "22:00", "end": "07:00"}},
+        )
         now = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
         assert is_in_quiet_hours(db, user.id, now=now) is False
 
     def test_overnight_quiet_hours(self, db, user):
-        _set_prefs(db, user, {"quiet_hours": {"enabled": True, "start": "22:00", "end": "07:00"}})
+        _set_prefs(
+            db,
+            user,
+            {"quiet_hours": {"enabled": True, "start": "22:00", "end": "07:00"}},
+        )
         now = datetime(2026, 1, 1, 23, 0, tzinfo=timezone.utc)
         assert is_in_quiet_hours(db, user.id, now=now) is True
 
     def test_security_exempt(self, db, user):
-        _set_prefs(db, user, {"quiet_hours": {"enabled": True, "start": "00:00", "end": "23:59"}})
+        _set_prefs(
+            db,
+            user,
+            {"quiet_hours": {"enabled": True, "start": "00:00", "end": "23:59"}},
+        )
         now = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
         assert should_delay_for_quiet_hours(db, user.id, "security", now=now) is False
         assert should_delay_for_quiet_hours(db, user.id, "prayer", now=now) is True
@@ -105,7 +123,10 @@ class TestIdempotency:
         assert n1.id == n2.id
         count = (
             db.query(Notification)
-            .filter(Notification.user_id == user.id, Notification.idempotency_key == "test-key-1")
+            .filter(
+                Notification.user_id == user.id,
+                Notification.idempotency_key == "test-key-1",
+            )
             .count()
         )
         assert count == 1

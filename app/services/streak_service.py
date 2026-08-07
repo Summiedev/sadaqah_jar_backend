@@ -1,4 +1,4 @@
-﻿# app/services/streak_service.py
+# app/services/streak_service.py
 from datetime import datetime, timedelta, date
 from sqlalchemy.orm import Session
 from app.models.user_streak import UserStreak

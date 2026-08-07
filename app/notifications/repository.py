@@ -38,15 +38,14 @@ def list_notifications(
     total = query.count()
 
     rows = (
-        query.order_by(Notification.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
+        query.order_by(Notification.created_at.desc()).offset(offset).limit(limit).all()
     )
     return rows, total
 
 
-def get_notification(db: Session, notification_id: int, user_id: int) -> Notification | None:
+def get_notification(
+    db: Session, notification_id: int, user_id: int
+) -> Notification | None:
     return db.scalar(
         select(Notification).where(
             Notification.id == notification_id,
@@ -88,7 +87,9 @@ def create_notification(
     return notification
 
 
-def mark_notification_read(db: Session, notification_id: int, user_id: int) -> Notification | None:
+def mark_notification_read(
+    db: Session, notification_id: int, user_id: int
+) -> Notification | None:
     notification = get_notification(db, notification_id, user_id)
     if notification is not None and not notification.is_read:
         notification.is_read = True
@@ -115,12 +116,15 @@ def delete_notification(db: Session, notification_id: int, user_id: int) -> None
 
 
 def get_unread_count(db: Session, user_id: int) -> int:
-    return db.scalar(
-        select(func.count(Notification.id)).where(
-            Notification.user_id == user_id,
-            Notification.is_read.is_(False),
+    return (
+        db.scalar(
+            select(func.count(Notification.id)).where(
+                Notification.user_id == user_id,
+                Notification.is_read.is_(False),
+            )
         )
-    ) or 0
+        or 0
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -160,12 +164,21 @@ def create_template(db: Session, payload: dict) -> NotificationTemplate:
     return template
 
 
-def update_template(db: Session, key: str, payload: dict) -> NotificationTemplate | None:
+def update_template(
+    db: Session, key: str, payload: dict
+) -> NotificationTemplate | None:
     template = get_template_by_key(db, key)
     if template is None:
         return None
 
-    for field in ("title_template", "message_template", "category", "strategy", "strategy_config", "enabled"):
+    for field in (
+        "title_template",
+        "message_template",
+        "category",
+        "strategy",
+        "strategy_config",
+        "enabled",
+    ):
         if field in payload:
             value = payload[field]
             if field == "strategy_config":
@@ -207,9 +220,7 @@ def get_device(db: Session, user_id: int, device_id: str) -> UserDevice | None:
 
 
 def list_devices(db: Session, user_id: int) -> Sequence[UserDevice]:
-    return db.scalars(
-        select(UserDevice).where(UserDevice.user_id == user_id)
-    ).all()
+    return db.scalars(select(UserDevice).where(UserDevice.user_id == user_id)).all()
 
 
 def upsert_device(

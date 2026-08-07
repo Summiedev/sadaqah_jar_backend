@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.books import repository as repo
 from app.books.schemas import (
     BookChapterRead,
+    BookPageRead,
     BookChapterCreate,
     BookChapterUpdate,
     BookCreate,
@@ -18,14 +19,20 @@ from app.books.schemas import (
 # ---------------------------------------------------------------------------
 
 
-def list_books(db, offset: int = 0, limit: int = 50, published_only: bool = True) -> BookListResponse:
-    rows, total = repo.list_books(db, published_only=published_only, offset=offset, limit=limit)
+def list_books(
+    db, offset: int = 0, limit: int = 50, published_only: bool = True
+) -> BookListResponse:
+    rows, total = repo.list_books(
+        db, published_only=published_only, offset=offset, limit=limit
+    )
     data = [_serialize(db, book) for book in rows]
     return BookListResponse(total=total, limit=limit, offset=offset, data=data)
 
 
-def get_book_detail(db, book_id: int) -> BookDetail | None:
-    book = repo.get_book(db, book_id)
+def get_book_detail(
+    db, book_id: int, *, published_only: bool = False
+) -> BookDetail | None:
+    book = repo.get_book(db, book_id, published_only=published_only)
     if not book:
         return None
     return _serialize_detail(db, book)
@@ -72,7 +79,9 @@ def list_chapters(db, book_id: int) -> list[BookChapterRead]:
     ]
 
 
-def create_chapter(db, book_id: int, payload: BookChapterCreate) -> BookChapterRead | None:
+def create_chapter(
+    db, book_id: int, payload: BookChapterCreate
+) -> BookChapterRead | None:
     book = repo.get_book(db, book_id)
     if not book:
         return None
@@ -87,7 +96,9 @@ def create_chapter(db, book_id: int, payload: BookChapterCreate) -> BookChapterR
     )
 
 
-def update_chapter(db, chapter_id: int, payload: BookChapterUpdate) -> BookChapterRead | None:
+def update_chapter(
+    db, chapter_id: int, payload: BookChapterUpdate
+) -> BookChapterRead | None:
     chapter = repo.get_chapter(db, chapter_id)
     if not chapter:
         return None
@@ -113,6 +124,7 @@ def delete_chapter(db, chapter_id: int) -> None:
 
 def _serialize(db, book) -> BookRead:
     chapters = repo.list_chapters(db, book.id)
+    pages = repo.list_pages(db, book.id)
     total_time = sum(c.reading_time_minutes for c in chapters)
     return BookRead(
         id=book.id,
@@ -122,18 +134,21 @@ def _serialize(db, book) -> BookRead:
         cover_url=book.cover_url,
         file_url=book.file_url,
         file_type=book.file_type,
+        file_format=book.file_format,
         category=book.category,
         language=book.language,
         published=book.published,
         sort_order=book.sort_order,
         chapter_count=len(chapters),
         total_reading_time=total_time,
+        page_count=len(pages),
     )
 
 
 def _serialize_detail(db, book) -> BookDetail:
     base = _serialize(db, book)
     chapters = repo.list_chapters(db, book.id)
+    pages = repo.list_pages(db, book.id)
     chapter_reads = [
         BookChapterRead(
             id=c.id,
@@ -148,4 +163,14 @@ def _serialize_detail(db, book) -> BookDetail:
     return BookDetail(
         **base.model_dump(),
         chapters=chapter_reads,
+        pages=[
+            BookPageRead(
+                id=p.id,
+                book_id=p.book_id,
+                page_number=p.page_number,
+                image_url=p.image_url,
+                image_type=p.image_type,
+            )
+            for p in pages
+        ],
     )

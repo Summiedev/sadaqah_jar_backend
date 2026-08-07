@@ -4,14 +4,16 @@ import httpx
 import secrets
 from sqlalchemy.orm import Session
 
-from app.core.audit import audit_logger
+from app.core.audit import AuditEvent, audit_logger
 from app.core.config import settings
 from app.core.exceptions import BusinessRuleException, ResourceNotFoundException
 from app.core.security import create_access_token, hash_password, verify_password
-from app.services.email_service import send_verification_email, send_password_reset_email, send_email
+from app.services.email_service import (
+    send_verification_email,
+    send_password_reset_email,
+    send_email,
+)
 from app.emails.templates import (
-    verification_email_html,
-    password_reset_email_html,
     email_change_request_html,
     email_change_notification_html,
     email_change_confirmed_html,
@@ -25,7 +27,7 @@ from app.users.exceptions import (
     InvalidTokenException,
     UsernameTakenException,
 )
-from app.users.models import PendingEmailChange, Role
+from app.users.models import Role
 from app.users.models import User, UserPreference, UserSession
 from app.users.repository import (
     create_session,
@@ -36,16 +38,10 @@ from app.users.repository import (
     revoke_all_sessions,
     list_sessions,
     get_user_by_google_id,
-    get_pending_email_change,
     get_pending_email_change_by_token,
-    confirm_pending_email_change,
-    cancel_pending_email_change,
-    create_pending_email_change,
 )
 from app.users.schemas import (
     ChangePasswordRequest,
-    ConfirmEmailChangeRequest,
-    ConfirmEmailChangeResponse,
     DeviceResponse,
     ForgotPasswordResponse,
     GoogleAuthRequest,
@@ -109,8 +105,10 @@ def register(db: Session, payload: UserRegister, device_id: str | None = None) -
 
 def login(db: Session, email: str, password: str, device_id: str | None = None) -> dict:
     user = repo.get_user_by_email(db, validate_email(email) or "")
-    if user is None or user.deleted_at is not None or not verify_password(
-        password, user.hashed_password
+    if (
+        user is None
+        or user.deleted_at is not None
+        or not verify_password(password, user.hashed_password)
     ):
         raise InvalidCredentialsException()
     repo.touch_last_active(db, user)
@@ -168,7 +166,9 @@ def get_profile(db: Session, user: User) -> UserProfileResponse:
     return _profile_response(db, user)
 
 
-def update_profile(db: Session, user: User, payload: UserProfileUpdate) -> UserProfileResponse:
+def update_profile(
+    db: Session, user: User, payload: UserProfileUpdate
+) -> UserProfileResponse:
     if payload.username is not None:
         username = validate_username(payload.username)
         if username is None:
@@ -211,7 +211,9 @@ def update_profile(db: Session, user: User, payload: UserProfileUpdate) -> UserP
 # ---------------------------------------------------------------------------
 
 
-def update_mode(db: Session, user: User, payload: UserModeUpdate) -> UserProfileResponse:
+def update_mode(
+    db: Session, user: User, payload: UserModeUpdate
+) -> UserProfileResponse:
     repo.set_mode(db, user, payload.mode)
     return _profile_response(db, user)
 
@@ -306,7 +308,9 @@ def _session_response(session: UserSession, current_token_hash: str | None) -> d
     ).model_dump()
 
 
-def list_user_sessions(db: Session, user: User, current_token_hash: str | None) -> list[dict]:
+def list_user_sessions(
+    db: Session, user: User, current_token_hash: str | None
+) -> list[dict]:
     sessions = list_sessions(db, user.id)
     return [_session_response(s, current_token_hash) for s in sessions]
 
@@ -387,7 +391,13 @@ def update_user_device(
     device = repo.get_device_by_id(db, user.id, device_id)
     if device is None:
         raise ResourceNotFoundException("Device not found")
-    repo.update_device(db, device, device_name=device_name, push_token=push_token, app_version=app_version)
+    repo.update_device(
+        db,
+        device,
+        device_name=device_name,
+        push_token=push_token,
+        app_version=app_version,
+    )
     return {"status": "ok"}
 
 
@@ -449,16 +459,18 @@ def request_email_change(
     user_agent: str | None = None,
 ) -> RequestEmailChangeResponse:
     if not verify_password(payload.current_password, user.hashed_password):
-        audit_logger.log(AuditEvent(
-            actor_id=user.id,
-            action="email_change_request_failed",
-            domain="users",
-            resource_type="user",
-            resource_id=str(user.id),
-            details={"reason": "invalid_password"},
-            ip_address=ip_address,
-            user_agent=user_agent,
-        ))
+        audit_logger.log(
+            AuditEvent(
+                actor_id=user.id,
+                action="email_change_request_failed",
+                domain="users",
+                resource_type="user",
+                resource_id=str(user.id),
+                details={"reason": "invalid_password"},
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+        )
         raise ForbiddenException("Current password is incorrect")
 
     new_email = validate_email(payload.new_email)
@@ -470,16 +482,18 @@ def request_email_change(
 
     existing = repo.get_user_by_email(db, new_email)
     if existing is not None and existing.id != user.id:
-        audit_logger.log(AuditEvent(
-            actor_id=user.id,
-            action="email_change_request_blocked",
-            domain="users",
-            resource_type="user",
-            resource_id=str(user.id),
-            details={"reason": "email_in_use", "target_email": new_email},
-            ip_address=ip_address,
-            user_agent=user_agent,
-        ))
+        audit_logger.log(
+            AuditEvent(
+                actor_id=user.id,
+                action="email_change_request_blocked",
+                domain="users",
+                resource_type="user",
+                resource_id=str(user.id),
+                details={"reason": "email_in_use", "target_email": new_email},
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+        )
         raise EmailTakenException()
 
     repo.cancel_pending_email_change(db, user.id)
@@ -488,24 +502,30 @@ def request_email_change(
     send_email(
         new_email,
         "Verify your new Mizan email",
-        email_change_request_html(raw_code, user.first_name or user.username, new_email),
+        email_change_request_html(
+            raw_code, user.first_name or user.username, new_email
+        ),
     )
     send_email(
         user.email,
         "Email change requested for Mizan",
-        email_change_notification_html(user.email, new_email, user.first_name or user.username),
+        email_change_notification_html(
+            user.email, new_email, user.first_name or user.username
+        ),
     )
 
-    audit_logger.log(AuditEvent(
-        actor_id=user.id,
-        action="email_change_requested",
-        domain="users",
-        resource_type="pending_email_change",
-        resource_id=str(pending.id),
-        details={"new_email": new_email},
-        ip_address=ip_address,
-        user_agent=user_agent,
-    ))
+    audit_logger.log(
+        AuditEvent(
+            actor_id=user.id,
+            action="email_change_requested",
+            domain="users",
+            resource_type="pending_email_change",
+            resource_id=str(pending.id),
+            details={"new_email": new_email},
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+    )
 
     return RequestEmailChangeResponse()
 
@@ -519,15 +539,17 @@ def confirm_email_change(
 ) -> tuple[str, str]:
     pending = get_pending_email_change_by_token(db, raw_token)
     if pending is None or pending.user_id != user.id:
-        audit_logger.log(AuditEvent(
-            actor_id=user.id,
-            action="email_change_confirm_failed",
-            domain="users",
-            resource_type="pending_email_change",
-            details={"reason": "invalid_or_expired_token"},
-            ip_address=ip_address,
-            user_agent=user_agent,
-        ))
+        audit_logger.log(
+            AuditEvent(
+                actor_id=user.id,
+                action="email_change_confirm_failed",
+                domain="users",
+                resource_type="pending_email_change",
+                details={"reason": "invalid_or_expired_token"},
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+        )
         raise InvalidTokenException()
 
     old_email = user.email
@@ -537,23 +559,30 @@ def confirm_email_change(
     access_token = create_access_token({"sub": str(updated_user.id)})
     refresh_token = repo.create_session(db, updated_user.id)
 
-    _send_email_change_confirmed(new_email=updated_user.email, user_name=updated_user.first_name or updated_user.username)
+    _send_email_change_confirmed(
+        new_email=updated_user.email,
+        user_name=updated_user.first_name or updated_user.username,
+    )
 
-    audit_logger.log(AuditEvent(
-        actor_id=updated_user.id,
-        action="email_change_confirmed",
-        domain="users",
-        resource_type="user",
-        resource_id=str(updated_user.id),
-        details={"old_email": old_email, "new_email": updated_user.email},
-        ip_address=ip_address,
-        user_agent=user_agent,
-    ))
+    audit_logger.log(
+        AuditEvent(
+            actor_id=updated_user.id,
+            action="email_change_confirmed",
+            domain="users",
+            resource_type="user",
+            resource_id=str(updated_user.id),
+            details={"old_email": old_email, "new_email": updated_user.email},
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+    )
 
     return access_token, refresh_token
 
 
-def _send_email_change_notification(old_email: str, new_email: str, user_name: str | None) -> None:
+def _send_email_change_notification(
+    old_email: str, new_email: str, user_name: str | None
+) -> None:
     send_email(
         old_email,
         "Email change requested for Mizan",
@@ -575,7 +604,9 @@ def cancel_email_change(db: Session, user: User) -> None:
         raise ResourceNotFoundException("No pending email change found")
 
 
-def get_pending_email_change_status(db: Session, user: User) -> PendingEmailChangeResponse | None:
+def get_pending_email_change_status(
+    db: Session, user: User
+) -> PendingEmailChangeResponse | None:
     pending = repo.get_pending_email_change(db, user.id)
     if pending is None:
         return None
@@ -598,12 +629,16 @@ def resend_verification(
     email = validate_email(payload.email) if payload.email else current_user.email
     user = repo.get_user_by_email(db, email)
     if user is None or user.deleted_at is not None:
-        return {"message": "If an account with that email exists and is not verified, a new verification code has been sent."}
+        return {
+            "message": "If an account with that email exists and is not verified, a new verification code has been sent."
+        }
     if user.email_verified:
         raise BusinessRuleException("Email is already verified")
     raw_token = repo.create_email_verification(db, user.id)
     send_verification_email(user.email, raw_token, user.first_name or user.username)
-    return {"message": "If an account with that email exists and is not verified, a new verification code has been sent."}
+    return {
+        "message": "If an account with that email exists and is not verified, a new verification code has been sent."
+    }
 
 
 # ---------------------------------------------------------------------------

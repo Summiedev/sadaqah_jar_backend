@@ -60,7 +60,9 @@ def send_email(recipient: str, subject: str, html_body: str) -> bool:
         return False
 
 
-def send_verification_email(recipient: str, token: str, user_name: str | None = None) -> bool:
+def send_verification_email(
+    recipient: str, token: str, user_name: str | None = None
+) -> bool:
     subject = "Your Mizan verification code"
     html_body = verification_email_html(token, user_name)
     return send_email(recipient, subject, html_body)

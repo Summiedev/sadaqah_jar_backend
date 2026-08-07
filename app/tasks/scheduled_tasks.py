@@ -92,16 +92,21 @@ def schedule_daily_prayer_reminders():
                         continue
                     # Frequency control: low = skip ~50% of non-essential reminders
                     if frequency == "low" and template.category not in {
-                        "prayer_fardh", "prayer", "adhkar_morning", "adhkar_evening"
+                        "prayer_fardh",
+                        "prayer",
+                        "adhkar_morning",
+                        "adhkar_evening",
                     }:
                         import random
+
                         if random.random() < 0.5:
                             continue
                     filtered.append(schedule)
                 db.commit()
                 for schedule in filtered:
                     result = deliver_scheduled_notification.apply_async(
-                        args=[schedule.id], eta=schedule.scheduled_for.replace(tzinfo=timezone.utc)
+                        args=[schedule.id],
+                        eta=schedule.scheduled_for.replace(tzinfo=timezone.utc),
                     )
                     schedule.celery_task_id = result.id
                 if filtered:
@@ -114,16 +119,16 @@ def schedule_daily_prayer_reminders():
 
 def _map_category_to_notification_type(category: str) -> str:
     mapping = {
-        'charity': 'sadaqah_act',
-        'reflection': 'reflection',
-        'family': 'family_activity',
-        'prayer': 'prayer_request',
-        'adhkar': 'adhkar',
-        'reading': 'reading_progress',
-        'islamic_occasions': 'friday',
-        'journey': 'goal_progress',
+        "charity": "sadaqah_act",
+        "reflection": "reflection",
+        "family": "family_activity",
+        "prayer": "prayer_request",
+        "adhkar": "adhkar",
+        "reading": "reading_progress",
+        "islamic_occasions": "friday",
+        "journey": "goal_progress",
     }
-    return mapping.get(category, 'general')
+    return mapping.get(category, "general")
 
 
 @celery_app.task(

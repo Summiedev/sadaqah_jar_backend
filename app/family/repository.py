@@ -54,19 +54,16 @@ def get_family_by_invite_code(db: Session, invite_code: str) -> Family | None:
 
 def list_user_families(db: Session, user_id: int) -> Sequence[Family]:
     """Return all active families the user is a member of."""
-    return (
-        db.scalars(
-            select(Family)
-            .join(FamilyMember, FamilyMember.family_id == Family.id)
-            .where(
-                FamilyMember.user_id == user_id,
-                FamilyMember.deleted_at.is_(None),
-                Family.deleted_at.is_(None),
-            )
-            .order_by(Family.created_at.desc())
+    return db.scalars(
+        select(Family)
+        .join(FamilyMember, FamilyMember.family_id == Family.id)
+        .where(
+            FamilyMember.user_id == user_id,
+            FamilyMember.deleted_at.is_(None),
+            Family.deleted_at.is_(None),
         )
-        .all()
-    )
+        .order_by(Family.created_at.desc())
+    ).all()
 
 
 def create_family(
@@ -114,15 +111,18 @@ def soft_delete_family(db: Session, family: Family) -> None:
 
 
 def count_user_families(db: Session, user_id: int) -> int:
-    return db.scalar(
-        select(func.count(Family.id))
-        .join(FamilyMember, FamilyMember.family_id == Family.id)
-        .where(
-            FamilyMember.user_id == user_id,
-            FamilyMember.deleted_at.is_(None),
-            Family.deleted_at.is_(None),
+    return (
+        db.scalar(
+            select(func.count(Family.id))
+            .join(FamilyMember, FamilyMember.family_id == Family.id)
+            .where(
+                FamilyMember.user_id == user_id,
+                FamilyMember.deleted_at.is_(None),
+                Family.deleted_at.is_(None),
+            )
         )
-    ) or 0
+        or 0
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -150,17 +150,14 @@ def get_member_by_id(db: Session, member_id: int) -> FamilyMember | None:
 
 
 def list_members(db: Session, family_id: int) -> Sequence[FamilyMember]:
-    return (
-        db.scalars(
-            select(FamilyMember)
-            .where(
-                FamilyMember.family_id == family_id,
-                FamilyMember.deleted_at.is_(None),
-            )
-            .order_by(FamilyMember.joined_at.asc())
+    return db.scalars(
+        select(FamilyMember)
+        .where(
+            FamilyMember.family_id == family_id,
+            FamilyMember.deleted_at.is_(None),
         )
-        .all()
-    )
+        .order_by(FamilyMember.joined_at.asc())
+    ).all()
 
 
 def add_member(
@@ -192,12 +189,15 @@ def soft_delete_member(db: Session, member: FamilyMember) -> None:
 
 
 def count_family_members(db: Session, family_id: int) -> int:
-    return db.scalar(
-        select(func.count(FamilyMember.id)).where(
-            FamilyMember.family_id == family_id,
-            FamilyMember.deleted_at.is_(None),
+    return (
+        db.scalar(
+            select(func.count(FamilyMember.id)).where(
+                FamilyMember.family_id == family_id,
+                FamilyMember.deleted_at.is_(None),
+            )
         )
-    ) or 0
+        or 0
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -205,9 +205,7 @@ def count_family_members(db: Session, family_id: int) -> int:
 # ---------------------------------------------------------------------------
 
 
-def get_invitation_by_code(
-    db: Session, invite_code: str
-) -> FamilyInvitation | None:
+def get_invitation_by_code(db: Session, invite_code: str) -> FamilyInvitation | None:
     return db.scalar(
         select(FamilyInvitation).where(
             FamilyInvitation.invite_code == invite_code,
@@ -234,7 +232,7 @@ def list_family_invitations(
     )
     if status is not None:
         query = query.where(FamilyInvitation.status == status)
-    return (db.scalars(query.order_by(FamilyInvitation.created_at.desc())).all())
+    return db.scalars(query.order_by(FamilyInvitation.created_at.desc())).all()
 
 
 def create_invitation(
@@ -313,12 +311,7 @@ def list_family_goals(
     )
     if not include_archived:
         query = query.where(FamilyGoal.is_archived.is_(False))
-    return (
-        db.scalars(
-            query.order_by(FamilyGoal.created_at.desc())
-        )
-        .all()
-    )
+    return db.scalars(query.order_by(FamilyGoal.created_at.desc())).all()
 
 
 def create_goal(
@@ -396,17 +389,14 @@ def get_milestone_by_id(db: Session, milestone_id: int) -> FamilyGoalMilestone |
 
 
 def list_milestones(db: Session, goal_id: int) -> Sequence[FamilyGoalMilestone]:
-    return (
-        db.scalars(
-            select(FamilyGoalMilestone)
-            .where(
-                FamilyGoalMilestone.goal_id == goal_id,
-                FamilyGoalMilestone.deleted_at.is_(None),
-            )
-            .order_by(FamilyGoalMilestone.sort_order.asc(), FamilyGoalMilestone.id.asc())
+    return db.scalars(
+        select(FamilyGoalMilestone)
+        .where(
+            FamilyGoalMilestone.goal_id == goal_id,
+            FamilyGoalMilestone.deleted_at.is_(None),
         )
-        .all()
-    )
+        .order_by(FamilyGoalMilestone.sort_order.asc(), FamilyGoalMilestone.id.asc())
+    ).all()
 
 
 def create_milestone(
@@ -455,7 +445,9 @@ def update_milestone(
     return milestone
 
 
-def achieve_milestone(db: Session, milestone: FamilyGoalMilestone) -> FamilyGoalMilestone:
+def achieve_milestone(
+    db: Session, milestone: FamilyGoalMilestone
+) -> FamilyGoalMilestone:
     milestone.is_achieved = True
     milestone.achieved_at = _utcnow()
     db.add(milestone)
@@ -511,22 +503,20 @@ def list_prayer_requests(
     if not include_answered:
         query = query.where(PrayerRequest.is_answered.is_(False))
 
-    total = db.scalar(
-        select(func.count(PrayerRequest.id)).where(
-            PrayerRequest.family_id == family_id,
-            PrayerRequest.deleted_at.is_(None),
-            PrayerRequest.is_answered.is_(False),
+    total = (
+        db.scalar(
+            select(func.count(PrayerRequest.id)).where(
+                PrayerRequest.family_id == family_id,
+                PrayerRequest.deleted_at.is_(None),
+                PrayerRequest.is_answered.is_(False),
+            )
         )
-    ) or 0
-
-    rows = (
-        db.scalars(
-            query.order_by(PrayerRequest.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-        )
-        .all()
+        or 0
     )
+
+    rows = db.scalars(
+        query.order_by(PrayerRequest.created_at.desc()).offset(offset).limit(limit)
+    ).all()
     return rows, total
 
 
@@ -567,22 +557,17 @@ def soft_delete_prayer_request(db: Session, prayer: PrayerRequest) -> None:
 # ---------------------------------------------------------------------------
 
 
-def get_prayer_response_counts(
-    db: Session, prayer_request_id: int
-) -> dict[str, int]:
-    rows = (
-        db.execute(
-            select(
-                PrayerRequestResponse.response_type,
-                func.count(PrayerRequestResponse.id),
-            )
-            .where(
-                PrayerRequestResponse.prayer_request_id == prayer_request_id,
-            )
-            .group_by(PrayerRequestResponse.response_type)
+def get_prayer_response_counts(db: Session, prayer_request_id: int) -> dict[str, int]:
+    rows = db.execute(
+        select(
+            PrayerRequestResponse.response_type,
+            func.count(PrayerRequestResponse.id),
         )
-        .all()
-    )
+        .where(
+            PrayerRequestResponse.prayer_request_id == prayer_request_id,
+        )
+        .group_by(PrayerRequestResponse.response_type)
+    ).all()
     return {row[0].value: row[1] for row in rows}
 
 
@@ -627,26 +612,26 @@ def get_prayer_comment_by_id(db: Session, comment_id: int) -> PrayerComment | No
 def list_prayer_comments(
     db: Session, prayer_request_id: int, limit: int = 50, offset: int = 0
 ) -> tuple[Sequence[PrayerComment], int]:
-    total = db.scalar(
-        select(func.count(PrayerComment.id)).where(
-            PrayerComment.prayer_request_id == prayer_request_id,
-            PrayerComment.deleted_at.is_(None),
-        )
-    ) or 0
-
-    rows = (
-        db.scalars(
-            select(PrayerComment)
-            .where(
+    total = (
+        db.scalar(
+            select(func.count(PrayerComment.id)).where(
                 PrayerComment.prayer_request_id == prayer_request_id,
                 PrayerComment.deleted_at.is_(None),
             )
-            .order_by(PrayerComment.created_at.desc())
-            .offset(offset)
-            .limit(limit)
         )
-        .all()
+        or 0
     )
+
+    rows = db.scalars(
+        select(PrayerComment)
+        .where(
+            PrayerComment.prayer_request_id == prayer_request_id,
+            PrayerComment.deleted_at.is_(None),
+        )
+        .order_by(PrayerComment.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
     return rows, total
 
 
@@ -667,7 +652,9 @@ def create_prayer_comment(
     return comment
 
 
-def update_prayer_comment(db: Session, comment: PrayerComment, text: str) -> PrayerComment:
+def update_prayer_comment(
+    db: Session, comment: PrayerComment, text: str
+) -> PrayerComment:
     comment.text = text
     db.add(comment)
     db.flush()
@@ -700,26 +687,26 @@ def list_reflections(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[Sequence[FamilyReflection], int]:
-    total = db.scalar(
-        select(func.count(FamilyReflection.id)).where(
-            FamilyReflection.family_id == family_id,
-            FamilyReflection.deleted_at.is_(None),
-        )
-    ) or 0
-
-    rows = (
-        db.scalars(
-            select(FamilyReflection)
-            .where(
+    total = (
+        db.scalar(
+            select(func.count(FamilyReflection.id)).where(
                 FamilyReflection.family_id == family_id,
                 FamilyReflection.deleted_at.is_(None),
             )
-            .order_by(FamilyReflection.created_at.desc())
-            .offset(offset)
-            .limit(limit)
         )
-        .all()
+        or 0
     )
+
+    rows = db.scalars(
+        select(FamilyReflection)
+        .where(
+            FamilyReflection.family_id == family_id,
+            FamilyReflection.deleted_at.is_(None),
+        )
+        .order_by(FamilyReflection.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
     return rows, total
 
 
@@ -740,7 +727,9 @@ def create_reflection(
     return reflection
 
 
-def update_reflection(db: Session, reflection: FamilyReflection, text: str) -> FamilyReflection:
+def update_reflection(
+    db: Session, reflection: FamilyReflection, text: str
+) -> FamilyReflection:
     reflection.text = text
     db.flush()
     return reflection
@@ -758,22 +747,17 @@ def soft_delete_reflection(db: Session, reflection: FamilyReflection) -> None:
 # ---------------------------------------------------------------------------
 
 
-def get_encouragement_counts(
-    db: Session, reflection_id: int
-) -> dict[str, int]:
-    rows = (
-        db.execute(
-            select(
-                ReflectionEncouragement.encouragement_type,
-                func.count(ReflectionEncouragement.id),
-            )
-            .where(
-                ReflectionEncouragement.reflection_id == reflection_id,
-            )
-            .group_by(ReflectionEncouragement.encouragement_type)
+def get_encouragement_counts(db: Session, reflection_id: int) -> dict[str, int]:
+    rows = db.execute(
+        select(
+            ReflectionEncouragement.encouragement_type,
+            func.count(ReflectionEncouragement.id),
         )
-        .all()
-    )
+        .where(
+            ReflectionEncouragement.reflection_id == reflection_id,
+        )
+        .group_by(ReflectionEncouragement.encouragement_type)
+    ).all()
     return {row[0].value: row[1] for row in rows}
 
 
@@ -864,14 +848,11 @@ def list_activities(
         except (ValueError, TypeError):
             pass
 
-    rows = (
-        db.scalars(
-            query.order_by(
-                FamilyActivity.created_at.desc(), FamilyActivity.id.desc()
-            ).limit(limit + 1)
-        )
-        .all()
-    )
+    rows = db.scalars(
+        query.order_by(
+            FamilyActivity.created_at.desc(), FamilyActivity.id.desc()
+        ).limit(limit + 1)
+    ).all()
 
     has_more = len(rows) > limit
     if has_more:

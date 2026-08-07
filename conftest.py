@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import os
 
 import pytest
@@ -61,5 +61,3 @@ def _in_memory_rate_limiter(monkeypatch):
 
     monkeypatch.setattr(rate_limit, "_get_script", lambda: _fake_script)
     yield
-
-
