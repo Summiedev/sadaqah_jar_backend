@@ -75,6 +75,12 @@ class User(Base):
     # feature is migrated or retired.
     jars = relationship("Jar", back_populates="user")
 
+    pending_email_changes = relationship(
+        "PendingEmailChange",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
 
 class UserPreference(Base):
     __tablename__ = "user_preferences"
@@ -161,6 +167,25 @@ class EmailVerificationToken(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+class PendingEmailChange(Base):
+    __tablename__ = "pending_email_changes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    new_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+    user = relationship("User", back_populates="pending_email_changes")
 
 
 class PasswordResetToken(Base):

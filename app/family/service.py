@@ -582,9 +582,33 @@ def cancel_invitation(
 
 def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
     """Join a family using an invite code."""
-    invitation = repo.get_invitation_by_code(db, payload.invite_code)
+    invite_code = payload.invite_code.strip().upper()
+    invitation = repo.get_invitation_by_code(db, invite_code)
     if not invitation:
-        raise InvalidInviteCodeException()
+        family = repo.get_family_by_invite_code(db, invite_code)
+        if not family:
+            raise InvalidInviteCodeException()
+
+        existing = repo.get_member(db, family.id, user_id)
+        if existing:
+            raise FamilyPermissionDeniedException("Already a member of this family")
+
+        repo.add_member(db, family_id=family.id, user_id=user_id)
+        db.commit()
+
+        ws_manager.send_family_event_threadsafe(
+            family.id,
+            {"event_type": "member.joined", "family_id": family.id, "actor_id": user_id},
+        )
+
+        _log_and_return(
+            db,
+            family_id=family.id,
+            event_type=EventType.MEMBER_JOINED,
+            actor_id=user_id,
+        )
+
+        return family
 
     if invitation.status != InvitationStatus.PENDING:
         raise InvitationExpiredException("Invitation is no longer valid")

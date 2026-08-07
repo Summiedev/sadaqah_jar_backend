@@ -306,3 +306,44 @@ class ChangePasswordRequest(BaseModel):
     @classmethod
     def password_strength(cls, v: str) -> str:
         return _validate_password_strength(v)
+
+
+# ---------------------------------------------------------------------------
+# Email change
+# ---------------------------------------------------------------------------
+
+
+class RequestEmailChangeRequest(BaseModel):
+    current_password: str
+    new_email: EmailStr
+
+
+class RequestEmailChangeResponse(BaseModel):
+    message: str = "Verification email sent to your new address."
+    pending: bool = True
+
+
+class ConfirmEmailChangeRequest(BaseModel):
+    token: str
+
+    @field_validator("token")
+    @classmethod
+    def validate_token(cls, v: str) -> str:
+        token = v.strip()
+        if len(token) != 6 or not token.isdigit():
+            raise ValueError("Enter the six-digit code from your email")
+        return token
+
+
+class ConfirmEmailChangeResponse(BaseModel):
+    message: str = "Email updated successfully."
+    pending: bool = False
+    access_token: str | None = None
+    refresh_token: str | None = None
+
+
+class PendingEmailChangeResponse(BaseModel):
+    id: int
+    new_email: EmailStr
+    expires_at: str | None = None
+    created_at: str | None = None

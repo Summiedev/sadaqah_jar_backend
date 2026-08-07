@@ -11,8 +11,8 @@ BRAND_INK = "#1E1A17"  # warm near-black
 BRAND_MUTED = "#6B5E52"
 BRAND_SUBTLE = "#8A7B6E"
 BRAND_LINE = "#E8DFD4"
-BRAND_EMERALD = "#047857"  # rich emerald green for CTAs
-BRAND_EMERALD_DARK = "#065F46"
+BRAND_EMERALD = "#8B6842"  # Mizan bronze for CTAs
+BRAND_EMERALD_DARK = "#6F4F2D"
 BRAND_GOLD = "#B08D57"  # subtle gold accent for geometry
 BRAND_GOLD_LIGHT = "#D4C4A8"
 

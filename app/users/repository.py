@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.users.models import (
     EmailVerificationToken,
     PasswordResetToken,
+    PendingEmailChange,
     Role,
     User,
     UserDevice,
@@ -363,3 +364,83 @@ def consume_password_reset(
     db.add(prt)
     db.commit()
     return user
+
+
+# ---------------------------------------------------------------------------
+# Pending email change
+# ---------------------------------------------------------------------------
+
+
+def create_pending_email_change(
+    db: Session, user_id: int, new_email: str
+) -> tuple[str, "PendingEmailChange"]:
+    raw_code = f"{secrets.randbelow(1_000_000):06d}"
+    pending = PendingEmailChange(
+        user_id=user_id,
+        new_email=new_email,
+        token_hash=hash_one_time_token(raw_code),
+        expires_at=_utcnow() + timedelta(hours=24),
+    )
+    db.add(pending)
+    db.commit()
+    db.refresh(pending)
+    return raw_code, pending
+
+
+def get_pending_email_change(db: Session, user_id: int) -> "PendingEmailChange | None":
+    now = _utcnow()
+    return db.scalar(
+        select(PendingEmailChange)
+        .where(
+            PendingEmailChange.user_id == user_id,
+            PendingEmailChange.confirmed_at.is_(None),
+            PendingEmailChange.cancelled_at.is_(None),
+            PendingEmailChange.expires_at > now,
+        )
+        .order_by(PendingEmailChange.created_at.desc())
+    )
+
+
+def get_pending_email_change_by_token(
+    db: Session, raw_token: str
+) -> "PendingEmailChange | None":
+    now = _utcnow()
+    return db.scalar(
+        select(PendingEmailChange).where(
+            PendingEmailChange.token_hash == hash_one_time_token(raw_token),
+            PendingEmailChange.confirmed_at.is_(None),
+            PendingEmailChange.cancelled_at.is_(None),
+            PendingEmailChange.expires_at > now,
+        )
+    )
+
+
+def confirm_pending_email_change(
+    db: Session, pending: "PendingEmailChange"
+) -> User:
+    user = get_user_by_id(db, pending.user_id)
+    if user is None:
+        return None  # type: ignore[return-value]
+    user.email = pending.new_email
+    user.email_verified = True
+    db.add(user)
+    pending.confirmed_at = _utcnow()
+    db.add(pending)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def cancel_pending_email_change(db: Session, user_id: int) -> int:
+    now = _utcnow()
+    result = (
+        db.query(PendingEmailChange)
+        .filter(
+            PendingEmailChange.user_id == user_id,
+            PendingEmailChange.confirmed_at.is_(None),
+            PendingEmailChange.cancelled_at.is_(None),
+        )
+        .update({"cancelled_at": now}, synchronize_session=False)
+    )
+    db.commit()
+    return result

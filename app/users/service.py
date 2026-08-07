@@ -4,10 +4,18 @@ import httpx
 import secrets
 from sqlalchemy.orm import Session
 
+from app.core.audit import audit_logger
 from app.core.config import settings
 from app.core.exceptions import BusinessRuleException, ResourceNotFoundException
 from app.core.security import create_access_token, hash_password, verify_password
-from app.services.email_service import send_verification_email, send_password_reset_email
+from app.services.email_service import send_verification_email, send_password_reset_email, send_email
+from app.emails.templates import (
+    verification_email_html,
+    password_reset_email_html,
+    email_change_request_html,
+    email_change_notification_html,
+    email_change_confirmed_html,
+)
 from app.users import repository as repo
 from app.users.exceptions import (
     EmailTakenException,
@@ -17,7 +25,7 @@ from app.users.exceptions import (
     InvalidTokenException,
     UsernameTakenException,
 )
-from app.users.models import Role
+from app.users.models import PendingEmailChange, Role
 from app.users.models import User, UserPreference, UserSession
 from app.users.repository import (
     create_session,
@@ -28,13 +36,23 @@ from app.users.repository import (
     revoke_all_sessions,
     list_sessions,
     get_user_by_google_id,
+    get_pending_email_change,
+    get_pending_email_change_by_token,
+    confirm_pending_email_change,
+    cancel_pending_email_change,
+    create_pending_email_change,
 )
 from app.users.schemas import (
     ChangePasswordRequest,
+    ConfirmEmailChangeRequest,
+    ConfirmEmailChangeResponse,
     DeviceResponse,
     ForgotPasswordResponse,
     GoogleAuthRequest,
+    PendingEmailChangeResponse,
     PushTokenRequest,
+    RequestEmailChangeRequest,
+    RequestEmailChangeResponse,
     ResendVerificationRequest,
     SessionResponse,
     UserModeUpdate,
@@ -161,14 +179,10 @@ def update_profile(db: Session, user: User, payload: UserProfileUpdate) -> UserP
             user.username = username
 
     if payload.email is not None:
-        email = validate_email(payload.email)
-        if email is None:
-            raise EmailTakenException()
-        if email != user.email:
-            if repo.get_user_by_email(db, email):
-                raise EmailTakenException()
-            user.email = email
-            user.email_verified = False
+        raise ForbiddenException(
+            "Email changes are not allowed through this endpoint. "
+            "Use POST /users/me/email/change-request to start an email change."
+        )
 
     if payload.first_name is not None:
         user.first_name = payload.first_name or None
@@ -420,6 +434,157 @@ def change_password(db: Session, user: User, payload: ChangePasswordRequest) -> 
     db.add(user)
     db.commit()
     repo.revoke_all_sessions(db, user.id)
+
+
+# ---------------------------------------------------------------------------
+# Email change (secure flow)
+# ---------------------------------------------------------------------------
+
+
+def request_email_change(
+    db: Session,
+    user: User,
+    payload: RequestEmailChangeRequest,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> RequestEmailChangeResponse:
+    if not verify_password(payload.current_password, user.hashed_password):
+        audit_logger.log(AuditEvent(
+            actor_id=user.id,
+            action="email_change_request_failed",
+            domain="users",
+            resource_type="user",
+            resource_id=str(user.id),
+            details={"reason": "invalid_password"},
+            ip_address=ip_address,
+            user_agent=user_agent,
+        ))
+        raise ForbiddenException("Current password is incorrect")
+
+    new_email = validate_email(payload.new_email)
+    if new_email is None:
+        raise ForbiddenException("Invalid email format")
+
+    if new_email == user.email:
+        raise ForbiddenException("New email must be different from your current email")
+
+    existing = repo.get_user_by_email(db, new_email)
+    if existing is not None and existing.id != user.id:
+        audit_logger.log(AuditEvent(
+            actor_id=user.id,
+            action="email_change_request_blocked",
+            domain="users",
+            resource_type="user",
+            resource_id=str(user.id),
+            details={"reason": "email_in_use", "target_email": new_email},
+            ip_address=ip_address,
+            user_agent=user_agent,
+        ))
+        raise EmailTakenException()
+
+    repo.cancel_pending_email_change(db, user.id)
+    raw_code, pending = repo.create_pending_email_change(db, user.id, new_email)
+
+    send_email(
+        new_email,
+        "Verify your new Mizan email",
+        email_change_request_html(raw_code, user.first_name or user.username, new_email),
+    )
+    send_email(
+        user.email,
+        "Email change requested for Mizan",
+        email_change_notification_html(user.email, new_email, user.first_name or user.username),
+    )
+
+    audit_logger.log(AuditEvent(
+        actor_id=user.id,
+        action="email_change_requested",
+        domain="users",
+        resource_type="pending_email_change",
+        resource_id=str(pending.id),
+        details={"new_email": new_email},
+        ip_address=ip_address,
+        user_agent=user_agent,
+    ))
+
+    return RequestEmailChangeResponse()
+
+
+def confirm_email_change(
+    db: Session,
+    user: User,
+    raw_token: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[str, str]:
+    pending = get_pending_email_change_by_token(db, raw_token)
+    if pending is None or pending.user_id != user.id:
+        audit_logger.log(AuditEvent(
+            actor_id=user.id,
+            action="email_change_confirm_failed",
+            domain="users",
+            resource_type="pending_email_change",
+            details={"reason": "invalid_or_expired_token"},
+            ip_address=ip_address,
+            user_agent=user_agent,
+        ))
+        raise InvalidTokenException()
+
+    old_email = user.email
+    updated_user = repo.confirm_pending_email_change(db, pending)
+    repo.revoke_all_sessions(db, user.id)
+
+    access_token = create_access_token({"sub": str(updated_user.id)})
+    refresh_token = repo.create_session(db, updated_user.id)
+
+    _send_email_change_confirmed(new_email=updated_user.email, user_name=updated_user.first_name or updated_user.username)
+
+    audit_logger.log(AuditEvent(
+        actor_id=updated_user.id,
+        action="email_change_confirmed",
+        domain="users",
+        resource_type="user",
+        resource_id=str(updated_user.id),
+        details={"old_email": old_email, "new_email": updated_user.email},
+        ip_address=ip_address,
+        user_agent=user_agent,
+    ))
+
+    return access_token, refresh_token
+
+
+def _send_email_change_notification(old_email: str, new_email: str, user_name: str | None) -> None:
+    send_email(
+        old_email,
+        "Email change requested for Mizan",
+        email_change_notification_html(old_email, new_email, user_name),
+    )
+
+
+def _send_email_change_confirmed(new_email: str, user_name: str | None) -> None:
+    send_email(
+        new_email,
+        "Your Mizan email has been updated",
+        email_change_confirmed_html(new_email, user_name),
+    )
+
+
+def cancel_email_change(db: Session, user: User) -> None:
+    count = repo.cancel_pending_email_change(db, user.id)
+    if count == 0:
+        raise ResourceNotFoundException("No pending email change found")
+
+
+def get_pending_email_change_status(db: Session, user: User) -> PendingEmailChangeResponse | None:
+    pending = repo.get_pending_email_change(db, user.id)
+    if pending is None:
+        return None
+    return PendingEmailChangeResponse(
+        id=pending.id,
+        new_email=pending.new_email,
+        expires_at=pending.expires_at.isoformat() if pending.expires_at else None,
+        created_at=pending.created_at.isoformat() if pending.created_at else None,
+    )
 
 
 # ---------------------------------------------------------------------------

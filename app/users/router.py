@@ -4,23 +4,32 @@ from fastapi import APIRouter, Depends, Header, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
+from app.core.exceptions import ResourceNotFoundException
+from app.users import repository as repo
 from app.users import service
 from app.users.dependencies import enforce_auth_rate_limit, get_current_user
 from app.users.models import User
 from app.users.repository import hash_refresh_token
+from app.emails.templates import email_change_request_html
+from app.services.email_service import send_email
 from app.users.schemas import (
     AvatarUpdate,
     ChangePasswordRequest,
+    ConfirmEmailChangeRequest,
+    ConfirmEmailChangeResponse,
     DeviceResponse,
     DeviceUpdate,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     GoogleAuthRequest,
+    PendingEmailChangeResponse,
     PushTokenRequest,
     RefreshRequest,
     ResendVerificationRequest,
     ResendVerificationResponse,
     ResetPasswordRequest,
+    RequestEmailChangeRequest,
+    RequestEmailChangeResponse,
     SessionResponse,
     TokenResponse,
     VerifyEmailOtpRequest,
@@ -178,6 +187,68 @@ def change_password(
     payload: ChangePasswordRequest, current_user: CurrentUser, db: DbDep
 ):
     service.change_password(db, current_user, payload)
+
+
+@router.post("/me/email/change-request", response_model=RequestEmailChangeResponse)
+def request_email_change(
+    payload: RequestEmailChangeRequest,
+    request: Request,
+    current_user: CurrentUser,
+    db: DbDep,
+):
+    enforce_auth_rate_limit(request, "email-change", limit=5, period=900)
+    return service.request_email_change(
+        db, current_user, payload,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+
+
+@router.post("/me/email/confirm", response_model=ConfirmEmailChangeResponse)
+def confirm_email_change(
+    payload: ConfirmEmailChangeRequest,
+    request: Request,
+    current_user: CurrentUser,
+    db: DbDep,
+):
+    enforce_auth_rate_limit(request, "email-confirm", limit=5, period=900, key_suffix=payload.token)
+    access, refresh = service.confirm_email_change(
+        db,
+        current_user,
+        payload.token,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    return ConfirmEmailChangeResponse(access_token=access, refresh_token=refresh)
+
+
+@router.get("/me/email/pending", response_model=PendingEmailChangeResponse | None)
+def get_pending_email_change(current_user: CurrentUser, db: DbDep):
+    return service.get_pending_email_change_status(db, current_user)
+
+
+@router.post("/me/email/cancel", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_email_change(current_user: CurrentUser, db: DbDep):
+    service.cancel_email_change(db, current_user)
+
+
+@router.post("/me/email/resend-verification", status_code=status.HTTP_204_NO_CONTENT)
+def resend_email_change_verification(
+    request: Request,
+    current_user: CurrentUser,
+    db: DbDep,
+):
+    enforce_auth_rate_limit(request, "email-change-resend", limit=3, period=900)
+    pending = service.get_pending_email_change_status(db, current_user)
+    if pending is None:
+        raise ResourceNotFoundException("No pending email change found")
+    repo.cancel_pending_email_change(db, current_user.id)
+    raw_code = repo.create_pending_email_change(db, current_user.id, pending.new_email)[0]
+    send_email(
+        pending.new_email,
+        "Verify your new Mizan email",
+        email_change_request_html(raw_code, current_user.first_name or current_user.username, pending.new_email),
+    )
 
 
 # ---------------------------------------------------------------------------
