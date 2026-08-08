@@ -62,22 +62,8 @@ def get_daily_acts(
     if cached:
         return cached
 
-    if ramadan_is_ramadan():
-        acts = (
-            db.query(SadaqahAct)
-            .filter(SadaqahAct.verified)
-            .order_by(func.random())
-            .limit(20)
-            .all()
-        )
-    else:
-        acts = (
-            db.query(SadaqahAct)
-            .filter(SadaqahAct.verified, ~SadaqahAct.is_ramadan_only)
-            .order_by(func.random())
-            .limit(20)
-            .all()
-        )
+    today = datetime.utcnow().date()
+    acts = _rotating_daily_acts(db, user_id, today)
 
     response = [
         {
@@ -223,6 +209,20 @@ def _get_or_create_quick_act(db: Session, act_type: str) -> SadaqahAct:
         db.add(act)
         db.flush()
     return act
+
+
+def _rotating_daily_acts(db: Session, user_id: int, today):
+    query = db.query(SadaqahAct).filter(SadaqahAct.verified)
+    if not ramadan_is_ramadan(today):
+        query = query.filter(~SadaqahAct.is_ramadan_only)
+    total = query.count()
+    if total == 0:
+        return []
+    offset = (today.toordinal() + user_id) % total
+    rows = query.order_by(SadaqahAct.id.asc()).offset(offset).limit(20).all()
+    if len(rows) < 20 and offset:
+        rows.extend(query.order_by(SadaqahAct.id.asc()).limit(20 - len(rows)).all())
+    return rows
 
 
 @router.post("/jar/add-star")

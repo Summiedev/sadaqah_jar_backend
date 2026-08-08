@@ -36,3 +36,8 @@ def test_ramadan_leaderboard_returns_empty_outside_configured_window(db, monkeyp
     finally:
         db.delete(season)
         db.commit()
+
+
+def test_public_leaderboard_limit_is_capped():
+    response = client.get("/api/v1/leaderboard/global?limit=100000")
+    assert response.status_code == 422

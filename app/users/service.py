@@ -62,7 +62,7 @@ from app.users.validators import validate_email, validate_username
 
 
 def _issue_tokens(db: Session, user: User, device_id: str | None = None) -> dict:
-    access = create_access_token({"sub": str(user.id)})
+    access = create_access_token({"sub": str(user.id), "ver": user.token_version})
     refresh = create_session(db, user.id, device_id=device_id)
     return {"access_token": access, "refresh_token": refresh, "token_type": "bearer"}
 
@@ -321,6 +321,9 @@ def logout_session(db: Session, user: User, session_id: int) -> None:
 
 
 def logout_everywhere(db: Session, user: User) -> int:
+    user.token_version += 1
+    db.add(user)
+    db.commit()
     return revoke_all_sessions(db, user.id)
 
 
@@ -426,6 +429,9 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
     if user is None:
         raise InvalidTokenException()
     # A password reset invalidates every existing refresh session.
+    user.token_version += 1
+    db.add(user)
+    db.commit()
     repo.revoke_all_sessions(db, user.id)
 
 
@@ -441,6 +447,7 @@ def change_password(db: Session, user: User, payload: ChangePasswordRequest) -> 
     if not verify_password(payload.current_password, user.hashed_password):
         raise ForbiddenException("Current password is incorrect")
     user.hashed_password = hash_password(payload.new_password)
+    user.token_version += 1
     db.add(user)
     db.commit()
     repo.revoke_all_sessions(db, user.id)
@@ -556,7 +563,12 @@ def confirm_email_change(
     updated_user = repo.confirm_pending_email_change(db, pending)
     repo.revoke_all_sessions(db, user.id)
 
-    access_token = create_access_token({"sub": str(updated_user.id)})
+    updated_user.token_version += 1
+    db.add(updated_user)
+    db.commit()
+    access_token = create_access_token(
+        {"sub": str(updated_user.id), "ver": updated_user.token_version}
+    )
     refresh_token = repo.create_session(db, updated_user.id)
 
     _send_email_change_confirmed(

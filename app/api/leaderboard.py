@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
@@ -52,7 +52,7 @@ def my_rank(
 
 
 @router.get("/friday")
-def friday_leaderboard(request: Request, limit: int = 10):
+def friday_leaderboard(request: Request, limit: int = Query(10, ge=1, le=100)):
     client_host = request.client.host if request.client else "unknown"
     _enforce_rate_limit(f"leaderboard:friday:{client_host}")
     data = get_top_friday(limit)
@@ -61,7 +61,7 @@ def friday_leaderboard(request: Request, limit: int = 10):
 
 
 @router.get("/global")
-def global_leaderboard(request: Request, limit: int = 10):
+def global_leaderboard(request: Request, limit: int = Query(10, ge=1, le=100)):
     client_host = request.client.host if request.client else "unknown"
     _enforce_rate_limit(f"leaderboard:global:{client_host}")
     data = get_top_global(limit)

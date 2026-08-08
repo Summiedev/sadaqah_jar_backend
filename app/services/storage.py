@@ -5,11 +5,14 @@ Configuration is read from environment variables.
 """
 
 import os
+import logging
 from typing import BinaryIO
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 
 def _get_s3_client():
@@ -65,14 +68,16 @@ def upload_file(
             ContentType=content_type,
         )
     except ClientError as exc:
+        logger.warning("S3 upload failed for key %s: %s", key, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to upload file: {exc}",
+            detail="Failed to upload file",
         ) from exc
     except BotoCoreError as exc:
+        logger.warning("S3 client upload error for key %s: %s", key, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Storage client error: {exc}",
+            detail="Storage service unavailable",
         ) from exc
 
     return key
@@ -87,14 +92,16 @@ def delete_file(bucket: str, key: str) -> None:
         s3.delete_object(Bucket=bucket, Key=key)
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") != "NoSuchKey":
+            logger.warning("S3 delete failed for key %s: %s", key, exc)
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Failed to delete file: {exc}",
+                detail="Failed to delete file",
             ) from exc
     except BotoCoreError as exc:
+        logger.warning("S3 client delete error for key %s: %s", key, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Storage client error: {exc}",
+            detail="Storage service unavailable",
         ) from exc
 
 
@@ -110,9 +117,10 @@ def get_presigned_url(bucket: str, key: str, expires_in: int = 3600) -> str:
             ExpiresIn=expires_in,
         )
     except (ClientError, BotoCoreError) as exc:
+        logger.warning("S3 presign failed for key %s: %s", key, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to generate download URL: {exc}",
+            detail="Failed to generate download URL",
         ) from exc
 
 
@@ -130,10 +138,11 @@ def file_exists(bucket: str, key: str) -> bool:
             return False
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Storage client error: {exc}",
+            detail="Storage service unavailable",
         ) from exc
     except BotoCoreError as exc:
+        logger.warning("S3 client head error for key %s: %s", key, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Storage client error: {exc}",
+            detail="Storage service unavailable",
         ) from exc

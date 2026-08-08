@@ -15,12 +15,15 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app.core.security import hash_password
 from app.db.session import SessionLocal
+from app.main import app
 from app.notifications import event_handlers
 from app.notifications.models import Notification
 from app.users.models import User, UserPreference
+from app.core.security import create_access_token
 
 
 @pytest.fixture(scope="module")
@@ -76,6 +79,27 @@ class TestTaskRegistration:
             in celery_app.tasks
         )
         assert "app.tasks.scheduled_tasks.generate_daily_acts" in celery_app.tasks
+
+
+def test_notification_templates_require_admin(db):
+    user = User(
+        username="template_non_admin",
+        email="template_non_admin@example.com",
+        hashed_password=hash_password("TestPass123"),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    token = create_access_token({"sub": str(user.id)})
+    try:
+        response = TestClient(app).get(
+            "/api/v1/notifications/templates",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code in {401, 403}
+    finally:
+        db.query(User).filter(User.id == user.id).delete()
+        db.commit()
 
 
 # ---------------------------------------------------------------------------

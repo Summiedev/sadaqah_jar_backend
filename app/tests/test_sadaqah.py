@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.core.security import create_access_token, hash_password
 from app.db.session import SessionLocal, engine
+from app.family.models import Family, FamilyMember, FamilyRole, FamilySettings
 from app.main import app
 from app.models.jar import Jar
 from app.models.sadaqah_act import SadaqahAct
@@ -56,6 +57,33 @@ def _create_act(db, title: str) -> SadaqahAct:
     return act
 
 
+def _create_family(db, owner_id: int, prefix: str) -> Family:
+    family = Family(
+        name=f"{prefix} family",
+        invite_code=f"{prefix}-{uuid.uuid4().hex[:12]}",
+        created_by=owner_id,
+    )
+    db.add(family)
+    db.commit()
+    db.refresh(family)
+    db.add(FamilyMember(family_id=family.id, user_id=owner_id, role=FamilyRole.OWNER))
+    db.add(FamilySettings(family_id=family.id))
+    db.commit()
+    db.refresh(family)
+    return family
+
+
+def _cleanup_family(db, family_id: int) -> None:
+    db.query(FamilySettings).filter(FamilySettings.family_id == family_id).delete(
+        synchronize_session=False
+    )
+    db.query(FamilyMember).filter(FamilyMember.family_id == family_id).delete(
+        synchronize_session=False
+    )
+    db.query(Family).filter(Family.id == family_id).delete(synchronize_session=False)
+    db.commit()
+
+
 def _cleanup_user_state(db, user_id: int) -> None:
     db.query(SadaqahLog).filter(SadaqahLog.user_id == user_id).delete(
         synchronize_session=False
@@ -98,6 +126,52 @@ def test_add_star_request_id_is_idempotent(db):
             synchronize_session=False
         )
         _cleanup_user_state(db, user.id)
+
+
+def test_activity_completion_rejects_non_member_family_id(db):
+    owner = _create_user(db, "activity_family_owner")
+    outsider = _create_user(db, "activity_family_outsider")
+    family = _create_family(db, owner.id, "activity-completion")
+
+    try:
+        response = client.post(
+            "/api/v1/activities/completions",
+            json={
+                "activity_type": "kindness",
+                "context": "family",
+                "family_id": family.id,
+            },
+            headers=_auth_header(outsider.id),
+        )
+
+        assert response.status_code == 403
+    finally:
+        _cleanup_family(db, family.id)
+        _cleanup_user_state(db, owner.id)
+        _cleanup_user_state(db, outsider.id)
+
+
+def test_activity_session_rejects_non_member_family_id(db):
+    owner = _create_user(db, "session_family_owner")
+    outsider = _create_user(db, "session_family_outsider")
+    family = _create_family(db, owner.id, "activity-session")
+
+    try:
+        response = client.post(
+            "/api/v1/activities/sessions",
+            json={
+                "activity_type": "prayer",
+                "context": "family",
+                "family_id": family.id,
+            },
+            headers=_auth_header(outsider.id),
+        )
+
+        assert response.status_code == 403
+    finally:
+        _cleanup_family(db, family.id)
+        _cleanup_user_state(db, owner.id)
+        _cleanup_user_state(db, outsider.id)
 
 
 def test_near_simultaneous_add_star_completes_once_and_spills_to_new_jar(db):

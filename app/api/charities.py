@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from app.core.rate_limit import check_rate_limit_key
 from app.db.session import get_db
@@ -44,8 +44,8 @@ def _signed_urls(urls: list[str] | None) -> list[str]:
 def list_charities(
     request: Request,
     category: str = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     _enforce_public_rate_limit(request)

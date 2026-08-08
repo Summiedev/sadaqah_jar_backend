@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Integer,
     Index,
     String,
     Text,
@@ -40,6 +41,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
 
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False), default=Role.USER)
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)

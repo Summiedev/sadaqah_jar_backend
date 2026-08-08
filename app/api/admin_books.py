@@ -23,6 +23,13 @@ from app.services.storage import (
     get_presigned_url,
     _get_bucket,
 )
+from app.services.file_validation import (
+    EPUB_MIME,
+    JPEG_MIME,
+    PDF_MIME,
+    PNG_MIME,
+    validate_file_content,
+)
 
 router = APIRouter(prefix="/admin/books", tags=["Admin Books"])
 
@@ -152,10 +159,12 @@ async def upload_book_file(
     if suffix not in allowed:
         raise HTTPException(status_code=400, detail="Upload a PDF or EPUB file")
     content = await file.read()
-    if not content or len(content) > 100 * 1024 * 1024:
-        raise HTTPException(
-            status_code=400, detail="Choose a file between 1 byte and 100 MB"
-        )
+    content_type = validate_file_content(
+        content,
+        allowed_mimes={PDF_MIME, EPUB_MIME},
+        max_size_bytes=100 * 1024 * 1024,
+        label="Book file",
+    )
 
     bucket = _get_bucket()
     key = f"books/{book_id}/{uuid4().hex}{suffix}"
@@ -164,7 +173,7 @@ async def upload_book_file(
         bucket=bucket,
         key=key,
         data=io.BytesIO(content),
-        content_type=file.content_type or f"application/{suffix.lstrip('.')}",
+        content_type=content_type,
     )
 
     # Remove old file if it exists
@@ -194,7 +203,7 @@ async def upload_book_file(
         book_id,
         BookUpdate(
             file_url=object_url,
-            file_type=file.content_type or suffix.lstrip("."),
+            file_type=content_type,
             file_format=suffix.lstrip("."),
         ),
     )
@@ -216,10 +225,12 @@ async def upload_book_cover(
     if suffix not in {".jpg", ".jpeg", ".png"}:
         raise HTTPException(status_code=400, detail="Upload a JPG or PNG cover image")
     content = await file.read()
-    if not content or len(content) > 10 * 1024 * 1024:
-        raise HTTPException(
-            status_code=400, detail="Choose a cover image between 1 byte and 10 MB"
-        )
+    content_type = validate_file_content(
+        content,
+        allowed_mimes={JPEG_MIME, PNG_MIME},
+        max_size_bytes=10 * 1024 * 1024,
+        label="Cover image",
+    )
 
     bucket = _get_bucket()
     key = f"books/{book_id}/cover/{uuid4().hex}{suffix}"
@@ -227,7 +238,7 @@ async def upload_book_cover(
         bucket=bucket,
         key=key,
         data=io.BytesIO(content),
-        content_type=file.content_type or f"image/{suffix.lstrip('.')}",
+        content_type=content_type,
         max_size_bytes=10 * 1024 * 1024,
     )
     old_key = _key_from_url(book.cover_url, bucket)
@@ -265,24 +276,25 @@ async def upload_book_pages(
                 status_code=400, detail="Page images must be JPG or PNG"
             )
         content = await file.read()
-        if not content or len(content) > 12 * 1024 * 1024:
-            raise HTTPException(
-                status_code=400,
-                detail="Each page image must be between 1 byte and 12 MB",
-            )
+        content_type = validate_file_content(
+            content,
+            allowed_mimes={JPEG_MIME, PNG_MIME},
+            max_size_bytes=12 * 1024 * 1024,
+            label="Page image",
+        )
         key = f"books/{book_id}/pages/{index:04d}-{uuid4().hex}{suffix}"
         upload_file(
             bucket=bucket,
             key=key,
             data=io.BytesIO(content),
-            content_type=file.content_type or f"image/{suffix.lstrip('.')}",
+            content_type=content_type,
             max_size_bytes=12 * 1024 * 1024,
         )
         pages.append(
             {
                 "page_number": index,
                 "image_url": _object_url(bucket, key),
-                "image_type": file.content_type or f"image/{suffix.lstrip('.')}",
+                "image_type": content_type,
             }
         )
 

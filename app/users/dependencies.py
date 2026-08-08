@@ -23,13 +23,19 @@ def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)], db: DbSession
 ) -> User:
     try:
-        subject = decode_access_token(token).get("sub")
+        payload = decode_access_token(token)
+        subject = payload.get("sub")
         user_id = int(subject) if subject is not None else None
+        token_version = int(payload.get("ver", 0))
     except (JWTError, TypeError, ValueError):
         raise InvalidTokenException()
 
     user = db.get(User, user_id)
-    if user is None or user.deleted_at is not None:
+    if (
+        user is None
+        or user.deleted_at is not None
+        or token_version != user.token_version
+    ):
         raise InvalidTokenException()
 
     user.last_active = datetime.now(timezone.utc).replace(tzinfo=None)

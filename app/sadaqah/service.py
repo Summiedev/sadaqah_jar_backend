@@ -18,6 +18,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.events import DomainEvent, event_bus
+from app.core.exceptions import AuthorizationException, ResourceNotFoundException
+from app.family import repository as family_repo
 from app.sadaqah import repository as repo
 from app.sadaqah.exceptions import (
     ActivityCompletionNotFoundException,
@@ -83,6 +85,24 @@ def _calculate_stars(
             stars *= 2
 
     return stars, friday_boost, ramadan_bonus
+
+
+def _require_family_membership(
+    db: Session, user_id: int, family_id: int | None
+) -> None:
+    """Authorize family-scoped activity writes.
+
+    Activity records can feed family timelines, goals, analytics, and
+    notifications, so callers must never be allowed to attach records to a
+    family just by guessing its ID.
+    """
+    if family_id is None:
+        raise ValueError("family_id is required for family/both context")
+    family = family_repo.get_family_by_id(db, family_id)
+    if family is None:
+        raise ResourceNotFoundException("Family not found")
+    if family_repo.get_member(db, family_id, user_id) is None:
+        raise AuthorizationException("Not a member of this family")
 
 
 def _compute_streak(completion_dates: list[date]) -> tuple[int, int, Optional[date]]:
@@ -152,8 +172,8 @@ def create_completion(
     completed_at = payload.get("completed_at") or _utcnow()
 
     # Validate context-specific requirements
-    if context in (ActivityContext.FAMILY, ActivityContext.BOTH) and not family_id:
-        raise ValueError("family_id is required for family/both context")
+    if context in (ActivityContext.FAMILY, ActivityContext.BOTH):
+        _require_family_membership(db, user_id, family_id)
 
     # Calculate stars
     stars, friday_boost, ramadan_bonus = _calculate_stars(
@@ -287,8 +307,8 @@ def start_session(db: Session, user_id: int, payload: dict) -> ActivitySessionRe
     family_id = payload.get("family_id")
     started_at = payload.get("started_at") or _utcnow()
 
-    if context in (ActivityContext.FAMILY, ActivityContext.BOTH) and not family_id:
-        raise ValueError("family_id is required for family/both context")
+    if context in (ActivityContext.FAMILY, ActivityContext.BOTH):
+        _require_family_membership(db, user_id, family_id)
 
     # End any existing in-progress session for this activity type
     existing = repo.ActivitySessionRepository().get_in_progress(

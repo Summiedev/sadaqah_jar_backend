@@ -92,7 +92,7 @@ def mark_all_notifications_read(db: DbDep, current_user: CurrentUser):
 @router.get("/templates", response_model=Envelope)
 def list_templates(
     db: DbDep,
-    current_user: CurrentUser,
+    _admin: Annotated[User, Depends(require_admin)],
     category: str | None = Query(None),
     enabled: bool | None = Query(None),
 ):

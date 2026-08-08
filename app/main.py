@@ -27,6 +27,22 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
+        )
+        if request.url.scheme == "https":
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Validate push delivery configuration at startup so operators
@@ -45,12 +61,19 @@ async def lifespan(app: FastAPI):
         from app.core.ws_manager import manager
 
         manager.bind_loop()
+        manager.start_pubsub_listener()
     except Exception:
         logger.exception("Failed to bind websocket event loop at startup")
 
     logger.info("API startup complete")
 
     yield
+    try:
+        from app.core.ws_manager import manager
+
+        manager.stop_pubsub_listener()
+    except Exception:
+        logger.exception("Failed to stop websocket Redis listener")
     logger.info("API shutdown")
 
 
@@ -65,6 +88,7 @@ app = FastAPI(
 )
 
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 if settings.CORS_ORIGINS:
     app.add_middleware(

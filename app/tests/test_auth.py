@@ -63,6 +63,12 @@ def test_register_and_login(db):
     assert "access_token" in response.json()
 
 
+def test_security_headers_present():
+    response = client.get("/health")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+
+
 def test_register_username_taken_returns_409(db):
     _clean("collision1@example.com", "collision-user")
     _clean("collision2@example.com", "collision-user")
@@ -253,4 +259,30 @@ def test_logout_all_devices(db):
     assert response.status_code == 204
 
     sessions = client.get(f"{API}/users/me/sessions", headers=_headers(token))
-    assert all(not s["is_current"] for s in sessions.json())
+    assert sessions.status_code == 401
+
+
+def test_change_password_invalidates_existing_access_token(db):
+    _clean("tokenver@example.com", "tokenver-user")
+    reg = client.post(
+        f"{API}/auth/register",
+        json={
+            "username": "tokenver-user",
+            "email": "tokenver@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+    token = reg.json()["access_token"]
+
+    changed = client.patch(
+        f"{API}/users/me/password",
+        json={
+            "current_password": "StrongPass123!",
+            "new_password": "NewStrongPass123!",
+        },
+        headers=_headers(token),
+    )
+    assert changed.status_code == 204
+
+    old_token_response = client.get(f"{API}/users/me", headers=_headers(token))
+    assert old_token_response.status_code == 401

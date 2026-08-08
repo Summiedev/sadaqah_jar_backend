@@ -11,6 +11,12 @@ from app.db.session import get_db
 from app.models.charity import Charity
 from app.schemas.admin import CharityCreate, CharityUpdate
 from app.services.storage import upload_file, delete_file, _get_bucket
+from app.services.file_validation import (
+    JPEG_MIME,
+    PDF_MIME,
+    PNG_MIME,
+    validate_file_content,
+)
 
 router = APIRouter(prefix="/admin/charities", tags=["Admin Charities"])
 
@@ -233,16 +239,18 @@ async def upload_charity_images(
         if suffix not in {".jpg", ".jpeg", ".png"}:
             raise HTTPException(status_code=400, detail="Images must be JPG or PNG")
         content = await file.read()
-        if not content or len(content) > 12 * 1024 * 1024:
-            raise HTTPException(
-                status_code=400, detail="Each image must be between 1 byte and 12 MB"
-            )
+        content_type = validate_file_content(
+            content,
+            allowed_mimes={JPEG_MIME, PNG_MIME},
+            max_size_bytes=12 * 1024 * 1024,
+            label="Image",
+        )
         key = f"donations/{charity_id}/images/{uuid4().hex}{suffix}"
         upload_file(
             bucket=bucket,
             key=key,
             data=io.BytesIO(content),
-            content_type=file.content_type or f"image/{suffix.lstrip('.')}",
+            content_type=content_type,
             max_size_bytes=12 * 1024 * 1024,
         )
         urls.append(_object_url(bucket, key))
@@ -287,15 +295,13 @@ async def upload_charity_evidence(
                 status_code=400, detail="Evidence files must be JPG, PNG, or PDF"
             )
         content = await file.read()
-        if not content or len(content) > 20 * 1024 * 1024:
-            raise HTTPException(
-                status_code=400,
-                detail="Each evidence file must be between 1 byte and 20 MB",
-            )
-        key = f"donations/{charity_id}/evidence/{uuid4().hex}{suffix}"
-        content_type = file.content_type or (
-            "application/pdf" if suffix == ".pdf" else f"image/{suffix.lstrip('.')}"
+        content_type = validate_file_content(
+            content,
+            allowed_mimes={JPEG_MIME, PNG_MIME, PDF_MIME},
+            max_size_bytes=20 * 1024 * 1024,
+            label="Evidence file",
         )
+        key = f"donations/{charity_id}/evidence/{uuid4().hex}{suffix}"
         upload_file(
             bucket=bucket,
             key=key,

@@ -33,7 +33,18 @@ celery_app.conf.beat_schedule = {
     "aggregate-weekly-stats": {
         "task": "app.tasks.scheduled_tasks.aggregate_weekly_stats",
         "schedule": crontab(hour=0, minute=0, day_of_week=0),
+        "options": {"queue": "analytics"},
     },
+}
+
+celery_app.conf.task_routes = {
+    "app.tasks.notification_tasks.*": {"queue": "notifications"},
+    "app.tasks.scheduled_tasks.deliver_scheduled_notification": {
+        "queue": "notifications"
+    },
+    "app.tasks.scheduled_tasks.schedule_daily_prayer_reminders": {"queue": "reminders"},
+    "app.tasks.scheduled_tasks.generate_daily_acts": {"queue": "analytics"},
+    "app.tasks.scheduled_tasks.aggregate_weekly_stats": {"queue": "analytics"},
 }
 
 # ``include`` above guarantees both task modules are imported by every
