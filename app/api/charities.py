@@ -23,13 +23,20 @@ def _key_from_url(raw_url: str | None, bucket: str) -> str | None:
 def _signed_urls(urls: list[str] | None) -> list[str]:
     if not urls:
         return []
-    bucket = _get_bucket()
+    try:
+        bucket = _get_bucket()
+    except HTTPException:
+        return [url for url in urls if url]
     signed = []
     for url in urls or []:
         key = _key_from_url(url, bucket)
-        signed.append(
-            get_presigned_url(bucket=bucket, key=key, expires_in=3600) if key else url
-        )
+        if not key:
+            signed.append(url)
+            continue
+        try:
+            signed.append(get_presigned_url(bucket=bucket, key=key, expires_in=3600))
+        except HTTPException:
+            signed.append(url)
     return signed
 
 

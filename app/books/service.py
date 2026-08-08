@@ -73,7 +73,7 @@ def list_chapters(db, book_id: int) -> list[BookChapterRead]:
             chapter_number=c.chapter_number,
             title=c.title,
             content=c.content,
-            reading_time_minutes=c.reading_time_minutes,
+            reading_time_minutes=c.reading_time_minutes or 0,
         )
         for c in chapters
     ]
@@ -92,7 +92,7 @@ def create_chapter(
         chapter_number=chapter.chapter_number,
         title=chapter.title,
         content=chapter.content,
-        reading_time_minutes=chapter.reading_time_minutes,
+        reading_time_minutes=chapter.reading_time_minutes or 0,
     )
 
 
@@ -109,7 +109,7 @@ def update_chapter(
         chapter_number=updated.chapter_number,
         title=updated.title,
         content=updated.content,
-        reading_time_minutes=updated.reading_time_minutes,
+        reading_time_minutes=updated.reading_time_minutes or 0,
     )
 
 
@@ -128,17 +128,17 @@ def _serialize(db, book) -> BookRead:
     total_time = sum(c.reading_time_minutes or 0 for c in chapters)
     return BookRead(
         id=book.id,
-        title=book.title,
-        author=book.author,
+        title=book.title or "Untitled book",
+        author=book.author or "Unknown author",
         description=book.description,
         cover_url=book.cover_url,
         file_url=book.file_url,
         file_type=book.file_type,
         file_format=book.file_format,
-        category=book.category,
-        language=book.language,
-        published=book.published,
-        sort_order=book.sort_order,
+        category=book.category or "General",
+        language=book.language or "en",
+        published=bool(book.published),
+        sort_order=book.sort_order or 0,
         chapter_count=len(chapters),
         total_reading_time=total_time,
         page_count=len(pages),
@@ -156,7 +156,7 @@ def _serialize_detail(db, book) -> BookDetail:
             chapter_number=c.chapter_number,
             title=c.title,
             content=c.content,
-            reading_time_minutes=c.reading_time_minutes,
+            reading_time_minutes=c.reading_time_minutes or 0,
         )
         for c in chapters
     ]

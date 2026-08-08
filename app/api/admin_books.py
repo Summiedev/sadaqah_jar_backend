@@ -91,7 +91,7 @@ def _serialize_chapter(chapter) -> dict:
         "chapter_number": chapter.chapter_number,
         "title": chapter.title,
         "content": chapter.content,
-        "reading_time_minutes": chapter.reading_time_minutes,
+        "reading_time_minutes": chapter.reading_time_minutes or 0,
     }
 
 

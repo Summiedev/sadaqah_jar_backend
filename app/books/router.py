@@ -24,11 +24,17 @@ def _key_from_url(raw_url: str | None, bucket: str) -> str | None:
 
 
 def _signed_url(raw_url: str | None) -> str | None:
-    bucket = _get_bucket()
+    try:
+        bucket = _get_bucket()
+    except HTTPException:
+        return raw_url
     key = _key_from_url(raw_url, bucket)
     if not key:
         return raw_url
-    return get_presigned_url(bucket=bucket, key=key, expires_in=3600)
+    try:
+        return get_presigned_url(bucket=bucket, key=key, expires_in=3600)
+    except HTTPException:
+        return raw_url
 
 
 def _public_book_payload(book, *, include_download_link: bool = True) -> dict:
@@ -89,7 +95,7 @@ def get_chapter(book_id: int, chapter_number: int, db: DbDep):
             chapter_number=chapter.chapter_number,
             title=chapter.title,
             content=chapter.content,
-            reading_time_minutes=chapter.reading_time_minutes,
+            reading_time_minutes=chapter.reading_time_minutes or 0,
         )
     )
 
