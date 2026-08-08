@@ -89,6 +89,17 @@ def get_reflection_by_request_id(
     )
 
 
+def update_reflection(
+    db: Session, reflection: JourneyReflection, payload: dict
+) -> JourneyReflection:
+    for field in ("title", "body", "mood", "is_private", "date"):
+        if field in payload:
+            setattr(reflection, field, payload[field])
+    reflection.updated_at = _utcnow()
+    db.flush()
+    return reflection
+
+
 # ---------------------------------------------------------------------------
 # Adhkar Progress
 # ---------------------------------------------------------------------------

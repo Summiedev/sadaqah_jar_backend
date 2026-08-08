@@ -14,6 +14,7 @@ from app.journey.exceptions import (
 from app.journey.schemas import (
     ReadingProgressResponse,
     ReflectionCreate,
+    ReflectionUpdate,
     ReflectionResponse,
     AdhkarProgressResponse,
     AdhkarFavoriteResponse,
@@ -95,6 +96,31 @@ def create_reflection(
         data["date"] = _utcnow()
 
     reflection = repo.create_reflection(db, user_id, data)
+    db.commit()
+    db.refresh(reflection)
+
+    return ReflectionResponse(
+        id=reflection.id,
+        user_id=reflection.user_id,
+        title=reflection.title,
+        body=reflection.body,
+        mood=reflection.mood,
+        is_private=reflection.is_private,
+        date=reflection.date,
+        created_at=reflection.created_at,
+        updated_at=reflection.updated_at,
+    )
+
+
+def update_reflection(
+    db: Session, reflection_id: int, user_id: int, payload: ReflectionUpdate
+) -> ReflectionResponse:
+    reflection = repo.get_reflection_by_id(db, reflection_id, user_id)
+    if not reflection:
+        raise ReflectionNotFoundException("Reflection not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    reflection = repo.update_reflection(db, reflection, data)
     db.commit()
     db.refresh(reflection)
 

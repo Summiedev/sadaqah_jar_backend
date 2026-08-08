@@ -14,6 +14,14 @@ class ReflectionCreate(BaseModel):
     request_id: str | None = None
 
 
+class ReflectionUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    body: str | None = Field(default=None, min_length=1)
+    mood: str | None = Field(default=None, min_length=1, max_length=64)
+    is_private: bool | None = None
+    date: datetime | None = None
+
+
 class ReflectionResponse(BaseModel):
     id: int
     user_id: int

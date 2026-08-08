@@ -19,6 +19,7 @@ from app.journey.schemas import (
     QuranProgressPayload,
     ReadingProgressResponse,
     ReflectionCreate,
+    ReflectionUpdate,
 )
 
 router = APIRouter(prefix="/journey", tags=["journey"])
@@ -57,6 +58,17 @@ def get_reflection(reflection_id: int, db: DbDep, current_user: CurrentUser):
 def create_reflection(payload: ReflectionCreate, db: DbDep, current_user: CurrentUser):
     reflection = service.create_reflection(db, current_user.id, payload)
     return Envelope(data=reflection, message="Reflection saved")
+
+
+@router.patch("/reflections/{reflection_id}", response_model=Envelope)
+def update_reflection(
+    reflection_id: int,
+    payload: ReflectionUpdate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    reflection = service.update_reflection(db, reflection_id, current_user.id, payload)
+    return Envelope(data=reflection, message="Reflection updated")
 
 
 # ---------------------------------------------------------------------------
