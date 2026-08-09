@@ -607,7 +607,7 @@ def test_encourage_reflection(db):
 
     resp = client.post(
         f"{API}/family/{family.id}/reflections/{refl.id}/encourage",
-        json={"encouragement_type": "ameen"},
+        json={"encouragement_type": "barakallahu_feek"},
         headers=_headers(member.id),
     )
     assert resp.status_code == 200

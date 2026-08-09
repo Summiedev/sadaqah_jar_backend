@@ -25,6 +25,7 @@ from app.family.schemas import (
     PrayerCommentCreate,
     ReflectionCreate,
     ReflectionEncourage,
+    ReflectionCommentCreate,
     SettingsUpdate,
     MemberRoleUpdate,
     JoinRequest,
@@ -796,6 +797,65 @@ def encourage_reflection(
         db, family_id, reflection_id, payload, current_user.id
     )
     return Envelope(data={"encouragement_counts": counts})
+
+
+@router.get("/{family_id}/reflections/{reflection_id}/comments", response_model=Envelope)
+def list_reflection_comments(
+    family_id: int,
+    reflection_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    comments, total = service.list_reflection_comments(
+        db, family_id, reflection_id, current_user.id, limit=limit, offset=offset
+    )
+    return Envelope(data=comments, meta=Meta(total=total))
+
+
+@router.post(
+    "/{family_id}/reflections/{reflection_id}/comments",
+    response_model=Envelope,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_reflection_comment(
+    family_id: int,
+    reflection_id: int,
+    payload: ReflectionCommentCreate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    comment = service.create_reflection_comment(
+        db, family_id, reflection_id, payload, current_user.id
+    )
+    return Envelope(
+        data={
+            "id": comment.id,
+            "reflection_id": comment.reflection_id,
+            "author_id": comment.author_id,
+            "text": comment.text,
+            "created_at": comment.created_at.isoformat(),
+        },
+        message="Comment added",
+    )
+
+
+@router.delete(
+    "/{family_id}/reflections/{reflection_id}/comments/{comment_id}",
+    response_model=Envelope,
+)
+def delete_reflection_comment(
+    family_id: int,
+    reflection_id: int,
+    comment_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    service.delete_reflection_comment(
+        db, family_id, reflection_id, comment_id, current_user.id
+    )
+    return Envelope(data=None, message="Comment deleted")
 
 
 # ---------------------------------------------------------------------------

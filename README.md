@@ -1,243 +1,347 @@
+Exit code: 0
+Wall time: 1.4 seconds
+Output:
 # Mizan Backend
 
-FastAPI backend for the Mizan sadaqah and habit-tracking app. Provides REST APIs and WebSocket support for user management, sadaqah act tracking, family collaboration, journey (adhkar) guides, book reading, and push notifications.
+The Mizan backend is the FastAPI service for the Mizan Islamic habit, sadaqah,
+family, journey, reflection, book, charity, and notification features. It
+provides a versioned REST API, WebSocket events, Celery background tasks, and
+admin endpoints.
 
-## Tech Stack
+## Capabilities
 
-- **Language:** Python 3.12
-- **Framework:** FastAPI (async, OpenAPI auto-docs)
-- **Database:** PostgreSQL (production), SQLite (tests)
-- **ORM:** SQLAlchemy 2.0
-- **Migrations:** Alembic
-- **Cache/Queue:** Redis + Celery
-- **Auth:** JWT (python-jose + passlib/argon2), Google OAuth 2.0
-- **Validation:** Pydantic v2
-- **Rate Limiting:** slowapi + Redis
-- **Push Notifications:** Firebase Cloud Messaging (firebase-admin)
-- **File Storage:** MinIO (S3-compatible)
-- **Testing:** pytest
-- **Linting/Formatting:** ruff
-- **Deployment:** Docker/Podman, Caddy reverse proxy, uvicorn ASGI server
+- JWT authentication, refresh tokens, logout, password changes, and Google OAuth
+- Personal sadaqah acts, logs, goals, streaks, badges, dashboards, and leaderboards
+- Family jars with invitations, memberships, permissions, goals, milestones, prayers, reflections, and activity
+- Journey progress for adhkar, Quran reading, favorites, and reflections
+- Books and chapters with admin publishing and evidence management
+- Verified donation and charity catalogue data
+- In-app notifications and Firebase Cloud Messaging
+- Redis caching, deduplication, rate limiting, and WebSocket coordination
+- PostgreSQL persistence, Alembic migrations, and MinIO/S3-compatible storage
 
-## Project Structure
+## Technology
 
-```
-sadaqah_jar_backend/
-├── app/
-│   ├── api/                 # HTTP route handlers (one file per domain)
-│   │   ├── router.py        # Central API router — includes all sub-routers
-│   │   ├── sadaqah.py       # Personal sadaqah acts, daily acts, streaks, logs
-│   │   ├── adhkar.py        # Adhkar (remembrance) tracking
-│   │   ├── friday.py        # Friday-specific adhkar & boosts
-│   │   ├── dashboard.py     # Dashboard stats and heatmap
-│   │   ├── leaderboard.py   # Global and family leaderboards
-│   │   ├── streak.py        # Personal streak data
-│   │   ├── badges.py        # Badge catalog
-│   │   ├── charities.py     # Verified charity list
-│   │   ├── books.py         # Book catalog endpoints
-│   │   ├── admin_*.py       # Admin panel endpoints (analytics, evidence, etc.)
-│   │   └── websocket.py     # WebSocket endpoint for real-time updates
-│   │
-│   ├── family/              # Family jar domain
-│   │   ├── models.py        # Family, FamilyMember, FamilyGoal, FamilyActivity, etc.
-│   │   ├── schemas.py       # Pydantic request/response schemas
-│   │   ├── service.py       # Business logic, permissions, activity logging
-│   │   ├── repository.py    # Database access layer
-│   │   ├── router.py        # HTTP endpoints for family operations
-│   │   └── exceptions.py    # Domain-specific exceptions
-│   │
-│   ├── core/                # Cross-cutting concerns
-│   │   ├── config.py        # Settings (env vars) via pydantic-settings
-│   │   ├── auth.py          # JWT creation/verification
-│   │   ├── security.py      # Password hashing, token helpers
-│   │   ├── dependencies.py  # Shared request dependencies (DB, current user)
-│   │   ├── envelope.py      # Response envelope pattern
-│   │   ├── cache.py         # Redis caching utilities
-│   │   ├── ws_manager.py    # WebSocket connection manager
-│   │   ├── rate_limit.py    # Redis-backed rate limiting
-│   │   └── ...
-│   │
-│   ├── db/                  # Database setup
-│   │   ├── base.py          # SQLAlchemy Base
-│   │   ├── deps.py          # Session dependency injection
-│   │   ├── session.py       # Engine and session factory
-│   │   └── test_db.py       # Test database helpers
-│   │
-│   ├── models/              # Shared/legacy models (Jar, SadaqahAct, etc.)
-│   ├── users/               # User auth, profile, permissions
-│   ├── goals/               # Goal tracking
-│   ├── journey/             # Journey/adhkar progress
-│   ├── books/               # Book catalog (admin-managed)
-│   ├── notifications/       # Push notification templates and scheduling
-│   ├── seed/                # Database seeding scripts
-│   ├── services/            # Business logic services (streaks, badges, prayer time, etc.)
-│   ├── tasks/               # Celery scheduled tasks (daily acts, reminders)
-│   └── utils/               # Shared helpers (invite codes, constants)
-│
-├── alembic/                 # Database migration scripts
-├── docker-compose.yml       # Local dev stack (Postgres, Redis, MinIO, Caddy)
-├── Dockerfile               # Production image
-├── pyproject.toml           # Project config, dependencies, pytest settings
-├── requirements.txt         # Pinned dependencies
-├── Caddyfile                # Reverse proxy config
-├── alembic.ini              # Alembic configuration
-└── conftest.py              # Top-level pytest config
+| Area | Technology |
+| --- | --- |
+| API | FastAPI, Uvicorn, Pydantic v2 |
+| Database | PostgreSQL in production, SQLite for tests |
+| ORM | SQLAlchemy 2 |
+| Migrations | Alembic |
+| Authentication | JWT, Argon2, Google OAuth |
+| Queue | Celery with Redis |
+| Cache and rate limits | Redis |
+| Push | Firebase Admin SDK / FCM |
+| Object storage | MinIO or S3-compatible storage |
+| Testing | pytest and FastAPI TestClient |
+| Quality | Ruff |
+| Deployment | Docker/Podman and an ASGI server |
+
+## Repository layout
+
+```text
+app/
+  api/              HTTP routers and admin routers
+  family/           Family models, repositories, services, and routes
+  journey/          Journey domain logic and persistence
+  users/            Users, authentication, sessions, and preferences
+  notifications/    Notification models, preferences, and deduplication
+  books/            Book models and schemas
+  models/           Shared SQLAlchemy models
+  services/         Cross-domain application services
+  tasks/            Celery tasks for notifications and schedules
+  core/             Settings, security, cache, WebSockets, and Celery
+  db/               SQLAlchemy engine, sessions, and metadata
+  seed/             Development and catalogue seed scripts
+  tests/            Backend integration and domain tests
+alembic/            Database migration history
+docker-compose.yml  Local service stack
+Dockerfile          Container image definition
+pyproject.toml      Dependencies and tool configuration
+alembic.ini         Alembic configuration
 ```
 
 ## Architecture
 
-The backend follows a **layer-first domain structure** within each module:
+Most domains follow this flow:
 
-1. **Models** (`models.py`) — SQLAlchemy ORM definitions with soft delete, timestamps, and versioning
-2. **Repository** (`repository.py`) — Pure database access, no business logic
-3. **Service** (`service.py`) — Business logic, authorization, and activity logging
-4. **Router** (`router.py`) — Thin HTTP layer that calls services and returns envelopes
-5. **Schemas** (`schemas.py`) — Pydantic request/response models
+```text
+HTTP router -> Pydantic schema -> service -> repository -> SQLAlchemy model
+                                      |
+                                      +-> activity and notification events
+```
 
-All API responses follow the **envelope pattern** (`Envelope` from `app/core/envelope.py`) for consistent front-end consumption. The permission system maps roles (OWNER, ADMIN, MEMBER) to action scopes (e.g., `CREATE_PRAYER`, `MANAGE_GOALS`).
+Routers are thin. Services own validation, authorization, transactions, and
+domain rules. Repositories own database access. Responses normally use the
+shared envelope from `app/core/envelope.py`.
 
-## Prerequisites
+Family permissions are enforced server-side. The frontend must not be treated
+as an authorization boundary.
 
-- **Python:** >= 3.12
-- **PostgreSQL:** 16 (production), SQLite for tests
-- **Redis:** 7 (cache + Celery broker + rate limiting)
-- **MinIO** (optional, for file/evidence storage)
+## Requirements
 
-## Installation
+- Python 3.12 or newer
+- PostgreSQL 16 or newer for production
+- Redis 7 or newer for production
+- Docker or Podman for local infrastructure
+- MinIO or S3-compatible storage for uploaded files
+- A Firebase service account for production push notifications
+
+## Local setup
+
+From the backend directory:
+
+### 1. Create an environment
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .
+python -m pip install pytest ruff
+```
+
+macOS/Linux:
 
 ```bash
-# Clone
-cd sadaqah_jar_backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+python -m pip install pytest ruff
+```
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+If using uv:
 
-# Install dependencies (preferred method)
+```bash
 uv sync --frozen
+```
 
-# Or with pip
-pip install -r requirements.txt
+### 2. Configure the environment
 
-# Copy and configure environment
+```bash
 cp .env.example .env
-# Edit .env — see Environment Variables below
+```
 
-# Run migrations
+On Windows:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Never commit `.env`, JWT secrets, OAuth secrets, SMTP credentials, or the
+Firebase service-account JSON.
+
+### 3. Start infrastructure
+
+```bash
+docker compose up -d db redis minio
+```
+
+Use `podman compose` when Podman is your runtime.
+
+### 4. Run migrations
+
+```bash
 alembic upgrade head
+```
 
-# (Optional) Seed the database
+### 5. Seed development data
+
+Seeding is optional and should normally be used only for development or a
+controlled initial deployment:
+
+```bash
 python -m app.seed.seed
 ```
 
-## Environment Variables
+The public charity endpoint only returns records that are verified, active,
+and published. An empty donation list can mean seed data is missing or that no
+charity has passed all three filters.
 
-All configuration is in `app/core/config.py` (`Settings` class, reads from `.env`).
+## Configuration
 
-| Variable | Required | Description |
-|---|---|---|
-| `APP_NAME` | Yes | Application name |
-| `ENV` | Yes | `development` or `production` |
-| `DATABASE_URL` | Yes | PostgreSQL DSN (e.g. `postgresql+psycopg2://user:pass@host:5432/mizan`) |
-| `REDIS_URL` | Yes | Redis URL (e.g. `redis://localhost:6379/0`) |
-| `JWT_SECRET` | Yes | Signing secret for JWT tokens (min 32 chars) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Yes | JWT token lifetime in minutes |
+Settings are loaded by `app/core/config.py` from environment variables and
+the repository `.env` file.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `APP_NAME` | Yes | API/application name |
+| `ENV` | Yes | `development`, `test`, or `production` |
+| `DATABASE_URL` | Yes | PostgreSQL or SQLite SQLAlchemy URL |
+| `REDIS_URL` | Yes | Redis broker, cache, and rate-limit URL |
+| `JWT_SECRET` | Yes | Unique secret of at least 32 characters |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Yes | Access-token lifetime |
 | `CORS_ORIGINS` | No | Comma-separated allowed origins |
-| `SMTP_HOST` / `SMTP_PORT` | No | SMTP server for verification/password-reset emails |
-| `FROM_EMAIL` | No | Email sender address |
+| `APP_URL` | No | Public URL used in email links |
+| `SMTP_HOST` / `SMTP_PORT` | No | Email server configuration |
+| `SMTP_USER` / `SMTP_PASSWORD` | No | Email credentials |
+| `FROM_EMAIL` | No | Email sender |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
-| `RESEND_API_KEY` | No | Resend email API key |
-| `FCM_SERVICE_ACCOUNT_PATH` | No | Path to Firebase service account JSON (blank = push disabled) |
-| `PRAYER_CALCULATION_METHOD` | No | Aladhan method ID (2 = ISNA, default) |
-| `APP_URL` | No | Public base URL for email links |
+| `RESEND_API_KEY` | No | Resend email provider key |
+| `FCM_SERVICE_ACCOUNT_PATH` | Production | Firebase service-account JSON path |
+| `PRAYER_CALCULATION_METHOD` | No | Aladhan method; default is 2 |
+| `PRAYER_API_TIMEOUT_SECONDS` | No | External prayer API timeout |
 
-**Important:** Never commit real `JWT_SECRET`, SMTP credentials, or Google/Resend API keys. The `FCM_SERVICE_ACCOUNT_PATH` must point to a valid Firebase service account JSON for push notifications to function; leaving it blank disables push delivery entirely.
+In production, startup fails if `FCM_SERVICE_ACCOUNT_PATH` is missing or
+invalid. This prevents push notifications from silently appearing configured
+when they cannot be delivered. Development and tests degrade safely to
+in-app notifications when FCM is unavailable.
 
-## Running the Project
-
-### Development
+## Running the API
 
 ```bash
-# Start the API with auto-reload
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-API docs:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-- Health check: `http://localhost:8000/health`
+Useful endpoints:
 
-### Docker / Podman
+| URL | Purpose |
+| --- | --- |
+| `/health` | Cheap liveness probe |
+| `/readiness` | Database, Redis, and push readiness |
+| `/docs` | Swagger UI |
+| `/redoc` | ReDoc |
+
+`/readiness` returns HTTP 503 when the database or Redis is unavailable.
+
+## Celery
+
+Notification worker:
 
 ```bash
-# Start all services (Postgres, Redis, MinIO, Caddy, app)
-podman-compose up -d
-# or: docker compose up -d
+celery -A app.core.celery_app worker --loglevel=info -Q notifications
 ```
 
-The app runs on port 8000 behind Caddy (port 80/443) at `api.sad-aqah.app`.
-
-## Testing
+Scheduler:
 
 ```bash
-# Run all tests (excludes test_daily_acts.py per pyproject.toml)
-pytest
-
-# Run a specific test file
-pytest app/tests/test_family.py -v
-
-# With coverage
-pytest --cov=app
-```
-
-Tests use an **in-memory SQLite database** (configured in `conftest.py` — creates `.pytest_tmp/test.db`). No external database is needed for tests.
-
-## Running Celery Tasks
-
-```bash
-# Start Celery worker
-celery -A app.core.celery_app worker --loglevel=info
-
-# Start Celery beat (scheduler)
 celery -A app.core.celery_app beat --loglevel=info
 ```
 
-Scheduled tasks include daily act generation, prayer reminders, and Friday boost processing.
+Event notifications use Redis deduplication and database idempotency keys. If
+the broker is temporarily unavailable, the originating family, prayer, goal,
+or activity action still completes and the in-app notification is persisted
+through a fallback path. Push delivery still requires a healthy worker and
+valid Firebase credentials.
 
-## API Endpoints
+## API domains
 
-All routes prefixed with `/api/v1`:
+All versioned routes are under `/api/v1`.
 
-| Prefix | Domain | Notes |
-|---|---|---|
-| `/auth/` | Authentication | Login, register, token refresh, Google OAuth |
-| `/users/` | User management | Profile, role changes |
-| `/sadaqah/` | Sadaqah tracking | Acts, daily acts, streaks, logs |
-| `/family/` | Family jars | Create/join families, goals, prayers, reflections, activities |
-| `/journey/` | Journey | Adhkar progress, reflections |
-| `/books/` | Books | Catalog (admin-managed) |
-| `/dashboard/` | Dashboard | Stats, heatmap |
-| `/badges/` | Badges | Badge catalog |
-| `/charities/` | Charities | Verified organizations |
-| `/notifications/` | Notifications | Templates and scheduled pushes |
-| `/admin/` | Admin | Analytics, evidence, leaderboard seasons |
-| `/websocket/` | WebSocket | Real-time family updates |
+| Prefix | Domain |
+| --- | --- |
+| `/auth` | Registration, login, refresh, logout, OAuth, and password flows |
+| `/users` | Profile, preferences, sessions, and devices |
+| `/sadaqah` | Acts, logs, daily acts, goals, streaks, and idempotent writes |
+| `/family` | Families, invitations, members, goals, prayers, reflections, and activity |
+| `/journey` | Adhkar, Quran progress, favorites, and journey reflections |
+| `/books` | Public books, chapters, reading progress, and bookmarks |
+| `/charities` | Public verified and published donation catalogue |
+| `/notifications` | In-app notifications, preferences, templates, and schedules |
+| `/admin/*` | Admin-only management and moderation |
+| `/websocket` | Real-time user and family events |
 
-## Contributing
+Public charity data is deliberately unauthenticated. Charity creation,
+publishing, editing, evidence, and deletion require administrator permissions.
 
-1. Lint: `ruff check .`
-2. Format: `ruff format .`
-3. Test: `pytest`
-4. Migrations: `alembic revision --autogenerate -m "description"` then `alembic upgrade head`
-5. Add new domain modules under `app/` following the existing pattern
+## Database migrations
 
-## Known Limitations
+Check whether model changes require a migration:
 
-- **No per-user book reading progress table** — the "Continue reading" feature in the frontend is UI-only; the backend seeds book/chapter data but does not persist per-user reading position (see `app/seed/seed.py` comment).
-- **Push notifications are no-op** when `FCM_SERVICE_ACCOUNT_PATH` is not set (the service returns `None` for Firebase messaging and skips delivery).
-- Celery task triggers require an external scheduler (system cron or container orchestrator).
-- Rate limiting depends on Redis being available in production.
+```bash
+alembic check
+```
+
+Create and apply a migration only when the schema changed:
+
+```bash
+alembic revision --autogenerate -m "describe the schema change"
+alembic upgrade head
+```
+
+Review autogenerated migrations manually. Do not use
+`Base.metadata.create_all()` as a production migration strategy.
+
+## Testing and quality
+
+Run the complete backend suite:
+
+```bash
+pytest -q
+```
+
+Run focused suites:
+
+```bash
+pytest -q app/tests/test_family.py
+pytest -q app/tests/test_notification_delivery.py
+```
+
+Compile application modules:
+
+```bash
+python -m compileall -q app
+```
+
+Lint and format:
+
+```bash
+ruff check .
+ruff format --check .
+```
+
+Tests use an isolated SQLite database under `.pytest_tmp`. Celery is eager in
+the test process so notification behavior is tested without a live Redis
+worker. Production remains broker-backed.
+
+## Docker deployment
+
+Typical deployment sequence:
+
+```bash
+docker compose build
+docker compose up -d db redis minio
+docker compose run --rm app alembic upgrade head
+docker compose up -d app worker beat
+```
+
+Before exposing the API:
+
+1. Set a strong unique `JWT_SECRET`.
+2. Set restrictive `CORS_ORIGINS`.
+3. Mount the Firebase service-account file securely.
+4. Run `/readiness` and confirm database, Redis, and push status.
+5. Confirm charity seed or admin-published donation records exist.
+6. Verify worker and beat logs.
+7. Put the API behind HTTPS and a reverse proxy.
+
+## Operational notes
+
+- `/health` confirms that the process is alive; it does not prove dependencies are ready.
+- `/readiness` is the deployment/load-balancer dependency probe.
+- Redis is required in production for rate limiting, deduplication, caching, and Celery.
+- Push requires valid FCM configuration and registered device tokens.
+- In-app notifications can still be persisted when push delivery is unavailable.
+- Charity records must be verified, active, and published to appear publicly.
+- File URLs may be signed MinIO/S3 URLs and should not be treated as permanent.
+- Soft-deleted records should not be restored with direct SQL edits.
+- Admin endpoints must never be exposed without authentication and role enforcement.
+
+## Adding a feature
+
+1. Add or update the domain model.
+2. Add repository database access.
+3. Add service validation and authorization.
+4. Add Pydantic schemas.
+5. Add a thin router endpoint.
+6. Add activity and notification events where appropriate.
+7. Add a migration only if the schema changed.
+8. Add tests for success, authorization, duplicate requests, failures, and retries.
+9. Run `alembic check`, `pytest`, `ruff check`, and relevant frontend tests.
 
 ## License
 
-No LICENSE file found in the project.
+No `LICENSE` file is currently included in this repository.

@@ -52,6 +52,7 @@ from app.family.models import (
     PrayerRequest,
     PrayerComment,
     FamilyReflection,
+    FamilyReflectionComment,
     FamilySettings,
 )
 from app.models.sadaqah_log import SadaqahLog
@@ -79,6 +80,8 @@ from app.family.schemas import (
     FamilyGoalMilestoneResponse,
     PrayerRequestResponse,
     ReflectionResponse,
+    ReflectionCommentCreate,
+    ReflectionCommentResponse,
     ActivityResponse,
     ActivityPage,
 )
@@ -1252,6 +1255,7 @@ def list_reflections(
     for r in reflections:
         author_name = _get_username(db, r.author_id)
         encouragement_counts = repo.get_encouragement_counts(db, r.id)
+        _, comment_total = repo.list_reflection_comments(db, r.id, limit=1)
         results.append(
             ReflectionResponse(
                 id=r.id,
@@ -1260,6 +1264,7 @@ def list_reflections(
                 author_name=author_name,
                 text=r.text,
                 encouragement_counts=encouragement_counts,
+                comment_counts={"total": comment_total},
                 created_at=r.created_at,
             )
         )
@@ -1353,6 +1358,11 @@ def encourage_reflection(
     user_id: int,
 ) -> dict[str, int]:
     """Add encouragement to a reflection."""
+    allowed = {"barakallahu_feek", "may_allah_accept"}
+    if payload.encouragement_type.value not in allowed:
+        raise BusinessRuleException(
+            "Only Barakallahu feek and May Allah accept it are supported"
+        )
     _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
 
     reflection = repo.get_reflection_by_id(db, reflection_id)
@@ -1368,6 +1378,70 @@ def encourage_reflection(
     db.commit()
 
     return repo.get_encouragement_counts(db, reflection_id)
+
+
+def list_reflection_comments(
+    db: Session,
+    family_id: int,
+    reflection_id: int,
+    user_id: int,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[ReflectionCommentResponse], int]:
+    _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
+    reflection = repo.get_reflection_by_id(db, reflection_id)
+    if not reflection or reflection.family_id != family_id:
+        raise ReflectionNotFoundException()
+    comments, total = repo.list_reflection_comments(
+        db, reflection_id, limit=limit, offset=offset
+    )
+    return [
+        ReflectionCommentResponse(
+            id=comment.id,
+            reflection_id=comment.reflection_id,
+            author_id=comment.author_id,
+            author_name=_get_username(db, comment.author_id),
+            text=comment.text,
+            created_at=comment.created_at,
+        )
+        for comment in comments
+    ], total
+
+
+def create_reflection_comment(
+    db: Session,
+    family_id: int,
+    reflection_id: int,
+    payload: ReflectionCommentCreate,
+    user_id: int,
+) -> FamilyReflectionComment:
+    _require_permission(db, family_id, user_id, Permission.CREATE_REFLECTION)
+    reflection = repo.get_reflection_by_id(db, reflection_id)
+    if not reflection or reflection.family_id != family_id:
+        raise ReflectionNotFoundException()
+    comment = repo.create_reflection_comment(
+        db, reflection_id=reflection_id, author_id=user_id, text=payload.text.strip()
+    )
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def delete_reflection_comment(
+    db: Session, family_id: int, reflection_id: int, comment_id: int, user_id: int
+) -> None:
+    _require_permission(db, family_id, user_id, Permission.CREATE_REFLECTION)
+    comment = db.get(FamilyReflectionComment, comment_id)
+    if (
+        not comment
+        or comment.reflection_id != reflection_id
+        or not repo.get_reflection_by_id(db, reflection_id)
+    ):
+        raise ReflectionNotFoundException("Reflection comment not found")
+    if comment.author_id != user_id:
+        raise FamilyPermissionDeniedException("Only the author can delete this comment")
+    repo.soft_delete_reflection_comment(db, comment)
+    db.commit()
 
 
 # ---------------------------------------------------------------------------

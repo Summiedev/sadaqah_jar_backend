@@ -273,6 +273,7 @@ class ReflectionResponse(BaseModel):
     author_name: str = ""
     text: str
     encouragement_counts: dict[str, int] = {}
+    comment_counts: dict[str, int] = {}
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -280,6 +281,21 @@ class ReflectionResponse(BaseModel):
 
 class ReflectionEncourage(BaseModel):
     encouragement_type: EncouragementType
+
+
+class ReflectionCommentCreate(BaseModel):
+    text: str = Field(..., min_length=1, max_length=5000)
+
+
+class ReflectionCommentResponse(BaseModel):
+    id: int
+    reflection_id: int
+    author_id: int
+    author_name: str = ""
+    text: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ---------------------------------------------------------------------------

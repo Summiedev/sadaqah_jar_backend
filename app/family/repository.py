@@ -20,6 +20,7 @@ from app.family.models import (
     PrayerComment,
     PrayerRequestResponse,
     FamilyReflection,
+    FamilyReflectionComment,
     ReflectionEncouragement,
     FamilyActivity,
     FamilySettings,
@@ -751,6 +752,52 @@ def soft_delete_reflection(db: Session, reflection: FamilyReflection) -> None:
     reflection.deleted_at = _utcnow()
 
     db.add(reflection)
+    db.flush()
+
+
+def list_reflection_comments(
+    db: Session, reflection_id: int, limit: int = 50, offset: int = 0
+) -> tuple[Sequence[FamilyReflectionComment], int]:
+    total = (
+        db.scalar(
+            select(func.count(FamilyReflectionComment.id)).where(
+                FamilyReflectionComment.reflection_id == reflection_id,
+                FamilyReflectionComment.deleted_at.is_(None),
+            )
+        )
+        or 0
+    )
+    rows = db.scalars(
+        select(FamilyReflectionComment)
+        .where(
+            FamilyReflectionComment.reflection_id == reflection_id,
+            FamilyReflectionComment.deleted_at.is_(None),
+        )
+        .order_by(FamilyReflectionComment.created_at.asc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return rows, total
+
+
+def create_reflection_comment(
+    db: Session, *, reflection_id: int, author_id: int, text: str
+) -> FamilyReflectionComment:
+    comment = FamilyReflectionComment(
+        reflection_id=reflection_id,
+        author_id=author_id,
+        text=text,
+    )
+    db.add(comment)
+    db.flush()
+    return comment
+
+
+def soft_delete_reflection_comment(
+    db: Session, comment: FamilyReflectionComment
+) -> None:
+    comment.deleted_at = _utcnow()
+    db.add(comment)
     db.flush()
 
 

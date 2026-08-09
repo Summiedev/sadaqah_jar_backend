@@ -57,9 +57,11 @@ class PrayerResponseType(str, PyEnum):
 
 
 class EncouragementType(str, PyEnum):
-    MAY_ALLAH_ACCEPT = "may_allah_accept"
-    AMEEN = "ameen"
     BARAKALLAHU_FEEK = "barakallahu_feek"
+    MAY_ALLAH_ACCEPT = "may_allah_accept"
+    # Legacy values remain readable so existing rows do not fail ORM
+    # deserialization. New writes are restricted in the service layer.
+    AMEEN = "ameen"
     MAY_ALLAH_INCREASE = "may_allah_increase"
 
 
@@ -391,8 +393,41 @@ class FamilyReflection(Base):
         back_populates="reflection",
         cascade="all, delete-orphan",
     )
+    comments = relationship(
+        "FamilyReflectionComment",
+        back_populates="reflection",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (Index("ix_family_reflections_list", "family_id", "created_at"),)
+
+
+class FamilyReflectionComment(Base):
+    """A written reply to a family reflection."""
+
+    __tablename__ = "family_reflection_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    reflection_id: Mapped[int] = mapped_column(
+        ForeignKey("family_reflections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    author_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
+
+    reflection = relationship("FamilyReflection", back_populates="comments")
 
 
 # ---------------------------------------------------------------------------
