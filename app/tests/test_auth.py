@@ -69,6 +69,14 @@ def test_security_headers_present():
     assert response.headers["X-Frame-Options"] == "DENY"
 
 
+def test_readiness_reports_dependency_status():
+    response = client.get("/readiness")
+    assert response.status_code in {200, 503}
+    body = response.json()
+    assert body["status"] in {"ready", "not_ready"}
+    assert {"database", "redis", "push"}.issubset(body["checks"])
+
+
 def test_register_username_taken_returns_409(db):
     _clean("collision1@example.com", "collision-user")
     _clean("collision2@example.com", "collision-user")

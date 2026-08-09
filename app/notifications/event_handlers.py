@@ -17,6 +17,7 @@ goes through the same retry-safe path as scheduled reminders.
 """
 
 import logging
+from uuid import uuid4
 
 from app.notifications.dedup import claim_event, release_event
 
@@ -69,13 +70,44 @@ def _enqueue(
     except Exception:
         # If enqueue fails (broker down), release the dedup claim so a later
         # retry of the same event is allowed through before the TTL expires.
+        # Notification delivery is deliberately best-effort at request time:
+        # a Redis/Celery outage must not roll back the user's family, goal, or
+        # prayer action. The exception is logged for monitoring and the caller
+        # can continue with the already-committed domain operation.
         logger.exception(
             "Failed to enqueue event notification %s for user %s",
             idempotency_key,
             user_id,
         )
         release_event(idempotency_key)
-        raise
+
+        # Preserve the in-app notification even when the broker is down. The
+        # idempotency key makes this safe if a broker publish actually reached
+        # a worker before the publisher received an error response. Push
+        # delivery remains the worker's responsibility and will be reported
+        # by readiness/monitoring until the worker is healthy again.
+        try:
+            from app.db.session import SessionLocal
+            from app.services.notification_service import create_notification
+
+            with SessionLocal() as fallback_db:
+                create_notification(
+                    fallback_db,
+                    user_id,
+                    title=title,
+                    message=message,
+                    category=category,
+                    action=action,
+                    idempotency_key=idempotency_key,
+                )
+                fallback_db.commit()
+        except Exception:
+            logger.exception(
+                "Failed to persist fallback notification %s for user %s",
+                idempotency_key,
+                user_id,
+            )
+        return False
     return True
 
 
@@ -147,7 +179,11 @@ def on_goal_milestone(user_id: int, goal_id: int, milestone: int) -> None:
 
 
 def on_family_activity(
-    user_id: int, family_id: int, actor_name: str, activity_type: str
+    user_id: int,
+    family_id: int,
+    actor_name: str,
+    activity_type: str,
+    event_key: str | None = None,
 ) -> None:
     """Notify a family member of new activity in their family."""
     messages = {
@@ -164,8 +200,37 @@ def on_family_activity(
         message=message,
         category="family",
         notification_type="family_activity",
-        idempotency_key=f"family_activity:{user_id}:{family_id}:{activity_type}",
+        # Do not use only family/type here: that permanently suppresses every
+        # later prayer/act/reflection of the same kind for this user.
+        idempotency_key=(
+            f"family_activity:{user_id}:{family_id}:{activity_type}:"
+            f"{event_key or uuid4().hex}"
+        ),
         action=f"family:{family_id}",
+    )
+
+
+def on_prayer_reply(
+    user_id: int,
+    family_id: int,
+    actor_name: str,
+    prayer_id: int,
+    kind: str = "response",
+) -> None:
+    """Notify the prayer author when someone responds or writes a dua."""
+    is_comment = kind == "comment"
+    _enqueue(
+        user_id=user_id,
+        title="Someone held your prayer close",
+        message=(
+            f"{actor_name} wrote a personal dua for your prayer."
+            if is_comment
+            else f"{actor_name} responded to your prayer request."
+        ),
+        category="family",
+        notification_type="prayer_reply",
+        idempotency_key=f"prayer_reply:{user_id}:{prayer_id}:{kind}:{actor_name}",
+        action=f"family:{family_id}:prayer:{prayer_id}",
     )
 
 

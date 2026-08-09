@@ -22,5 +22,11 @@ os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 
 from app.db.base import Base  # noqa: E402
 from app.db.session import engine  # noqa: E402
+from app.core.celery_app import celery_app  # noqa: E402
 
 Base.metadata.create_all(bind=engine)
+
+# Tests must exercise notification task execution without requiring a live
+# Redis worker. Production remains broker-backed; eager mode is isolated to
+# this test process and prevents event handlers from hanging on a dead broker.
+celery_app.conf.update(task_always_eager=True, task_eager_propagates=True)

@@ -28,6 +28,15 @@ celery_app.conf.task_default_max_retries = 3
 celery_app.conf.task_time_limit = 300
 celery_app.conf.task_soft_time_limit = 240
 
+# The API process must never wait indefinitely for Redis while publishing an
+# event notification. A worker outage should degrade notification delivery,
+# not turn an otherwise successful family/goal/prayer request into a 500 or a
+# hung request.
+celery_app.conf.broker_connection_timeout = 2
+celery_app.conf.broker_connection_retry = False
+celery_app.conf.broker_connection_retry_on_startup = False
+celery_app.conf.task_publish_retry = False
+
 # Periodic tasks dispatched by Celery beat.
 celery_app.conf.beat_schedule = {
     "aggregate-weekly-stats": {

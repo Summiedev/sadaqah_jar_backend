@@ -218,6 +218,8 @@ def _log_and_return(
         actor_id=actor_id,
         extra=extra,
     )
+
+    db.commit()
     return FamilyEvent(
         event_type=event_type,
         family_id=family_id,
@@ -241,7 +243,11 @@ def _get_username(db: Session, user_id: int) -> str:
 
 
 def _notify_family_members(
-    db: Session, family_id: int, actor_id: int, activity_type: str
+    db: Session,
+    family_id: int,
+    actor_id: int,
+    activity_type: str,
+    event_key: str | None = None,
 ) -> None:
     """Notify all family members (except the actor) of new activity.
 
@@ -259,6 +265,7 @@ def _notify_family_members(
             family_id=family_id,
             actor_name=actor_name,
             activity_type=activity_type,
+            event_key=event_key,
         )
 
 
@@ -1008,6 +1015,7 @@ def list_prayer_requests(
                 is_answered=p.is_answered,
                 is_private=p.is_private,
                 response_counts=response_counts,
+                comment_counts={"total": repo.get_prayer_comment_count(db, p.id)},
                 created_at=p.created_at,
             )
         )
@@ -1039,7 +1047,9 @@ def create_prayer_request(
     )
 
     # Notify other family members of the new prayer request
-    _notify_family_members(db, family_id, user_id, "prayer_request")
+    _notify_family_members(
+        db, family_id, user_id, "prayer_request", event_key=f"prayer:{prayer.id}"
+    )
 
     return prayer
 
@@ -1061,6 +1071,16 @@ def respond_to_prayer(
         response_type=payload.response_type.value,
     )
     db.commit()
+
+    if prayer.author_id != user_id:
+        from app.notifications.event_handlers import on_prayer_reply
+
+        on_prayer_reply(
+            user_id=prayer.author_id,
+            family_id=family_id,
+            actor_name=_get_username(db, user_id),
+            prayer_id=prayer_id,
+        )
 
     return repo.get_prayer_response_counts(db, prayer_id)
 
@@ -1123,6 +1143,17 @@ def create_prayer_comment(
     )
     db.commit()
     db.refresh(comment)
+
+    if prayer.author_id != user_id:
+        from app.notifications.event_handlers import on_prayer_reply
+
+        on_prayer_reply(
+            user_id=prayer.author_id,
+            family_id=family_id,
+            actor_name=_get_username(db, user_id),
+            prayer_id=prayer_id,
+            kind="comment",
+        )
 
     return comment
 

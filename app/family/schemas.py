@@ -48,6 +48,8 @@ class EventType(str, PyEnum):
     GOAL_COMPLETED = "goal.completed"
     PRAYER_REQUEST_CREATED = "prayer_request.created"
     PRAYER_REQUEST_ANSWERED = "prayer_request.answered"
+    PRAYER_RESPONDED = "prayer.responded"
+    PRAYER_COMMENTED = "prayer.commented"
     REFLECTION_SHARED = "reflection.shared"
     INVITATION_ACCEPTED = "invitation.accepted"
     INVITATION_DECLINED = "invitation.declined"

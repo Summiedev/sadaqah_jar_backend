@@ -100,6 +100,12 @@ def update_reflection(
     return reflection
 
 
+def soft_delete_reflection(db: Session, reflection: JourneyReflection) -> None:
+    reflection.deleted_at = _utcnow()
+    reflection.updated_at = _utcnow()
+    db.flush()
+
+
 # ---------------------------------------------------------------------------
 # Adhkar Progress
 # ---------------------------------------------------------------------------

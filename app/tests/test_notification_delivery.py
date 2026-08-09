@@ -177,7 +177,7 @@ class TestEnqueue:
         assert result is True
         fake_task.delay.assert_called_once()
 
-    def test_enqueue_releases_claim_on_broker_failure(self):
+    def test_enqueue_releases_claim_on_broker_failure_without_failing_action(self):
         with patch.object(event_handlers, "claim_event", return_value=True):
             with patch.object(event_handlers, "release_event") as release:
                 fake_task = MagicMock()
@@ -186,15 +186,15 @@ class TestEnqueue:
                     "app.tasks.notification_tasks.deliver_event_notification",
                     fake_task,
                 ):
-                    with pytest.raises(RuntimeError):
-                        event_handlers._enqueue(
-                            user_id=1,
-                            title="t",
-                            message="m",
-                            category="journey",
-                            notification_type="goal_progress",
-                            idempotency_key="broker-fail-key",
-                        )
+                    result = event_handlers._enqueue(
+                        user_id=1,
+                        title="t",
+                        message="m",
+                        category="journey",
+                        notification_type="goal_progress",
+                        idempotency_key="broker-fail-key",
+                    )
+                assert result is False
                 release.assert_called_once_with("broker-fail-key")
 
 

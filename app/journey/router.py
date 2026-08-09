@@ -71,6 +71,12 @@ def update_reflection(
     return Envelope(data=reflection, message="Reflection updated")
 
 
+@router.delete("/reflections/{reflection_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_reflection(reflection_id: int, db: DbDep, current_user: CurrentUser):
+    """Soft-delete a reflection owned by the authenticated user."""
+    service.delete_reflection(db, reflection_id, current_user.id)
+
+
 # ---------------------------------------------------------------------------
 # Adhkar Progress
 # ---------------------------------------------------------------------------

@@ -137,6 +137,14 @@ def update_reflection(
     )
 
 
+def delete_reflection(db: Session, reflection_id: int, user_id: int) -> None:
+    reflection = repo.get_reflection_by_id(db, reflection_id, user_id)
+    if not reflection:
+        raise ReflectionNotFoundException("Reflection not found")
+    repo.soft_delete_reflection(db, reflection)
+    db.commit()
+
+
 # ---------------------------------------------------------------------------
 # Adhkar Progress
 # ---------------------------------------------------------------------------

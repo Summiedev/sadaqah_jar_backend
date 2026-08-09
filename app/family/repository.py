@@ -571,6 +571,18 @@ def get_prayer_response_counts(db: Session, prayer_request_id: int) -> dict[str,
     return {row[0].value: row[1] for row in rows}
 
 
+def get_prayer_comment_count(db: Session, prayer_request_id: int) -> int:
+    return int(
+        db.scalar(
+            select(func.count(PrayerComment.id)).where(
+                PrayerComment.prayer_request_id == prayer_request_id,
+                PrayerComment.deleted_at.is_(None),
+            )
+        )
+        or 0
+    )
+
+
 def add_prayer_response(
     db: Session,
     *,

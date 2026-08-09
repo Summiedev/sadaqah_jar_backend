@@ -51,7 +51,15 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.push_notification_service import validate_push_configuration
 
-        validate_push_configuration()
+        push_status = validate_push_configuration()
+        if (
+            settings.ENV.lower() in {"production", "prod"}
+            and not push_status["enabled"]
+        ):
+            raise RuntimeError(
+                "Push delivery is not configured for production. Set "
+                "FCM_SERVICE_ACCOUNT_PATH to a valid Firebase service account."
+            )
     except Exception:
         logger.exception("Push configuration validation raised unexpectedly")
 
@@ -105,3 +113,51 @@ app.include_router(api_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/readiness")
+def readiness():
+    """Report dependency readiness for deploy/load-balancer probes.
+
+    ``/health`` remains a cheap liveness probe. This endpoint verifies the
+    dependencies that are required to serve authenticated application traffic
+    and makes notification configuration visible to operators without leaking
+    credential paths or secrets.
+    """
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import text
+
+    checks: dict[str, object] = {}
+    try:
+        from app.db.session import SessionLocal
+
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception:
+        logger.exception("Readiness database check failed")
+        checks["database"] = "unavailable"
+
+    try:
+        from app.core.cache import redis_client
+
+        redis_client.ping()
+        checks["redis"] = "ok"
+    except Exception:
+        logger.exception("Readiness Redis check failed")
+        checks["redis"] = "unavailable"
+
+    try:
+        from app.services.push_notification_service import validate_push_configuration
+
+        push = validate_push_configuration()
+        checks["push"] = "ok" if push["enabled"] else push["reason"]
+    except Exception:
+        logger.exception("Readiness push check failed")
+        checks["push"] = "unavailable"
+
+    ready = checks["database"] == "ok" and checks["redis"] == "ok"
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"status": "ready" if ready else "not_ready", "checks": checks},
+    )
