@@ -1639,6 +1639,7 @@ def add_family_act(
     family_id: int,
     user_id: int,
     act_type: str = "sadaqah",
+    note: str | None = None,
     request_id: str | None = None,
 ) -> dict[str, Any]:
     """Add an act to the family jar. Increments the active goal's acts_done
@@ -1691,7 +1692,11 @@ def add_family_act(
         family_id=family_id,
         event_type=EventType.ACT_ADDED,
         actor_id=user_id,
-        extra={"act_type": act_type, "goal_id": active_goal.id},
+        extra={
+            "act_type": act_type,
+            "goal_id": active_goal.id,
+            **({"note": note} if note else {}),
+        },
         request_id=request_id,
     )
     db.commit()

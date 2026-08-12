@@ -26,18 +26,45 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.Column("deleted_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(["reflection_id"], ["family_reflections.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["reflection_id"], ["family_reflections.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["author_id"], ["users.id"], ondelete="CASCADE"),
     )
-    op.create_index("ix_family_reflection_comments_id", "family_reflection_comments", ["id"])
-    op.create_index("ix_family_reflection_comments_reflection_id", "family_reflection_comments", ["reflection_id"])
-    op.create_index("ix_family_reflection_comments_author_id", "family_reflection_comments", ["author_id"])
-    op.create_index("ix_family_reflection_comments_deleted_at", "family_reflection_comments", ["deleted_at"])
+    op.create_index(
+        "ix_family_reflection_comments_id", "family_reflection_comments", ["id"]
+    )
+    op.create_index(
+        "ix_family_reflection_comments_reflection_id",
+        "family_reflection_comments",
+        ["reflection_id"],
+    )
+    op.create_index(
+        "ix_family_reflection_comments_author_id",
+        "family_reflection_comments",
+        ["author_id"],
+    )
+    op.create_index(
+        "ix_family_reflection_comments_deleted_at",
+        "family_reflection_comments",
+        ["deleted_at"],
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_family_reflection_comments_deleted_at", table_name="family_reflection_comments")
-    op.drop_index("ix_family_reflection_comments_author_id", table_name="family_reflection_comments")
-    op.drop_index("ix_family_reflection_comments_reflection_id", table_name="family_reflection_comments")
-    op.drop_index("ix_family_reflection_comments_id", table_name="family_reflection_comments")
+    op.drop_index(
+        "ix_family_reflection_comments_deleted_at",
+        table_name="family_reflection_comments",
+    )
+    op.drop_index(
+        "ix_family_reflection_comments_author_id",
+        table_name="family_reflection_comments",
+    )
+    op.drop_index(
+        "ix_family_reflection_comments_reflection_id",
+        table_name="family_reflection_comments",
+    )
+    op.drop_index(
+        "ix_family_reflection_comments_id", table_name="family_reflection_comments"
+    )
     op.drop_table("family_reflection_comments")

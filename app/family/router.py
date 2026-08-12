@@ -18,6 +18,7 @@ from app.family.models import InvitationStatus
 from app.family.schemas import (
     FamilyCreate,
     FamilyUpdate,
+    FamilyActCreate,
     GoalCreate,
     GoalUpdate,
     PrayerRequestCreate,
@@ -799,7 +800,9 @@ def encourage_reflection(
     return Envelope(data={"encouragement_counts": counts})
 
 
-@router.get("/{family_id}/reflections/{reflection_id}/comments", response_model=Envelope)
+@router.get(
+    "/{family_id}/reflections/{reflection_id}/comments", response_model=Envelope
+)
 def list_reflection_comments(
     family_id: int,
     reflection_id: int,
@@ -924,10 +927,21 @@ def add_family_act(
     family_id: int,
     db: DbDep,
     current_user: CurrentUser,
+    payload: FamilyActCreate | None = None,
     request_id: str | None = None,
 ):
     """Add an act to the family jar. Increments the active goal's acts_done."""
+    act_type = payload.act_type if payload else "sadaqah"
+    note = payload.note if payload else None
+    final_request_id = (
+        payload.request_id if payload and payload.request_id else request_id
+    )
     result = service.add_family_act(
-        db, family_id, current_user.id, request_id=request_id
+        db,
+        family_id,
+        current_user.id,
+        act_type=act_type,
+        note=note,
+        request_id=final_request_id,
     )
     return Envelope(data=result, message="Act added to family jar")

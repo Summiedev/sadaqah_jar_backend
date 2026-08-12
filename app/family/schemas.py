@@ -213,6 +213,12 @@ class GoalUpdate(BaseModel):
     acts_done: int | None = Field(None, ge=0)
 
 
+class FamilyActCreate(BaseModel):
+    act_type: str = Field("sadaqah", min_length=1, max_length=120)
+    note: str | None = Field(None, max_length=1000)
+    request_id: str | None = Field(None, max_length=120)
+
+
 # ---------------------------------------------------------------------------
 # Prayer Requests
 # ---------------------------------------------------------------------------

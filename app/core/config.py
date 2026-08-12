@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     # out of source control; leaving it blank makes push delivery a no-op.
     FCM_SERVICE_ACCOUNT_PATH: str = ""
 
+    # Quran Foundation Content API. These are intentionally optional so local
+    # development can run before the dataset import is configured.
+    QF_CLIENT_ID: str = ""
+    QF_CLIENT_SECRET: str = ""
+    QF_ENV: str = "production"
+
     @field_validator("JWT_SECRET")
     @classmethod
     def validate_jwt_secret(cls, value: str) -> str:

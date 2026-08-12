@@ -17,6 +17,7 @@ import app.books.models  # noqa: E402,F401
 import app.models.jar  # noqa: E402,F401
 import app.models.leaderboard_season  # noqa: E402,F401
 import app.notifications.models  # noqa: E402,F401
+import app.quran.models  # noqa: E402,F401
 import app.models.sadaqah_act  # noqa: E402,F401
 import app.models.sadaqah_log  # noqa: E402,F401
 import app.models.user_badge  # noqa: E402,F401

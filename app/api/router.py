@@ -27,6 +27,7 @@ from app.books.bookmark_router import router as book_bookmarks_router
 from app.goals.router import router as goals_router
 from app.api.leaderboard import router as leaderboard_router
 from app.notifications.router import router as notifications_router
+from app.quran.router import router as quran_router
 from app.api.sadaqah import router as sadaqah_router
 from app.sadaqah.router import router as activities_router
 from app.api.streak import router as streak_router
@@ -56,6 +57,7 @@ for router in (
     book_bookmarks_router,
     leaderboard_router,
     notifications_router,
+    quran_router,
     sadaqah_router,
     activities_router,
     streak_router,
