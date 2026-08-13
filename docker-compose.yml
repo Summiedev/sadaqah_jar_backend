@@ -3,6 +3,8 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    environment:
+      FCM_SERVICE_ACCOUNT_PATH: ${FCM_SERVICE_ACCOUNT_PATH:-/opt/secure/mizan-97a67-firebase-adminsdk-fbsvc-219c32ed91.json}
     volumes:
       - ${FCM_SERVICE_ACCOUNT_HOST_PATH:-/opt/secure/mizan-97a67-firebase-adminsdk-fbsvc-219c32ed91.json}:/opt/secure/mizan-97a67-firebase-adminsdk-fbsvc-219c32ed91.json:ro
     depends_on:
@@ -24,6 +26,8 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    environment:
+      FCM_SERVICE_ACCOUNT_PATH: ${FCM_SERVICE_ACCOUNT_PATH:-/opt/secure/mizan-97a67-firebase-adminsdk-fbsvc-219c32ed91.json}
     volumes:
       - ${FCM_SERVICE_ACCOUNT_HOST_PATH:-/opt/secure/mizan-97a67-firebase-adminsdk-fbsvc-219c32ed91.json}:/opt/secure/mizan-97a67-firebase-adminsdk-fbsvc-219c32ed91.json:ro
     command: celery -A app.core.celery_app.celery_app worker --loglevel=INFO --queues=default,notifications,reminders,analytics

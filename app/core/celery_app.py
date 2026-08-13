@@ -39,6 +39,13 @@ celery_app.conf.task_publish_retry = False
 
 # Periodic tasks dispatched by Celery beat.
 celery_app.conf.beat_schedule = {
+    # Rebuild each user's prayer-relative schedule every day. Individual
+    # deliveries are then sent by the reminders queue at their local times.
+    "schedule-daily-prayer-reminders": {
+        "task": "app.tasks.scheduled_tasks.schedule_daily_prayer_reminders",
+        "schedule": crontab(hour=0, minute=5),
+        "options": {"queue": "reminders"},
+    },
     "aggregate-weekly-stats": {
         "task": "app.tasks.scheduled_tasks.aggregate_weekly_stats",
         "schedule": crontab(hour=0, minute=0, day_of_week=0),
