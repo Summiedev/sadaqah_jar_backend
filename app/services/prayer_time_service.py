@@ -2,11 +2,14 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+import logging
 from zoneinfo import ZoneInfo
 
 import httpx
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class PrayerTimeLookupError(RuntimeError):
@@ -54,23 +57,45 @@ def get_prayer_times(
     except Exception as exc:
         raise PrayerTimeLookupError(f"Invalid IANA timezone: {timezone_name}") from exc
 
-    try:
-        response = httpx.get(
-            "https://api.aladhan.com/v1/timings",
-            params={
-                "latitude": latitude,
-                "longitude": longitude,
-                "date": local_date.strftime("%d-%m-%Y"),
-                "method": settings.PRAYER_CALCULATION_METHOD,
-            },
-            timeout=settings.PRAYER_API_TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        timings = response.json()["data"]["timings"]
-    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "date": local_date.strftime("%d-%m-%Y"),
+        "method": settings.PRAYER_CALCULATION_METHOD,
+    }
+    timings = None
+    last_error: Exception | None = None
+    # The path and query variants are both supported by Aladhan. Trying the
+    # path form prevents transient proxy/cache failures from cancelling a
+    # user's entire aware reminder schedule.
+    endpoints = (
+        f"https://api.aladhan.com/v1/timings/{params['date']}",
+        "https://api.aladhan.com/v1/timings",
+    )
+    for endpoint in endpoints:
+        try:
+            response = httpx.get(
+                endpoint,
+                params=params,
+                headers={"User-Agent": "Mizan/1.0 prayer-reminders"},
+                timeout=settings.PRAYER_API_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            timings = payload["data"]["timings"]
+            break
+        except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+            last_error = exc
+            logger.warning(
+                "Prayer provider request failed for %s (%s): %s",
+                endpoint,
+                response.status_code if "response" in locals() else "network",
+                exc,
+            )
+    if not isinstance(timings, dict):
         raise PrayerTimeLookupError(
             "Unable to retrieve prayer times from Aladhan"
-        ) from exc
+        ) from last_error
 
     fajr = _parse_clock(timings["Fajr"], local_date, timezone_name)
     sunrise = _parse_clock(timings["Sunrise"], local_date, timezone_name)
