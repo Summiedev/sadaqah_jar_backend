@@ -1180,6 +1180,16 @@ class DatabaseSeeder:
                 },
             ),
             (
+                "random_sadaqah_prompt",
+                "A small sadaqah",
+                "{title}. {message}",
+                "charity",
+                {
+                    "content_source": "good_deeds",
+                    "deep_link": "/home?open=sadaqah",
+                },
+            ),
+            (
                 "quote_reminder",
                 "{title}",
                 "{message}",

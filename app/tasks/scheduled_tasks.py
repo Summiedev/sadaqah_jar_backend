@@ -1,4 +1,6 @@
-from datetime import datetime, timezone
+import hashlib
+import json
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from app.core.cache import cache_daily_acts
@@ -6,7 +8,7 @@ from app.core.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
-from app.notifications.models import NotificationTemplate, ScheduledNotification
+from app.notifications.models import NotificationTemplate, ScheduledNotification, SchedulingStrategy
 from app.services.analytics_service import compute_weekly_stats
 from app.services.notification_service import create_notification
 from app.services.personalization_service import generate_personalized_acts
@@ -60,6 +62,7 @@ def schedule_daily_prayer_reminders():
     """
     db = SessionLocal()
     try:
+        _apply_rhythm_deep_links(db)
         users = (
             db.query(User)
             .filter(
@@ -81,6 +84,15 @@ def schedule_daily_prayer_reminders():
                 schedules = schedule_prayer_relative_templates(
                     db, user_id=user.id, local_date=local_date, prayer_times=times
                 )
+                random_sadaqah = _schedule_random_sadaqah(
+                    db,
+                    user_id=user.id,
+                    local_date=local_date,
+                    prayer_times=times,
+                )
+                if random_sadaqah is not None:
+                    db.add(random_sadaqah)
+                    schedules.append(random_sadaqah)
                 # Filter schedules by category preference and frequency
                 frequency = get_frequency(db, user.id)
                 filtered = []
@@ -115,6 +127,106 @@ def schedule_daily_prayer_reminders():
                 db.rollback()
     finally:
         db.close()
+
+
+def _schedule_random_sadaqah(*, db, user_id: int, local_date, prayer_times):
+    """Add at most one gentle sadaqah prompt in a safe daytime window.
+
+    The date and user ID produce a stable daily position, so retries never
+    move an already-scheduled reminder or create a second one. Some days are
+    intentionally skipped to keep the prompt occasional rather than noisy.
+    """
+    if not is_category_enabled(db, user_id, "charity"):
+        return None
+    frequency = get_frequency(db, user_id)
+    digest = hashlib.sha256(f"{user_id}:{local_date}".encode()).hexdigest()
+    if int(digest[:2], 16) % (3 if frequency == "high" else 4) == 0:
+        return None
+
+    template = (
+        db.query(NotificationTemplate)
+        .filter(NotificationTemplate.key == "random_sadaqah_prompt")
+        .first()
+    )
+    if template is None:
+        template = NotificationTemplate(
+            key="random_sadaqah_prompt",
+            title_template="A small sadaqah",
+            message_template="{title}. {message}",
+            category="charity",
+            strategy=SchedulingStrategy.RANDOMIZED.value,
+            strategy_config=json.dumps(
+                {
+                    "content_source": "good_deeds",
+                    "deep_link": "/home?open=sadaqah",
+                }
+            ),
+            enabled=True,
+        )
+        db.add(template)
+        db.flush()
+
+    existing = (
+        db.query(ScheduledNotification)
+        .filter_by(
+            user_id=user_id,
+            template_id=template.id,
+            local_date=local_date.isoformat(),
+        )
+        .first()
+    )
+    if existing is not None:
+        return None
+
+    start = prayer_times.duha_start + timedelta(minutes=45)
+    end = prayer_times.asr - timedelta(minutes=45)
+    if end <= start:
+        return None
+    window_minutes = int((end - start).total_seconds() // 60)
+    offset = int(digest[2:10], 16) % max(window_minutes, 1)
+    return ScheduledNotification(
+        user_id=user_id,
+        template_id=template.id,
+        local_date=local_date.isoformat(),
+        scheduled_for=(start + timedelta(minutes=offset))
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None),
+    )
+
+
+def _apply_rhythm_deep_links(db) -> None:
+    """Keep existing seeded templates aligned after a deployment."""
+    links = {
+        "morning_adhkar": "/journey/adhkar/morning",
+        "morning_adhkar_expanded": "/journey/adhkar/morning",
+        "evening_adhkar": "/journey/adhkar/evening",
+        "evening_adhkar_expanded": "/journey/adhkar/evening",
+        "quran_reminder": "/journey?tab=quran",
+        "quran_verse": "/journey?tab=quran",
+        "friday_kahf_reminder": "/journey?tab=quran&surah=18",
+        "friday_reminder": "/journey",
+        "friday_expanded": "/journey",
+        "tahajjud_reminder": "/home",
+        "random_sadaqah_prompt": "/home?open=sadaqah",
+    }
+    changed = False
+    templates = (
+        db.query(NotificationTemplate)
+        .filter(NotificationTemplate.key.in_(links))
+        .all()
+    )
+    for template in templates:
+        try:
+            config = json.loads(template.strategy_config or "{}")
+        except (TypeError, json.JSONDecodeError):
+            config = {}
+        if config.get("deep_link") == links[template.key]:
+            continue
+        config["deep_link"] = links[template.key]
+        template.strategy_config = json.dumps(config)
+        changed = True
+    if changed:
+        db.flush()
 
 
 def _map_category_to_notification_type(category: str) -> str:
@@ -167,6 +279,12 @@ def deliver_scheduled_notification(self, schedule_id: int):
             idempotency_key=idempotency_key,
         )
         notification_type = _map_category_to_notification_type(template.category)
+        template_config = {}
+        try:
+            template_config = json.loads(template.strategy_config or "{}")
+        except (TypeError, json.JSONDecodeError):
+            template_config = {}
+        deep_link = template_config.get("deep_link")
         send_push_notification(
             db,
             user_id=schedule.user_id,
@@ -176,7 +294,7 @@ def deliver_scheduled_notification(self, schedule_id: int):
             data={
                 "category": template.category,
                 "template_key": template.key,
-                "deep_link": f"/notifications/{notification.id}",
+                "deep_link": deep_link or f"/notifications/{notification.id}",
             },
         )
         schedule.status = "delivered"
