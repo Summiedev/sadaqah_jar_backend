@@ -14,6 +14,7 @@ import app.family.models  # noqa: E402,F401
 import app.goals.models  # noqa: E402,F401
 import app.journey.models  # noqa: E402,F401
 import app.books.models  # noqa: E402,F401
+import app.books.bookmark_model  # noqa: E402,F401
 import app.models.jar  # noqa: E402,F401
 import app.models.leaderboard_season  # noqa: E402,F401
 import app.notifications.models  # noqa: E402,F401
