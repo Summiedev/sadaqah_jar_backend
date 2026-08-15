@@ -83,6 +83,10 @@ def send_push_notification(
     """Send to every active device token registered for one user."""
     messaging = _firebase_messaging()
     if messaging is None:
+        logger.error(
+            "Push delivery skipped for user %s: Firebase is not configured or could not initialize",
+            user_id,
+        )
         return 0
     # Include both `notification_type` (backwards-compat) and `type` (client expectation)
     merged_data = {"notification_type": notification_type, "type": notification_type}
@@ -93,6 +97,12 @@ def send_push_notification(
         .filter(UserDevice.user_id == user_id, UserDevice.push_token.is_not(None))
         .all()
     )
+    if not devices:
+        logger.warning(
+            "Push delivery skipped for user %s: no registered device token",
+            user_id,
+        )
+        return 0
     delivered = 0
     for device in devices:
         try:

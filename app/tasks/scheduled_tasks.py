@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -19,6 +20,8 @@ from app.services.prayer_time_service import PrayerTimeLookupError, get_prayer_t
 from app.services.reminder_content_service import resolve_reminder_content
 from app.services.ramadan_service import is_ramadan
 from app.services.streak_service import validate_streak
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task
@@ -123,8 +126,19 @@ def schedule_daily_prayer_reminders():
                     schedule.celery_task_id = result.id
                 if filtered:
                     db.commit()
-            except (PrayerTimeLookupError, ValueError):
+            except (PrayerTimeLookupError, ValueError) as exc:
                 db.rollback()
+                logger.warning(
+                    "Could not schedule aware reminders for user %s: %s",
+                    user.id,
+                    exc,
+                )
+            except Exception:
+                db.rollback()
+                logger.exception(
+                    "Unexpected error while scheduling aware reminders for user %s",
+                    user.id,
+                )
     finally:
         db.close()
 
@@ -285,7 +299,7 @@ def deliver_scheduled_notification(self, schedule_id: int):
         except (TypeError, json.JSONDecodeError):
             template_config = {}
         deep_link = template_config.get("deep_link")
-        send_push_notification(
+        delivered = send_push_notification(
             db,
             user_id=schedule.user_id,
             title=title,
@@ -297,8 +311,18 @@ def deliver_scheduled_notification(self, schedule_id: int):
                 "deep_link": deep_link or f"/notifications/{notification.id}",
             },
         )
-        schedule.status = "delivered"
-        schedule.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        if delivered:
+            schedule.status = "delivered"
+            schedule.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        else:
+            # Keep the in-app notification, but make the failed push visible to
+            # operators instead of falsely reporting successful delivery.
+            schedule.status = "failed"
+            logger.warning(
+                "Reminder %s created in-app but reached no FCM device for user %s",
+                schedule.id,
+                schedule.user_id,
+            )
         db.commit()
     except Exception as exc:
         db.rollback()
