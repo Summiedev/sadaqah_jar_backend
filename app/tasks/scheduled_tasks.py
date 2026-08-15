@@ -70,8 +70,6 @@ def schedule_daily_prayer_reminders():
             db.query(User)
             .filter(
                 User.deleted_at.is_(None),
-                User.latitude.is_not(None),
-                User.longitude.is_not(None),
             )
             .yield_per(250)
         )
@@ -81,6 +79,16 @@ def schedule_daily_prayer_reminders():
                 continue
             try:
                 local_date = datetime.now(ZoneInfo(timezone_name)).date()
+                # A charity prompt is useful even when a prayer provider is
+                # temporarily unavailable or location has not been granted.
+                # Keep it on the user's local daytime schedule instead of
+                # silently dropping every reminder for that account.
+                if user.latitude is None or user.longitude is None:
+                    fallback = _schedule_fallback_sadaqah(
+                        db, user_id=user.id, local_date=local_date, timezone_name=timezone_name
+                    )
+                    _enqueue_filtered_schedules(db, [fallback] if fallback else [], user.id)
+                    continue
                 times = get_prayer_times(
                     user.latitude, user.longitude, local_date, timezone_name
                 )
@@ -128,6 +136,21 @@ def schedule_daily_prayer_reminders():
                     db.commit()
             except (PrayerTimeLookupError, ValueError) as exc:
                 db.rollback()
+                try:
+                    fallback = _schedule_fallback_sadaqah(
+                        db, user_id=user.id, local_date=local_date, timezone_name=timezone_name
+                    )
+                    if fallback is not None:
+                        db.add(fallback)
+                        db.commit()
+                        result = deliver_scheduled_notification.apply_async(
+                            args=[fallback.id],
+                            eta=fallback.scheduled_for.replace(tzinfo=timezone.utc),
+                        )
+                        fallback.celery_task_id = result.id
+                        db.commit()
+                except Exception:
+                    db.rollback()
                 logger.warning(
                     "Could not schedule aware reminders for user %s: %s",
                     user.id,
@@ -141,6 +164,21 @@ def schedule_daily_prayer_reminders():
                 )
     finally:
         db.close()
+
+
+def _enqueue_filtered_schedules(db, schedules, user_id: int) -> None:
+    """Persist and enqueue already-filtered fallback schedules."""
+    if not schedules:
+        return
+    db.add_all(schedules)
+    db.commit()
+    for schedule in schedules:
+        result = deliver_scheduled_notification.apply_async(
+            args=[schedule.id],
+            eta=schedule.scheduled_for.replace(tzinfo=timezone.utc),
+        )
+        schedule.celery_task_id = result.id
+    db.commit()
 
 
 def _schedule_random_sadaqah(*, db, user_id: int, local_date, prayer_times):
@@ -198,6 +236,57 @@ def _schedule_random_sadaqah(*, db, user_id: int, local_date, prayer_times):
         return None
     window_minutes = int((end - start).total_seconds() // 60)
     offset = int(digest[2:10], 16) % max(window_minutes, 1)
+    return ScheduledNotification(
+        user_id=user_id,
+        template_id=template.id,
+        local_date=local_date.isoformat(),
+        scheduled_for=(start + timedelta(minutes=offset))
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None),
+    )
+
+
+def _schedule_fallback_sadaqah(*, db, user_id: int, local_date, timezone_name: str):
+    """Schedule the same occasional prompt without prayer-time dependency."""
+    local_zone = ZoneInfo(timezone_name)
+    digest = hashlib.sha256(f"fallback:{user_id}:{local_date}".encode()).hexdigest()
+    # Keep the reminder in a quiet daytime window and vary it per user/day.
+    start = datetime.combine(local_date, datetime.min.time(), tzinfo=local_zone).replace(
+        hour=13, minute=0
+    )
+    offset = int(digest[:8], 16) % (3 * 60)
+    template = (
+        db.query(NotificationTemplate)
+        .filter(NotificationTemplate.key == "random_sadaqah_prompt")
+        .first()
+    )
+    if template is None:
+        template = NotificationTemplate(
+            key="random_sadaqah_prompt",
+            title_template="A small sadaqah",
+            message_template="{title}. {message}",
+            category="charity",
+            strategy=SchedulingStrategy.RANDOMIZED.value,
+            strategy_config=json.dumps(
+                {"content_source": "good_deeds", "deep_link": "/home?open=sadaqah"}
+            ),
+            enabled=True,
+        )
+        db.add(template)
+        db.flush()
+    if not is_category_enabled(db, user_id, "charity"):
+        return None
+    if (
+        db.query(ScheduledNotification)
+        .filter_by(
+            user_id=user_id,
+            template_id=template.id,
+            local_date=local_date.isoformat(),
+        )
+        .first()
+        is not None
+    ):
+        return None
     return ScheduledNotification(
         user_id=user_id,
         template_id=template.id,
