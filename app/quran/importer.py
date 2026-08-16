@@ -25,6 +25,7 @@ from app.quran.models import (
     QuranAudioSegment,
     QuranAyah,
     QuranPageAsset,
+    QuranSurah,
     QuranTranslation,
     QuranTransliteration,
 )
@@ -148,11 +149,38 @@ def import_dataset(*, dry_run: bool = False) -> None:
 
     db = SessionLocal()
     try:
+        # Parent rows must exist before page-by-page ayah inserts can satisfy
+        # quran_ayahs.surah_id's foreign key.
+        for chapter in chapters:
+            chapter_id = _page(chapter.get("id"), 0)
+            if not 1 <= chapter_id <= 114:
+                raise QuranImportError(f"Invalid chapter id: {chapter_id}")
+            db.merge(
+                QuranSurah(
+                    id=chapter_id,
+                    name_ar=str(chapter.get("name_arabic") or chapter.get("name_ar") or ""),
+                    name_en=str(
+                        (
+                            chapter.get("translated_name", {}).get("name")
+                            if isinstance(chapter.get("translated_name"), dict)
+                            else chapter.get("translated_name")
+                        )
+                        or chapter.get("name_en")
+                        or ""
+                    ),
+                    name_transliteration=str(chapter.get("name_simple") or chapter.get("name_transliteration") or ""),
+                    revelation_type=str(chapter.get("revelation_place") or chapter.get("revelation_type") or ""),
+                    ayah_count=_page(chapter.get("verses_count") or chapter.get("ayah_count"), 0),
+                    bismillah_pre=bool(chapter.get("bismillah_pre", True)),
+                )
+            )
+        db.commit()
         for page_number in range(1, 605):
             payload = client.get(
                 f"verses/by_page/{page_number}",
                 mushaf=MUSHAF_ID,
                 words="true",
+                fields="text_uthmani,text_uthmani_tajweed,text_imlaei_simple,page_number,juz_number,hizb_number,rub_el_hizb_number,manzil_number,ruku_number,sajda,sajda_type,image_url,image_width,image_height",
                 word_fields="text_uthmani,text_qpc_hafs,page_number,line_number",
                 translations=translation_id,
                 tafsirs=tafsir_id,
