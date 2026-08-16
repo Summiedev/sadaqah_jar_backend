@@ -110,6 +110,13 @@ def send_push_notification(
                 messaging.Message(
                     token=device.push_token,
                     notification=messaging.Notification(title=title, body=body),
+                    android=messaging.AndroidConfig(
+                        notification=messaging.AndroidNotification(
+                            channel_id="mizan_reminders_v2",
+                            icon="ic_stat_mizan",
+                            sound="default",
+                        )
+                    ),
                     data=merged_data,
                 )
             )
