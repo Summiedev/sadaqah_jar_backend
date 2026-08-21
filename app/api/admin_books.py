@@ -376,6 +376,29 @@ def delete_admin_book(
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
+    book = repo.get_book(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    # Remove object-storage files as part of the admin delete flow. The book
+    # row is soft-deleted for referential safety, but leaving its PDF/EPUB,
+    # cover, or page images behind would leak storage and orphan private data.
+    try:
+        bucket = _get_bucket()
+    except HTTPException:
+        bucket = None
+    if bucket:
+        urls = [book.file_url, book.cover_url]
+        urls.extend(page.image_url for page in repo.list_pages(db, book_id))
+        for raw_url in urls:
+            key = _key_from_url(raw_url, bucket)
+            if key:
+                try:
+                    delete_file(bucket=bucket, key=key)
+                except HTTPException:
+                    # The database delete remains authoritative if an old
+                    # object has already been removed from storage.
+                    pass
     service.delete_book(db, book_id)
     db.commit()
     return {"message": "Book deleted"}

@@ -13,6 +13,7 @@ from app.models.jar import Jar
 from app.models.sadaqah_act import SadaqahAct
 from app.models.sadaqah_log import SadaqahLog
 from app.models.user import User
+from app.goals.models import UserGoal
 
 
 client = TestClient(app)
@@ -122,6 +123,41 @@ def test_add_star_request_id_is_idempotent(db):
         assert active_jar is not None
         assert active_jar.current_stars == first.json()["current_stars"]
     finally:
+        db.query(SadaqahAct).filter(SadaqahAct.id == act.id).delete(
+            synchronize_session=False
+        )
+        _cleanup_user_state(db, user.id)
+
+
+def test_add_star_restores_personal_goal_progress_after_relogin(db):
+    user = _create_user(db, "goal-persistence")
+    act = _create_act(db, "Persistent goal act")
+    goal = UserGoal(
+        user_id=user.id,
+        title="Keep going",
+        acts_target=10,
+        acts_done=0,
+        month=None,
+    )
+    db.add(goal)
+    db.commit()
+
+    try:
+        response = client.post(
+            "/api/v1/sadaqah/jar/add-star",
+            params={"act_id": act.id, "request_id": uuid.uuid4().hex},
+            headers=_auth_header(user.id),
+        )
+
+        assert response.status_code == 200
+        db.refresh(goal)
+        assert response.json()["current_stars"] == 1
+        assert goal.acts_done == 1
+    finally:
+        db.query(UserGoal).filter(UserGoal.user_id == user.id).delete(
+            synchronize_session=False
+        )
+        db.commit()
         db.query(SadaqahAct).filter(SadaqahAct.id == act.id).delete(
             synchronize_session=False
         )

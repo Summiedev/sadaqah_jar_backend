@@ -122,11 +122,23 @@ def send_push_notification(
             )
             delivered += 1
         except Exception as exc:
-            code = getattr(exc, "code", "")
+            code = str(getattr(exc, "code", "")).lower()
+            error_text = str(exc).lower()
             if code in {
                 "registration-token-not-registered",
                 "invalid-registration-token",
-            }:
+            } or any(
+                marker in error_text
+                for marker in (
+                    "notregistered",
+                    "not registered",
+                    "unregistered",
+                    "invalid-registration-token",
+                )
+            ):
+                # FCM will keep returning this token forever unless it is
+                # removed. The next app launch/token-refresh registers the
+                # replacement token for the device.
                 device.push_token = None
             logger.warning("FCM delivery failed for device %s: %s", device.id, exc)
     db.flush()

@@ -4,6 +4,7 @@ Thin endpoints — all business logic and authorization lives in the service lay
 Follows REST conventions with consistent response envelopes.
 """
 
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -14,7 +15,7 @@ from app.db.deps import get_db
 from app.users.dependencies import get_current_user
 from app.users.models import User
 from app.family import service
-from app.family.models import InvitationStatus
+from app.family.models import Family, FamilyInvitation, InvitationStatus
 from app.family.schemas import (
     FamilyCreate,
     FamilyUpdate,
@@ -207,24 +208,39 @@ def get_top_contributor(family_id: int, db: DbDep, current_user: CurrentUser):
 
 @router.get("/invitations", response_model=Envelope)
 def list_all_invitations(db: DbDep, current_user: CurrentUser):
-    """List all pending invitations across families the user is a member of."""
-    families = service.list_user_families(db, current_user.id)
-    results = []
-    for family in families:
-        invitations = service.list_invitations(db, family.id, current_user.id)
-        for inv in invitations:
-            if inv.status == InvitationStatus.PENDING:
-                results.append(
-                    {
-                        "id": inv.id,
-                        "family_id": inv.family_id,
-                        "family_name": family.name,
-                        "invite_code": inv.invite_code,
-                        "status": inv.status.value,
-                        "created_at": inv.created_at.isoformat(),
-                        "expires_at": inv.expires_at.isoformat(),
-                    }
-                )
+    """List active invitations created by the current user.
+
+    Family invite codes are shareable links rather than user-targeted
+    invitations, so there is no incoming recipient to query. The previous
+    implementation walked every family membership and called a permissioned
+    service for each family, which was both wasteful and prone to returning a
+    network-looking failure in the client.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    rows = (
+        db.query(FamilyInvitation, Family.name)
+        .join(Family, Family.id == FamilyInvitation.family_id)
+        .filter(
+            FamilyInvitation.invited_by == current_user.id,
+            FamilyInvitation.status == InvitationStatus.PENDING,
+            FamilyInvitation.deleted_at.is_(None),
+            FamilyInvitation.expires_at > now,
+        )
+        .order_by(FamilyInvitation.created_at.desc())
+        .all()
+    )
+    results = [
+        {
+            "id": invitation.id,
+            "family_id": invitation.family_id,
+            "family_name": family_name,
+            "invite_code": invitation.invite_code,
+            "status": invitation.status.value,
+            "created_at": invitation.created_at.isoformat(),
+            "expires_at": invitation.expires_at.isoformat(),
+        }
+        for invitation, family_name in rows
+    ]
     return Envelope(data=results)
 
 

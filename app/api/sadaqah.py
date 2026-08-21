@@ -13,6 +13,7 @@ from app.models.user import User
 from app.models.jar import Jar
 from app.models.sadaqah_act import SadaqahAct, SadaqahCategory
 from app.models.sadaqah_log import SadaqahLog
+from app.goals.models import GoalStatus, UserGoal
 from app.services.hijri_service import is_last_10_nights as hijri_last10
 from app.services.hijri_service import is_ramadan as hijri_is_ramadan
 
@@ -298,6 +299,7 @@ def add_star(
         active_jar = (
             db.query(Jar)
             .filter(Jar.user_id == user_id, Jar.completed_at.is_(None))
+            .order_by(Jar.id.desc())
             .with_for_update()
             .first()
         )
@@ -322,6 +324,28 @@ def add_star(
             new_jar = Jar(user_id=user_id)
             db.add(new_jar)
             db.flush()
+
+        # Keep the jar and personal-goal progress in one transaction. The
+        # client restores both after login, so leaving the goal at zero would
+        # hide a real jar balance on a fresh install.
+        current_month = today.strftime("%Y-%m")
+        active_goals = (
+            db.query(UserGoal)
+            .filter(
+                UserGoal.user_id == user_id,
+                UserGoal.status == GoalStatus.ACTIVE,
+                UserGoal.deleted_at.is_(None),
+                (UserGoal.month.is_(None) | (UserGoal.month == current_month)),
+            )
+            .with_for_update()
+            .all()
+        )
+        for goal in active_goals:
+            goal.acts_done = max(goal.acts_done + 1, active_jar.current_stars)
+            if goal.acts_done >= goal.acts_target:
+                goal.status = GoalStatus.COMPLETED
+                goal.completed_at = now
+            goal.updated_at = now
 
         # Create the log row.
         log = SadaqahLog(
@@ -480,7 +504,10 @@ def get_jar(
     current_mode = mode_parts[0] if mode_parts else "normal"
 
     jar = (
-        db.query(Jar).filter(Jar.user_id == user_id, Jar.completed_at.is_(None)).first()
+        db.query(Jar)
+        .filter(Jar.user_id == user_id, Jar.completed_at.is_(None))
+        .order_by(Jar.id.desc())
+        .first()
     )
 
     if not jar:
