@@ -1,7 +1,7 @@
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from app.core.cache import cache_daily_acts
@@ -9,6 +9,8 @@ from app.core.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
+from app.models.sadaqah_log import SadaqahLog
+from app.journey.models import JourneyAdhkarProgress, JourneyQuranProgress
 from app.notifications.models import NotificationTemplate, ScheduledNotification, SchedulingStrategy
 from app.services.analytics_service import compute_weekly_stats
 from app.services.notification_service import create_notification
@@ -75,8 +77,7 @@ def schedule_daily_prayer_reminders():
         )
         for user in users:
             timezone_name = user.preferences.timezone if user.preferences else None
-            if not timezone_name:
-                continue
+            timezone_name = _valid_timezone_name(timezone_name)
             try:
                 local_date = datetime.now(ZoneInfo(timezone_name)).date()
                 # A charity prompt is useful even when a prayer provider is
@@ -84,10 +85,13 @@ def schedule_daily_prayer_reminders():
                 # Keep it on the user's local daytime schedule instead of
                 # silently dropping every reminder for that account.
                 if user.latitude is None or user.longitude is None:
-                    fallback = _schedule_fallback_sadaqah(
-                        db, user_id=user.id, local_date=local_date, timezone_name=timezone_name
+                    fallback = _schedule_timezone_rhythm(
+                        db,
+                        user_id=user.id,
+                        local_date=local_date,
+                        timezone_name=timezone_name,
                     )
-                    _enqueue_filtered_schedules(db, [fallback] if fallback else [], user.id)
+                    _enqueue_filtered_schedules(db, fallback, user.id)
                     continue
                 times = get_prayer_times(
                     user.latitude, user.longitude, local_date, timezone_name
@@ -110,6 +114,11 @@ def schedule_daily_prayer_reminders():
                 for schedule in schedules:
                     template = db.get(NotificationTemplate, schedule.template_id)
                     if template is None:
+                        continue
+                    if _should_skip_for_user(
+                        db, user, template, local_date=local_date
+                    ):
+                        schedule.status = "cancelled"
                         continue
                     if not is_category_enabled(db, user.id, template.category):
                         continue
@@ -137,17 +146,21 @@ def schedule_daily_prayer_reminders():
             except (PrayerTimeLookupError, ValueError) as exc:
                 db.rollback()
                 try:
-                    fallback = _schedule_fallback_sadaqah(
-                        db, user_id=user.id, local_date=local_date, timezone_name=timezone_name
+                    fallback = _schedule_timezone_rhythm(
+                        db,
+                        user_id=user.id,
+                        local_date=local_date,
+                        timezone_name=timezone_name,
                     )
-                    if fallback is not None:
-                        db.add(fallback)
+                    if fallback:
+                        db.add_all(fallback)
                         db.commit()
-                        result = deliver_scheduled_notification.apply_async(
-                            args=[fallback.id],
-                            eta=fallback.scheduled_for.replace(tzinfo=timezone.utc),
-                        )
-                        fallback.celery_task_id = result.id
+                        for schedule in fallback:
+                            result = deliver_scheduled_notification.apply_async(
+                                args=[schedule.id],
+                                eta=schedule.scheduled_for.replace(tzinfo=timezone.utc),
+                            )
+                            schedule.celery_task_id = result.id
                         db.commit()
                 except Exception:
                     db.rollback()
@@ -179,6 +192,129 @@ def _enqueue_filtered_schedules(db, schedules, user_id: int) -> None:
         )
         schedule.celery_task_id = result.id
     db.commit()
+
+
+def _valid_timezone_name(value: str | None) -> str:
+    """Use UTC when a user has not selected a timezone yet."""
+    if value:
+        try:
+            ZoneInfo(value)
+            return value
+        except Exception:
+            logger.warning("Invalid user timezone %r; using UTC", value)
+    return "UTC"
+
+
+def _preference_document(user: User, field: str) -> dict:
+    raw = getattr(user.preferences, field, "{}") if user.preferences else "{}"
+    try:
+        value = json.loads(raw or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _explicit_reminder_enabled(user: User, key: str, *, default: bool) -> bool:
+    reminders = _preference_document(user, "reminder_preferences")
+    value = reminders.get(key)
+    if value is None:
+        value = reminders.get(f"{key}_enabled")
+    return default if value is None else bool(value)
+
+
+def _is_friday_enabled(user: User) -> bool:
+    notifications = _preference_document(user, "notification_preferences")
+    if "friday_reminder" in notifications:
+        return bool(notifications["friday_reminder"])
+    reminders = _preference_document(user, "reminder_preferences")
+    if "friday_reminder" in reminders:
+        return bool(reminders["friday_reminder"])
+    return bool(reminders.get("friday", False))
+
+
+def _has_local_activity(db, user_id: int, local_date, *, kind: str, timezone_name: str) -> bool:
+    zone = ZoneInfo(timezone_name)
+    start = datetime.combine(local_date, time.min, tzinfo=zone).astimezone(timezone.utc).replace(tzinfo=None)
+    end = datetime.combine(local_date + timedelta(days=1), time.min, tzinfo=zone).astimezone(timezone.utc).replace(tzinfo=None)
+    if kind == "quran":
+        return db.query(JourneyQuranProgress.id).filter(
+            JourneyQuranProgress.user_id == user_id,
+            JourneyQuranProgress.last_read_at >= start,
+            JourneyQuranProgress.last_read_at < end,
+        ).first() is not None
+    if kind == "adhkar":
+        return db.query(JourneyAdhkarProgress.id).filter(
+            JourneyAdhkarProgress.user_id == user_id,
+            JourneyAdhkarProgress.updated_at >= start,
+            JourneyAdhkarProgress.updated_at < end,
+            JourneyAdhkarProgress.count > 0,
+        ).first() is not None
+    if kind == "charity":
+        return db.query(SadaqahLog.id).filter(
+            SadaqahLog.user_id == user_id,
+            SadaqahLog.date == local_date,
+        ).first() is not None
+    return False
+
+
+def _should_skip_for_user(db, user: User, template: NotificationTemplate, *, local_date) -> bool:
+    if template.key.startswith("friday") or template.key == "friday_expanded":
+        if not _is_friday_enabled(user):
+            return True
+    if template.key == "tahajjud_reminder" and not _explicit_reminder_enabled(
+        user, "tahajjud", default=False
+    ):
+        return True
+    timezone_name = _valid_timezone_name(user.preferences.timezone if user.preferences else None)
+    if template.category in {"quran", "reading"} and _has_local_activity(
+        db, user.id, local_date, kind="quran", timezone_name=timezone_name
+    ):
+        return True
+    if template.category in {"adhkar", "adhkar_morning", "adhkar_evening"} and _has_local_activity(
+        db, user.id, local_date, kind="adhkar", timezone_name=timezone_name
+    ):
+        return True
+    return template.category == "charity" and _has_local_activity(
+        db, user.id, local_date, kind="charity", timezone_name=timezone_name
+    )
+
+
+def _schedule_timezone_rhythm(*, db, user_id: int, local_date, timezone_name: str):
+    """Schedule non-prayer rhythm anchors when exact prayer times are unavailable."""
+    zone = ZoneInfo(_valid_timezone_name(timezone_name))
+    user = db.get(User, user_id)
+    if user is None:
+        return []
+    slots = [
+        ("morning_adhkar", time(8, 0)),
+        ("quran_reminder", time(14, 0)),
+        ("evening_adhkar", time(18, 30)),
+    ]
+    if local_date.weekday() == 4 and _is_friday_enabled(user):
+        slots.extend((("friday_reminder", time(9, 0)), ("friday_kahf_reminder", time(15, 0))))
+    if _explicit_reminder_enabled(user, "tahajjud", default=False):
+        slots.append(("tahajjud_reminder", time(22, 0)))
+    schedules = []
+    for key, local_time in slots:
+        template = db.query(NotificationTemplate).filter(
+            NotificationTemplate.key == key,
+            NotificationTemplate.enabled.is_(True),
+        ).first()
+        if template is None or _should_skip_for_user(db, user, template, local_date=local_date):
+            continue
+        if not is_category_enabled(db, user_id, template.category):
+            continue
+        if db.query(ScheduledNotification).filter_by(
+            user_id=user_id, template_id=template.id, local_date=local_date.isoformat()
+        ).first() is not None:
+            continue
+        schedules.append(ScheduledNotification(
+            user_id=user_id,
+            template_id=template.id,
+            local_date=local_date.isoformat(),
+            scheduled_for=datetime.combine(local_date, local_time, tzinfo=zone).astimezone(timezone.utc).replace(tzinfo=None),
+        ))
+    return schedules
 
 
 def _schedule_random_sadaqah(*, db, user_id: int, local_date, prayer_times):

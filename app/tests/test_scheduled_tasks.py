@@ -7,6 +7,8 @@ Tests for scheduled_tasks.py - targets audit-flagged bugs:
    functional contract - acts are generated for active users.
 """
 
+import json
+from datetime import date, datetime
 from unittest.mock import patch
 
 import pytest
@@ -17,6 +19,9 @@ from app.models.jar import Jar
 from app.notifications.models import Notification
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
+from app.users.models import UserPreference
+from app.journey.models import JourneyQuranProgress
+from app.notifications.models import NotificationTemplate, SchedulingStrategy
 
 
 @pytest.fixture(scope="module")
@@ -128,3 +133,111 @@ class TestGenerateDailyActs:
         generate_daily_acts()
 
         assert mock_personalise.call_count >= 1
+
+
+class TestAwareReminderRules:
+    def _template(self, db, key, category="journey"):
+        existing = db.query(NotificationTemplate).filter_by(key=key).first()
+        if existing is not None:
+            return existing
+        template = NotificationTemplate(
+            key=key,
+            title_template=key,
+            message_template="A gentle reminder",
+            category=category,
+            strategy=SchedulingStrategy.PRAYER_RELATIVE.value,
+            strategy_config=json.dumps({"anchor": "fajr"}),
+            enabled=True,
+        )
+        db.add(template)
+        db.commit()
+        db.refresh(template)
+        return template
+
+    def test_tahajjud_is_opt_in_and_friday_uses_profile_toggle(self, db, user):
+        from app.tasks.scheduled_tasks import _should_skip_for_user
+
+        friday = self._template(db, "friday_reminder", "islamic_occasions")
+        tahajjud = self._template(db, "tahajjud_reminder", "time_based")
+        assert _should_skip_for_user(db, user, friday, local_date=date(2026, 8, 21))
+        assert _should_skip_for_user(db, user, tahajjud, local_date=date(2026, 8, 21))
+
+        user.preferences = UserPreference(
+            timezone="Africa/Lagos",
+            notification_preferences=json.dumps({"friday_reminder": True}),
+            reminder_preferences=json.dumps({"tahajjud": True}),
+        )
+        db.commit()
+        db.refresh(user)
+        assert not _should_skip_for_user(db, user, friday, local_date=date(2026, 8, 21))
+        assert not _should_skip_for_user(db, user, tahajjud, local_date=date(2026, 8, 21))
+
+    def test_quran_activity_suppresses_same_day_quran_prompt(self, db, user):
+        from app.tasks.scheduled_tasks import _should_skip_for_user
+
+        user.preferences = UserPreference(timezone="Africa/Lagos")
+        progress = JourneyQuranProgress(
+            user_id=user.id,
+            surah_id=1,
+            verse_key="1:1",
+            page=1,
+            last_read_at=datetime(2026, 8, 21, 9, 0),
+        )
+        template = self._template(db, "quran_rule_test", "quran")
+        db.add(progress)
+        db.commit()
+        assert _should_skip_for_user(db, user, template, local_date=date(2026, 8, 21))
+
+    def test_missing_timezone_uses_utc_rhythm_and_tahajjud_stays_off(self, db, user):
+        from app.tasks.scheduled_tasks import _schedule_timezone_rhythm
+
+        user.preferences = UserPreference(
+            notification_preferences="{}", reminder_preferences="{}"
+        )
+        for key, category in (
+            ("morning_adhkar", "adhkar_morning"),
+            ("quran_reminder", "quran"),
+            ("evening_adhkar", "adhkar_evening"),
+            ("tahajjud_reminder", "time_based"),
+        ):
+            self._template(db, key, category)
+        db.commit()
+        schedules = _schedule_timezone_rhythm(
+            db=db,
+            user_id=user.id,
+            local_date=date(2026, 8, 21),
+            timezone_name="",
+        )
+        assert {schedule.template_id for schedule in schedules}
+        assert all(schedule.scheduled_for.tzinfo is None for schedule in schedules)
+        tahajjud_id = db.query(NotificationTemplate.id).filter_by(
+            key="tahajjud_reminder"
+        ).scalar()
+        assert all(schedule.template_id != tahajjud_id for schedule in schedules)
+
+    def test_prayer_relative_templates_deduplicate_semantic_group(self, db, user):
+        from app.services.prayer_reminder_service import PrayerTimes, schedule_prayer_relative_templates
+
+        canonical = self._template(db, "morning_adhkar", "adhkar_morning")
+        expanded = self._template(db, "morning_adhkar_expanded", "adhkar_morning")
+        anchor = datetime(2026, 8, 21, 5, 0)
+        prayer_times = PrayerTimes(
+            fajr=anchor,
+            sunrise=anchor,
+            duha_start=anchor,
+            duha_end=anchor,
+            zuhr=anchor,
+            asr=anchor,
+            maghrib=anchor,
+            isha=anchor,
+        )
+
+        schedules = schedule_prayer_relative_templates(
+            db,
+            user_id=user.id,
+            local_date=date(2026, 8, 21),
+            prayer_times=prayer_times,
+        )
+        ids = [schedule.template_id for schedule in schedules]
+        assert canonical.id in ids
+        assert expanded.id not in ids

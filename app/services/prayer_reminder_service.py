@@ -9,6 +9,25 @@ from app.notifications.models import ScheduledNotification, SchedulingStrategy
 from app.services.prayer_time_service import PrayerTimes
 
 
+# Several seeded templates intentionally describe the same moment in the
+# daily rhythm. Keep one canonical reminder per group so a retry or a seed
+# update cannot make the user receive duplicate prompts.
+_TEMPLATE_GROUPS = {
+    "morning_adhkar": ("morning_adhkar", 0),
+    "morning_adhkar_expanded": ("morning_adhkar", 1),
+    "evening_adhkar": ("evening_adhkar", 0),
+    "evening_adhkar_expanded": ("evening_adhkar", 1),
+    "quran_reminder": ("quran", 0),
+    "quran_verse": ("quran", 1),
+    "friday_reminder": ("friday", 0),
+    "friday_expanded": ("friday", 1),
+    "witr_reminder": ("witr", 0),
+    "witr_reminder_expanded": ("witr", 1),
+    "salatul_duha": ("duha", 0),
+    "duha_reminder": ("duha", 1),
+}
+
+
 def _config(raw: str | dict | None) -> dict:
     if isinstance(raw, dict):
         return raw
@@ -41,7 +60,15 @@ def schedule_prayer_relative_templates(
         .all()
     )
     scheduled: list[ScheduledNotification] = []
+    groups_seen: set[str] = set()
+    templates = sorted(
+        templates,
+        key=lambda template: _TEMPLATE_GROUPS.get(template.key, (template.key, 99)),
+    )
     for template in templates:
+        group = _TEMPLATE_GROUPS.get(template.key)
+        if group is not None and group[0] in groups_seen:
+            continue
         config = _config(template.strategy_config)
         allowed_days = config.get("days_of_week")
         if allowed_days is not None and local_date.weekday() not in allowed_days:
@@ -65,6 +92,8 @@ def schedule_prayer_relative_templates(
             .first()
         )
         if existing is not None:
+            if group is not None:
+                groups_seen.add(group[0])
             continue
         schedule = ScheduledNotification(
             user_id=user_id,
@@ -74,6 +103,8 @@ def schedule_prayer_relative_templates(
         )
         db.add(schedule)
         scheduled.append(schedule)
+        if group is not None:
+            groups_seen.add(group[0])
     db.flush()
     return scheduled
 
