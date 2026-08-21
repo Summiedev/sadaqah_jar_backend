@@ -48,7 +48,8 @@ def get_family_by_id(db: Session, family_id: int) -> Family | None:
 def get_family_by_invite_code(db: Session, invite_code: str) -> Family | None:
     return db.scalar(
         select(Family).where(
-            Family.invite_code == invite_code, Family.deleted_at.is_(None)
+            func.upper(Family.invite_code) == invite_code.upper(),
+            Family.deleted_at.is_(None),
         )
     )
 
@@ -209,7 +210,7 @@ def count_family_members(db: Session, family_id: int) -> int:
 def get_invitation_by_code(db: Session, invite_code: str) -> FamilyInvitation | None:
     return db.scalar(
         select(FamilyInvitation).where(
-            FamilyInvitation.invite_code == invite_code,
+            func.upper(FamilyInvitation.invite_code) == invite_code.upper(),
             FamilyInvitation.deleted_at.is_(None),
         )
     )
@@ -236,6 +237,27 @@ def list_family_invitations(
     return db.scalars(query.order_by(FamilyInvitation.created_at.desc())).all()
 
 
+def list_incoming_invitations(
+    db: Session, *, user_id: int, email: str
+) -> Sequence[tuple[FamilyInvitation, str]]:
+    """Return pending targeted invitations addressed to this account."""
+    normalized_email = email.strip().lower()
+    query = (
+        select(FamilyInvitation, Family.name)
+        .join(Family, Family.id == FamilyInvitation.family_id)
+        .where(
+            FamilyInvitation.status == InvitationStatus.PENDING,
+            FamilyInvitation.deleted_at.is_(None),
+            Family.deleted_at.is_(None),
+            FamilyInvitation.expires_at > _utcnow(),
+            (FamilyInvitation.invited_user_id == user_id)
+            | (func.lower(FamilyInvitation.invited_email) == normalized_email),
+        )
+        .order_by(FamilyInvitation.created_at.desc())
+    )
+    return db.execute(query).all()
+
+
 def create_invitation(
     db: Session,
     *,
@@ -243,12 +265,16 @@ def create_invitation(
     invited_by: int,
     invite_code: str,
     expires_at: datetime,
+    invited_user_id: int | None = None,
+    invited_email: str | None = None,
 ) -> FamilyInvitation:
     invitation = FamilyInvitation(
         family_id=family_id,
         invited_by=invited_by,
         invite_code=invite_code,
         expires_at=expires_at,
+        invited_user_id=invited_user_id,
+        invited_email=invited_email,
     )
     db.add(invitation)
     db.flush()

@@ -187,6 +187,15 @@ class FamilyInvitation(Base):
     invited_by: Mapped[int] = mapped_column(
         ForeignKey("users.id"), nullable=False, index=True
     )
+    # A targeted invitation may point at an existing account, an email address
+    # for a user who has not registered yet, or both. Legacy share-code
+    # invitations leave both fields null.
+    invited_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    invited_email: Mapped[str | None] = mapped_column(
+        String(320), nullable=True, index=True
+    )
     invite_code: Mapped[str] = mapped_column(
         String(64), unique=True, nullable=False, index=True
     )
@@ -211,6 +220,16 @@ class FamilyInvitation(Base):
 
     __table_args__ = (
         Index("ix_family_invitations_family_status", "family_id", "status"),
+        Index(
+            "ix_family_invitations_recipient_status",
+            "invited_user_id",
+            "status",
+        ),
+        Index(
+            "ix_family_invitations_email_status",
+            "invited_email",
+            "status",
+        ),
     )
 
 

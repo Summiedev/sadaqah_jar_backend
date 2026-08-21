@@ -84,6 +84,7 @@ from app.family.schemas import (
     ReflectionCommentResponse,
     ActivityResponse,
     ActivityPage,
+    InvitationCreate,
 )
 
 
@@ -562,7 +563,10 @@ def remove_member(db: Session, family_id: int, member_id: int, user_id: int) -> 
 
 
 def create_invitation(
-    db: Session, family_id: int, user_id: int
+    db: Session,
+    family_id: int,
+    user_id: int,
+    payload: InvitationCreate | None = None,
 ) -> tuple[FamilyInvitation, FamilyEvent]:
     """Create a new invitation for the family."""
     _require_permission(db, family_id, user_id, Permission.CREATE_INVITATION)
@@ -570,15 +574,43 @@ def create_invitation(
     invite_code = _generate_invite_code()
     expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=7)
 
+    invited_email = (
+        str(payload.invited_email).strip().lower()
+        if payload and payload.invited_email
+        else None
+    )
+    invited_user_id = None
+    if invited_email:
+        from app.users.models import User
+
+        target = db.query(User).filter(func.lower(User.email) == invited_email).first()
+        invited_user_id = target.id if target else None
+        if invited_user_id == user_id:
+            raise BusinessRuleException("You cannot invite yourself")
+
     invitation = repo.create_invitation(
         db,
         family_id=family_id,
         invited_by=user_id,
         invite_code=invite_code,
         expires_at=expires_at,
+        invited_user_id=invited_user_id,
+        invited_email=invited_email,
     )
     db.commit()
     db.refresh(invitation)
+
+    if invited_user_id:
+        family = repo.get_family_by_id(db, family_id)
+        if family:
+            from app.notifications.event_handlers import on_invitation_created
+
+            on_invitation_created(
+                user_id=invited_user_id,
+                family_id=family_id,
+                family_name=family.name,
+                invite_code=invite_code,
+            )
 
     return invitation, FamilyEvent(
         event_type=EventType.INVITATION_ACCEPTED,
@@ -594,6 +626,66 @@ def list_invitations(
     _require_permission(db, family_id, user_id, Permission.VIEW_MEMBERS)
     repo.expire_pending_invitations(db, family_id)
     return repo.list_family_invitations(db, family_id, status=InvitationStatus.PENDING)
+
+
+def list_incoming_invitations(db: Session, user_id: int) -> list[dict[str, Any]]:
+    from app.users.models import User
+
+    user = db.get(User, user_id)
+    if not user:
+        return []
+    rows = repo.list_incoming_invitations(db, user_id=user_id, email=user.email)
+    return [
+        {
+            "id": invitation.id,
+            "family_id": invitation.family_id,
+            "family_name": family_name,
+            "invited_by": invitation.invited_by,
+            "invited_user_id": invitation.invited_user_id,
+            "invited_email": invitation.invited_email,
+            "invite_code": invitation.invite_code,
+            "status": invitation.status.value,
+            "created_at": invitation.created_at.isoformat(),
+            "expires_at": invitation.expires_at.isoformat(),
+        }
+        for invitation, family_name in rows
+    ]
+
+
+def _require_targeted_invitation_access(
+    db: Session, invitation: FamilyInvitation, user_id: int
+) -> None:
+    """Prevent a copied targeted invite code being used by another account."""
+    if invitation.invited_user_id is None and invitation.invited_email is None:
+        return
+    from app.users.models import User
+
+    user = db.get(User, user_id)
+    if not user or (
+        invitation.invited_user_id != user_id
+        and invitation.invited_email != user.email.strip().lower()
+    ):
+        raise FamilyPermissionDeniedException(
+            "This invitation is addressed to another account"
+        )
+
+
+def accept_invitation_by_id(
+    db: Session, invitation_id: int, user_id: int
+) -> Family:
+    invitation = repo.get_invitation_by_id(db, invitation_id)
+    if not invitation:
+        raise InvitationNotFoundException()
+    _require_targeted_invitation_access(db, invitation, user_id)
+    return join_family(db, JoinRequest(invite_code=invitation.invite_code), user_id)
+
+
+def decline_invitation_by_id(db: Session, invitation_id: int, user_id: int) -> None:
+    invitation = repo.get_invitation_by_id(db, invitation_id)
+    if not invitation:
+        raise InvitationNotFoundException()
+    _require_targeted_invitation_access(db, invitation, user_id)
+    decline_invitation(db, invitation.invite_code, user_id)
 
 
 def cancel_invitation(
@@ -647,6 +739,8 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
     if invitation.status != InvitationStatus.PENDING:
         raise InvitationExpiredException("Invitation is no longer valid")
 
+    _require_targeted_invitation_access(db, invitation, user_id)
+
     if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         repo.update_invitation_status(db, invitation, InvitationStatus.EXPIRED)
         db.commit()
@@ -682,6 +776,16 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
         actor_id=user_id,
     )
 
+    if invitation.invited_user_id is not None or invitation.invited_email is not None:
+        from app.notifications.event_handlers import on_invitation_decision
+
+        on_invitation_decision(
+            user_id=invitation.invited_by,
+            family_id=invitation.family_id,
+            invite_code=invitation.invite_code,
+            accepted=True,
+        )
+
     return family
 
 
@@ -696,6 +800,8 @@ def decline_invitation(db: Session, invite_code: str, user_id: int) -> None:
     if not invitation:
         raise InvalidInviteCodeException()
 
+    _require_targeted_invitation_access(db, invitation, user_id)
+
     repo.update_invitation_status(db, invitation, InvitationStatus.DECLINED)
     db.commit()
 
@@ -704,6 +810,14 @@ def decline_invitation(db: Session, invite_code: str, user_id: int) -> None:
         family_id=invitation.family_id,
         event_type=EventType.INVITATION_DECLINED,
         actor_id=user_id,
+    )
+    from app.notifications.event_handlers import on_invitation_decision
+
+    on_invitation_decision(
+        user_id=invitation.invited_by,
+        family_id=invitation.family_id,
+        invite_code=invitation.invite_code,
+        accepted=False,
     )
     return None
 

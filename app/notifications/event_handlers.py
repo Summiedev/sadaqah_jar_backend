@@ -272,6 +272,22 @@ def on_invitation_created(
     )
 
 
+def on_invitation_decision(
+    *, user_id: int, family_id: int, invite_code: str, accepted: bool
+) -> None:
+    """Notify the inviter when a targeted invitation is answered."""
+    decision = "accepted" if accepted else "declined"
+    _enqueue(
+        user_id=user_id,
+        title="Family invitation updated",
+        message=f"Your family invitation was {decision}.",
+        category="family",
+        notification_type="invitation",
+        idempotency_key=f"invitation:{family_id}:{invite_code}:{decision}",
+        action="invitations",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Reading Progress
 # ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum as PyEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.envelope import Envelope
 
@@ -174,7 +174,9 @@ class MemberRoleUpdate(BaseModel):
 
 
 class InvitationCreate(BaseModel):
-    """Create an invitation for a family."""
+    """Create a share-code invitation or target a specific email account."""
+
+    invited_email: EmailStr | None = None
 
 
 class InvitationResponse(BaseModel):
@@ -183,6 +185,8 @@ class InvitationResponse(BaseModel):
     family_name: str = ""
     invited_by: int
     invited_by_username: str = ""
+    invited_user_id: int | None = None
+    invited_email: str | None = None
     invite_code: str
     status: InvitationStatus
     created_at: datetime

@@ -33,6 +33,7 @@ from app.family.schemas import (
     JoinRequest,
     FamilyGoalMilestoneCreate,
     FamilyGoalMilestoneUpdate,
+    InvitationCreate,
 )
 
 router = APIRouter(prefix="/family", tags=["family"])
@@ -244,18 +245,35 @@ def list_all_invitations(db: DbDep, current_user: CurrentUser):
     return Envelope(data=results)
 
 
+@router.get("/invitations/incoming", response_model=Envelope)
+def list_incoming_invitations(db: DbDep, current_user: CurrentUser):
+    """List pending invitations addressed to the signed-in user."""
+    return Envelope(data=service.list_incoming_invitations(db, current_user.id))
+
+
 @router.post(
     "/{family_id}/invitations",
     response_model=Envelope,
     status_code=status.HTTP_201_CREATED,
 )
-def create_invitation(family_id: int, db: DbDep, current_user: CurrentUser):
-    """Create a new invitation for the family."""
-    invitation, event = service.create_invitation(db, family_id, current_user.id)
+def create_invitation(
+    family_id: int,
+    db: DbDep,
+    current_user: CurrentUser,
+    payload: InvitationCreate | None = None,
+):
+    """Create a share-code invite, optionally addressed to an email."""
+    invitation, event = service.create_invitation(
+        db, family_id, current_user.id, payload
+    )
     return Envelope(
         data={
             "id": invitation.id,
+            "family_id": invitation.family_id,
             "invite_code": invitation.invite_code,
+            "invited_user_id": invitation.invited_user_id,
+            "invited_email": invitation.invited_email,
+            "status": invitation.status.value,
             "expires_at": invitation.expires_at.isoformat(),
         },
         message="Invitation created",
@@ -270,7 +288,10 @@ def list_invitations(family_id: int, db: DbDep, current_user: CurrentUser):
         data=[
             {
                 "id": inv.id,
+                "family_id": inv.family_id,
                 "invite_code": inv.invite_code,
+                "invited_user_id": inv.invited_user_id,
+                "invited_email": inv.invited_email,
                 "status": inv.status.value,
                 "created_at": inv.created_at.isoformat(),
                 "expires_at": inv.expires_at.isoformat(),
@@ -278,6 +299,27 @@ def list_invitations(family_id: int, db: DbDep, current_user: CurrentUser):
             for inv in invitations
         ]
     )
+
+
+@router.post("/invitations/id/{invitation_id}/accept", response_model=Envelope)
+def accept_invitation_by_id(
+    invitation_id: int, db: DbDep, current_user: CurrentUser
+):
+    """Accept a pending targeted invitation owned by the current user."""
+    family = service.accept_invitation_by_id(db, invitation_id, current_user.id)
+    return Envelope(
+        data={"id": family.id, "name": family.name},
+        message="Invitation accepted",
+    )
+
+
+@router.post("/invitations/id/{invitation_id}/decline", response_model=Envelope)
+def decline_invitation_by_id(
+    invitation_id: int, db: DbDep, current_user: CurrentUser
+):
+    """Decline a pending targeted invitation owned by the current user."""
+    service.decline_invitation_by_id(db, invitation_id, current_user.id)
+    return Envelope(data=None, message="Invitation declined")
 
 
 @router.delete("/{family_id}/invitations/{invitation_id}", response_model=Envelope)

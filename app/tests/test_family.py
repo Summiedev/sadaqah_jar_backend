@@ -128,6 +128,75 @@ def _create_family(db, owner_id, name="Test Family") -> Family:
     return f
 
 
+def test_targeted_invitation_is_visible_only_to_recipient_and_can_be_accepted(db):
+    owner = _create_user(db, "targeted-owner", "targeted-owner@example.com")
+    target = _create_user(db, "targeted-target", "Targeted-Target@example.com")
+    stranger = _create_user(db, "targeted-stranger", "targeted-stranger@example.com")
+    family = _create_family(db, owner.id, name="Targeted Family")
+
+    created = client.post(
+        f"{API}/family/{family.id}/invitations",
+        json={"invited_email": target.email},
+        headers=_headers(owner.id),
+    )
+    assert created.status_code == 201
+    invitation = created.json()["data"]
+    assert invitation["invited_email"] == target.email.lower()
+    assert invitation["invited_user_id"] == target.id
+
+    incoming = client.get(
+        f"{API}/family/invitations/incoming", headers=_headers(target.id)
+    )
+    assert incoming.status_code == 200
+    assert [row["id"] for row in incoming.json()["data"]] == [invitation["id"]]
+
+    hidden = client.get(
+        f"{API}/family/invitations/incoming", headers=_headers(stranger.id)
+    )
+    assert hidden.status_code == 200
+    assert hidden.json()["data"] == []
+
+    forbidden = client.post(
+        f"{API}/family/invitations/id/{invitation['id']}/accept",
+        headers=_headers(stranger.id),
+    )
+    # The API may deliberately conceal the existence of an invitation from a
+    # non-recipient with 404, rather than leaking invitation IDs with 403.
+    assert forbidden.status_code in (403, 404)
+    db.expire_all()
+    assert db.get(FamilyInvitation, invitation["id"]).status == InvitationStatus.PENDING
+    accepted = client.post(
+        f"{API}/family/invitations/id/{invitation['id']}/accept",
+        headers=_headers(target.id),
+    )
+    assert accepted.status_code == 200, accepted.json()
+    db.expire_all()
+    saved = db.get(FamilyInvitation, invitation["id"])
+    assert saved is not None
+    assert saved.status == InvitationStatus.ACCEPTED
+    assert db.query(FamilyMember).filter_by(family_id=family.id, user_id=target.id).one()
+
+
+def test_targeted_invitation_can_be_declined(db):
+    owner = _create_user(db, "decline-owner", "decline-owner@example.com")
+    target = _create_user(db, "decline-target", "decline-target@example.com")
+    family = _create_family(db, owner.id, name="Decline Family")
+
+    created = client.post(
+        f"{API}/family/{family.id}/invitations",
+        json={"invited_email": target.email},
+        headers=_headers(owner.id),
+    )
+    invitation_id = created.json()["data"]["id"]
+    declined = client.post(
+        f"{API}/family/invitations/id/{invitation_id}/decline",
+        headers=_headers(target.id),
+    )
+    assert declined.status_code == 200
+    db.expire_all()
+    assert db.get(FamilyInvitation, invitation_id).status == InvitationStatus.DECLINED
+
+
 def _clean_family(db, family_id):
     db.query(ReflectionEncouragement).filter(
         ReflectionEncouragement.reflection_id.in_(
