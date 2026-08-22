@@ -97,6 +97,18 @@ def _items(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
     return [dict(item) for item in value if isinstance(item, dict)]
 
 
+def _audio_items(value: Any) -> list[dict[str, Any]]:
+    """Normalize the API's object or list audio response into rows."""
+    if isinstance(value, dict):
+        nested = value.get("items")
+        if isinstance(nested, list):
+            return [dict(item) for item in nested if isinstance(item, dict)]
+        return [dict(value)]
+    if isinstance(value, list):
+        return [dict(item) for item in value if isinstance(item, dict)]
+    return []
+
+
 def _resource_id(resources: list[dict[str, Any]], *needles: str) -> int:
     for resource in resources:
         name = str(
@@ -241,7 +253,7 @@ def import_dataset(*, dry_run: bool = False) -> None:
                 if isinstance(transliteration, dict) and transliteration.get("text"):
                     db.add(QuranTransliteration(ayah_id=existing.id, text=str(transliteration["text"])))
                 audio = verse.get("audio")
-                for item in _items({"items": audio}, "items"):
+                for item in _audio_items(audio):
                     if item.get("url"):
                         db.add(QuranAudioSegment(
                             ayah_id=existing.id,
