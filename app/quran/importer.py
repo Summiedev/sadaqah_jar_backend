@@ -18,6 +18,7 @@ import os
 from typing import Any
 
 import httpx
+from sqlalchemy import func
 
 from app.core.config import settings
 from app.db.session import SessionLocal
@@ -272,12 +273,61 @@ def import_dataset(*, dry_run: bool = False) -> None:
         client.http.close()
 
 
+def verify_dataset() -> None:
+    """Fail loudly unless the complete offline reader dataset is present."""
+    db = SessionLocal()
+    try:
+        surahs = db.query(func.count(QuranSurah.id)).scalar() or 0
+        ayahs = db.query(func.count(QuranAyah.id)).scalar() or 0
+        pages = db.query(func.count(QuranPageAsset.page_number)).scalar() or 0
+        arabic = (
+            db.query(func.count(QuranAyah.id))
+            .filter(QuranAyah.text_uthmani != "")
+            .scalar()
+            or 0
+        )
+        translation = (
+            db.query(func.count(QuranTranslation.id))
+            .filter(QuranTranslation.edition_code == TRANSLATION_CODE)
+            .scalar()
+            or 0
+        )
+        tafsir = (
+            db.query(func.count(QuranTranslation.id))
+            .filter(QuranTranslation.edition_code == TAFSIR_CODE)
+            .scalar()
+            or 0
+        )
+        audio = db.query(func.count(QuranAudioSegment.id)).scalar() or 0
+        expected = {
+            "surahs": surahs == 114,
+            "ayahs": ayahs == 6236,
+            "arabic": arabic == 6236,
+            "pages": pages == 604,
+            "Hilali & Khan translation": translation == 6236,
+            "Ibn Kathir tafsir": tafsir == 6236,
+            "audio segments": audio > 0,
+        }
+        for label, complete in expected.items():
+            logger.info("Quran verify %-24s %s", label, "OK" if complete else "MISSING")
+        if not all(expected.values()):
+            raise QuranImportError(
+                "Quran dataset is incomplete. Run the importer, then verify again."
+            )
+    finally:
+        db.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Verify credentials and resources only")
+    parser.add_argument("--verify", action="store_true", help="Verify all 114 surahs, 6236 ayahs and 604 page assets")
     args = parser.parse_args()
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
-    import_dataset(dry_run=args.dry_run)
+    if args.verify:
+        verify_dataset()
+    else:
+        import_dataset(dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

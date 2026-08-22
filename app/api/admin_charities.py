@@ -73,7 +73,7 @@ def list_charities(
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
-    query = db.query(Charity).order_by(Charity.id.desc())
+    query = db.query(Charity).filter(Charity.is_active).order_by(Charity.id.desc())
     total = query.count()
     rows = query.offset(offset).limit(limit).all()
     return {
@@ -187,7 +187,27 @@ def deactivate_charity(
     if not charity:
         raise HTTPException(status_code=404, detail="Charity not found")
 
+    # Keep the row for historical donation-intent references, but make the
+    # campaign disappear everywhere and remove its private media.
+    try:
+        bucket = _get_bucket()
+    except HTTPException:
+        bucket = None
+    if bucket:
+        for raw_url in [*(charity.image_urls or []), *(charity.evidence_urls or [])]:
+            key = _key_from_url(raw_url, bucket)
+            if key:
+                try:
+                    delete_file(bucket=bucket, key=key)
+                except HTTPException:
+                    # Storage cleanup must not leave the database campaign
+                    # visible if an old object has already disappeared.
+                    pass
+    charity.image_urls = []
+    charity.evidence_urls = []
     charity.is_active = False
+    charity.is_published = False
+    charity.status = "closed"
     db.commit()
 
     return {"message": "Charity deactivated"}
@@ -202,7 +222,23 @@ def delete_charity(
     if not charity:
         raise HTTPException(status_code=404, detail="Charity not found")
 
+    try:
+        bucket = _get_bucket()
+    except HTTPException:
+        bucket = None
+    if bucket:
+        for raw_url in [*(charity.image_urls or []), *(charity.evidence_urls or [])]:
+            key = _key_from_url(raw_url, bucket)
+            if key:
+                try:
+                    delete_file(bucket=bucket, key=key)
+                except HTTPException:
+                    pass
+    charity.image_urls = []
+    charity.evidence_urls = []
     charity.is_active = False
+    charity.is_published = False
+    charity.status = "closed"
     db.commit()
 
     return {"message": "Charity deleted"}
