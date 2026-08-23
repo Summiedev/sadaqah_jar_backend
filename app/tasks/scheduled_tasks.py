@@ -85,13 +85,17 @@ def schedule_daily_prayer_reminders():
                 # Keep it on the user's local daytime schedule instead of
                 # silently dropping every reminder for that account.
                 if user.latitude is None or user.longitude is None:
-                    fallback = _schedule_timezone_rhythm(
+                    fallback = _schedule_fallback_sadaqah(
                         db,
                         user_id=user.id,
                         local_date=local_date,
                         timezone_name=timezone_name,
                     )
-                    _enqueue_filtered_schedules(db, fallback, user.id)
+                    _enqueue_filtered_schedules(
+                        db,
+                        [fallback] if fallback is not None else [],
+                        user.id,
+                    )
                     continue
                 times = get_prayer_times(
                     user.latitude, user.longitude, local_date, timezone_name
@@ -146,21 +150,20 @@ def schedule_daily_prayer_reminders():
             except (PrayerTimeLookupError, ValueError) as exc:
                 db.rollback()
                 try:
-                    fallback = _schedule_timezone_rhythm(
+                    fallback = _schedule_fallback_sadaqah(
                         db,
                         user_id=user.id,
                         local_date=local_date,
                         timezone_name=timezone_name,
                     )
-                    if fallback:
-                        db.add_all(fallback)
+                    if fallback is not None:
+                        db.add(fallback)
                         db.commit()
-                        for schedule in fallback:
-                            result = deliver_scheduled_notification.apply_async(
-                                args=[schedule.id],
-                                eta=schedule.scheduled_for.replace(tzinfo=timezone.utc),
-                            )
-                            schedule.celery_task_id = result.id
+                        result = deliver_scheduled_notification.apply_async(
+                            args=[fallback.id],
+                            eta=fallback.scheduled_for.replace(tzinfo=timezone.utc),
+                        )
+                        fallback.celery_task_id = result.id
                         db.commit()
                 except Exception:
                     db.rollback()

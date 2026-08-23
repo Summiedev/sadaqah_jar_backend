@@ -111,6 +111,7 @@ def send_push_notification(
                     token=device.push_token,
                     notification=messaging.Notification(title=title, body=body),
                     android=messaging.AndroidConfig(
+                        priority="high",
                         notification=messaging.AndroidNotification(
                             channel_id="mizan_reminders_v2",
                             icon="ic_stat_mizan",

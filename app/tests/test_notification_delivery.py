@@ -102,6 +102,38 @@ def test_notification_templates_require_admin(db):
         db.commit()
 
 
+def test_authenticated_test_push_uses_real_fcm_delivery(user):
+    """The preferences test button must exercise FCM, not only the inbox."""
+    token = create_access_token({"sub": str(user.id)})
+    with patch(
+        "app.notifications.router.send_push_notification",
+        return_value=1,
+    ) as send_push:
+        response = TestClient(app).post(
+            "/api/v1/notifications/test-push",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["delivered"] == 1
+    send_push.assert_called_once()
+
+
+def test_authenticated_test_push_reports_missing_device(user):
+    token = create_access_token({"sub": str(user.id)})
+    with patch(
+        "app.notifications.router.send_push_notification",
+        return_value=0,
+    ):
+        response = TestClient(app).post(
+            "/api/v1/notifications/test-push",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 503
+    assert "No active device" in response.json()["error"]["message"]
+
+
 # ---------------------------------------------------------------------------
 # 2. Rapid-fire event deduplication
 # ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@ from app.notifications.schemas import (
     DeviceTokenRequest,
     NotificationTemplateCreate,
 )
+from app.services.push_notification_service import send_push_notification
 from app.users.models import UserPreference
 import json
 
@@ -82,6 +83,26 @@ def delete_notification(notification_id: int, db: DbDep, current_user: CurrentUs
 def mark_all_notifications_read(db: DbDep, current_user: CurrentUser):
     updated = service.mark_all_read(db, current_user.id)
     return Envelope(data={"updated": updated})
+
+
+@router.post("/test-push", response_model=Envelope)
+def send_test_push(db: DbDep, current_user: CurrentUser):
+    """Send an authenticated device push to verify the complete FCM path."""
+    delivered = send_push_notification(
+        db,
+        user_id=current_user.id,
+        title="Mizan is ready",
+        body="Your reminders can now reach this device.",
+        notification_type="general",
+        data={"deep_link": "/notifications"},
+    )
+    db.commit()
+    if delivered < 1:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No active device received the test push. Check Firebase, device registration, and notification permissions.",
+        )
+    return Envelope(data={"delivered": delivered})
 
 
 # ---------------------------------------------------------------------------
