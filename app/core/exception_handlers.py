@@ -53,6 +53,10 @@ _EXCEPTION_STATUS_MAP = {
     "auth.invalid_credentials": status.HTTP_401_UNAUTHORIZED,
     "auth.invalid_token": status.HTTP_401_UNAUTHORIZED,
     "auth.invalid_google_token": status.HTTP_401_UNAUTHORIZED,
+    "family.not_found": status.HTTP_404_NOT_FOUND,
+    "family.invalid_invite_code": status.HTTP_404_NOT_FOUND,
+    "family.permission_denied": status.HTTP_403_FORBIDDEN,
+    "family.membership_conflict": status.HTTP_409_CONFLICT,
 }
 
 _FRIENDLY_MESSAGES = {

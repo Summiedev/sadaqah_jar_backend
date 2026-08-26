@@ -12,9 +12,9 @@ class FamilyException(AppException):
     pass
 
 
-class FamilyNotFoundException(ResourceNotFoundException):
+class FamilyNotFoundException(AppException):
     def __init__(self, message: str = "Family not found"):
-        super().__init__(message)
+        super().__init__("family.not_found", message)
 
 
 class MemberNotFoundException(ResourceNotFoundException):
@@ -27,9 +27,9 @@ class InvitationNotFoundException(ResourceNotFoundException):
         super().__init__(message)
 
 
-class InvalidInviteCodeException(ResourceNotFoundException):
+class InvalidInviteCodeException(AppException):
     def __init__(self, message: str = "Invalid invite code"):
-        super().__init__(message)
+        super().__init__("family.invalid_invite_code", message)
 
 
 class GoalNotFoundException(ResourceNotFoundException):
@@ -57,9 +57,14 @@ class SettingsNotFoundException(ResourceNotFoundException):
         super().__init__(message)
 
 
-class FamilyPermissionDeniedException(ResourceNotFoundException):
+class FamilyPermissionDeniedException(AppException):
     def __init__(self, message: str = "Permission denied"):
-        super().__init__(message)
+        super().__init__("family.permission_denied", message)
+
+
+class FamilyMembershipConflictException(AppException):
+    def __init__(self, message: str = "You are already a member of this family"):
+        super().__init__("family.membership_conflict", message)
 
 
 class GoalAlreadyCompletedException(ConflictException):

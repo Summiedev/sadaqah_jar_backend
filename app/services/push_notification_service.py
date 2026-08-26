@@ -91,7 +91,7 @@ def send_push_notification(
     # Include both `notification_type` (backwards-compat) and `type` (client expectation)
     merged_data = {"notification_type": notification_type, "type": notification_type}
     if data:
-        merged_data.update(data)
+        merged_data.update({str(key): str(value) for key, value in data.items()})
     devices = (
         db.query(UserDevice)
         .filter(UserDevice.user_id == user_id, UserDevice.push_token.is_not(None))
@@ -106,7 +106,7 @@ def send_push_notification(
     delivered = 0
     for device in devices:
         try:
-            messaging.send(
+            message_id = messaging.send(
                 messaging.Message(
                     token=device.push_token,
                     notification=messaging.Notification(title=title, body=body),
@@ -116,12 +116,19 @@ def send_push_notification(
                             channel_id="mizan_reminders_v2",
                             icon="ic_stat_mizan",
                             sound="default",
-                        )
+                        ),
                     ),
                     data=merged_data,
                 )
             )
             delivered += 1
+            logger.info(
+                "FCM delivered user=%s device=%s message=%s type=%s",
+                user_id,
+                device.id,
+                message_id,
+                notification_type,
+            )
         except Exception as exc:
             code = str(getattr(exc, "code", "")).lower()
             error_text = str(exc).lower()

@@ -29,6 +29,7 @@ class UserRegister(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     role: str | None = None
+    family_code: str | None = Field(None, max_length=64)
 
     @field_validator("password")
     @classmethod
@@ -41,6 +42,18 @@ class UserRegister(BaseModel):
         if v is None:
             return None
         return v.upper()
+
+    @field_validator("family_code")
+    @classmethod
+    def normalize_family_code(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        code = value.strip().upper()
+        if any(not (character.isalnum() or character in "-_") for character in code):
+            raise ValueError(
+                "Invalid family code. Please check the code and try again."
+            )
+        return code
 
 
 class UserLogin(BaseModel):

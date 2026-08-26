@@ -285,3 +285,38 @@ class TestDeliveryIdempotency:
         from app.notifications.preferences import is_category_enabled
 
         assert is_category_enabled(db, user.id, "journey", channel="in_app") is False
+
+    def test_push_channel_is_not_blocked_when_in_app_channel_is_disabled(
+        self, db, user
+    ):
+        pref = db.get(UserPreference, user.id)
+        if pref is None:
+            pref = UserPreference(user_id=user.id)
+            db.add(pref)
+        pref.notification_preferences = json.dumps(
+            {"categories": {"journey": {"in_app": False, "push": True}}}
+        )
+        db.commit()
+
+        from app.tasks.notification_tasks import deliver_event_notification
+
+        with patch(
+            "app.tasks.notification_tasks.send_push_notification",
+            return_value=1,
+        ) as send_push:
+            deliver_event_notification.run(
+                user.id,
+                "A gentle reminder",
+                "Return when you are ready.",
+                "journey",
+                "goal_progress",
+                f"push-only:{user.id}",
+            )
+
+        send_push.assert_called_once()
+        assert (
+            db.query(Notification)
+            .filter(Notification.idempotency_key == f"push-only:{user.id}")
+            .count()
+            == 0
+        )

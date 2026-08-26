@@ -60,6 +60,7 @@ def create_user(
     first_name: str | None = None,
     last_name: str | None = None,
     role: Role | None = None,
+    commit: bool = True,
 ) -> User:
     user = User(
         username=username,
@@ -71,7 +72,10 @@ def create_user(
     )
     user.preferences = UserPreference()
     db.add(user)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(user)
     return user
 
@@ -130,7 +134,13 @@ def hash_one_time_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
-def create_session(db: Session, user_id: int, device_id: str | None = None) -> str:
+def create_session(
+    db: Session,
+    user_id: int,
+    device_id: str | None = None,
+    *,
+    commit: bool = True,
+) -> str:
     raw_token = secrets.token_urlsafe(REFRESH_TOKEN_BYTES)
     db.add(
         UserSession(
@@ -140,7 +150,10 @@ def create_session(db: Session, user_id: int, device_id: str | None = None) -> s
             expires_at=_utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
         )
     )
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return raw_token
 
 
@@ -232,6 +245,14 @@ def upsert_device(
     app_version: str | None,
     push_token: str | None,
 ) -> UserDevice:
+    if push_token:
+        # One FCM registration token identifies one app installation. If the
+        # device changed accounts, detach the token from stale user rows so a
+        # notification cannot be delivered to the wrong signed-in account.
+        db.query(UserDevice).filter(
+            UserDevice.push_token == push_token,
+            UserDevice.user_id != user_id,
+        ).update({"push_token": None}, synchronize_session=False)
     device = get_device(db, user_id, device_id)
     if device is None:
         device = UserDevice(user_id=user_id, device_id=device_id)
@@ -285,7 +306,7 @@ def delete_device(db: Session, device: UserDevice) -> None:
 # ---------------------------------------------------------------------------
 
 
-def create_email_verification(db: Session, user_id: int) -> str:
+def create_email_verification(db: Session, user_id: int, *, commit: bool = True) -> str:
     # Codes are friendlier than email links on mobile; only their hash is stored.
     raw = f"{secrets.randbelow(1_000_000):06d}"
     db.add(
@@ -295,7 +316,10 @@ def create_email_verification(db: Session, user_id: int) -> str:
             expires_at=_utcnow() + timedelta(hours=24),
         )
     )
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return raw
 
 

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 import httpx
 import secrets
@@ -61,9 +62,58 @@ from app.users.schemas import (
 from app.users.validators import validate_email, validate_username
 
 
-def _issue_tokens(db: Session, user: User, device_id: str | None = None) -> dict:
+def _resolve_registration_family(db: Session, code: str, email: str):
+    """Validate a signup family code before any account row is written."""
+    from app.family import repository as family_repo
+    from app.family.exceptions import (
+        FamilyNotFoundException,
+        FamilyPermissionDeniedException,
+        InvalidInviteCodeException,
+        InvitationExpiredException,
+    )
+    from app.family.models import InvitationStatus
+
+    invitation = family_repo.get_invitation_by_code(db, code)
+    if invitation is not None:
+        if invitation.status != InvitationStatus.PENDING:
+            raise InvitationExpiredException("Invitation is no longer valid")
+        if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+            raise InvitationExpiredException("Invitation has expired")
+        if invitation.invited_user_id is not None:
+            raise FamilyPermissionDeniedException(
+                "This invitation belongs to an existing account. Sign in to accept it."
+            )
+        if (
+            invitation.invited_email
+            and invitation.invited_email.lower() != email.lower()
+        ):
+            raise FamilyPermissionDeniedException(
+                "This invitation is addressed to another email address"
+            )
+        family = family_repo.get_family_by_id(db, invitation.family_id)
+        if family is None:
+            raise FamilyNotFoundException("This family is no longer available")
+        return family, invitation
+
+    family = family_repo.get_family_by_invite_code(db, code)
+    if family is not None:
+        return family, None
+    if family_repo.get_family_by_invite_code_including_deleted(db, code):
+        raise FamilyNotFoundException("This family is no longer available")
+    raise InvalidInviteCodeException(
+        "Invalid family code. Please check the code and try again."
+    )
+
+
+def _issue_tokens(
+    db: Session,
+    user: User,
+    device_id: str | None = None,
+    *,
+    commit: bool = True,
+) -> dict:
     access = create_access_token({"sub": str(user.id), "ver": user.token_version})
-    refresh = create_session(db, user.id, device_id=device_id)
+    refresh = create_session(db, user.id, device_id=device_id, commit=commit)
     return {"access_token": access, "refresh_token": refresh, "token_type": "bearer"}
 
 
@@ -83,24 +133,50 @@ def register(db: Session, payload: UserRegister, device_id: str | None = None) -
     if repo.get_user_by_username(db, username):
         raise UsernameTakenException()
 
+    family = None
+    invitation = None
+    if payload.family_code:
+        family, invitation = _resolve_registration_family(
+            db, payload.family_code, email
+        )
+
     requested_role = None
     if payload.role in {Role.ADMIN.value, "ADMIN"}:
         existing_count = db.query(User).count()
         if existing_count == 0:
             requested_role = Role.ADMIN
 
-    user = repo.create_user(
-        db,
-        username=username,
-        email=email,
-        hashed_password=hash_password(payload.password),
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-        role=requested_role,
-    )
-    raw_token = repo.create_email_verification(db, user.id)
+    try:
+        user = repo.create_user(
+            db,
+            username=username,
+            email=email,
+            hashed_password=hash_password(payload.password),
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            role=requested_role,
+            commit=False,
+        )
+        raw_token = repo.create_email_verification(db, user.id, commit=False)
+        if family is not None:
+            from app.family import repository as family_repo
+            from app.family.models import InvitationStatus
+
+            family_repo.add_or_reactivate_member(
+                db, family_id=family.id, user_id=user.id
+            )
+            if invitation is not None:
+                family_repo.update_invitation_status(
+                    db, invitation, InvitationStatus.ACCEPTED
+                )
+        tokens = _issue_tokens(db, user, device_id=device_id, commit=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     send_verification_email(user.email, raw_token, user.first_name or user.username)
-    return _issue_tokens(db, user, device_id=device_id)
+    return tokens
 
 
 def login(db: Session, email: str, password: str, device_id: str | None = None) -> dict:

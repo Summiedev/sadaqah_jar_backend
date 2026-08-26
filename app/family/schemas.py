@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum as PyEnum
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.envelope import Envelope
 
@@ -197,6 +197,18 @@ class InvitationResponse(BaseModel):
 
 class JoinRequest(BaseModel):
     invite_code: str = Field(..., min_length=1, max_length=64)
+
+    @field_validator("invite_code")
+    @classmethod
+    def normalize_invite_code(cls, value: str) -> str:
+        code = value.strip().upper()
+        if not code:
+            raise ValueError("Enter a family invite code")
+        if any(not (character.isalnum() or character in "-_") for character in code):
+            raise ValueError(
+                "Invalid family code. Please check the code and try again."
+            )
+        return code
 
 
 # ---------------------------------------------------------------------------

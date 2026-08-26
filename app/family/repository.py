@@ -54,6 +54,14 @@ def get_family_by_invite_code(db: Session, invite_code: str) -> Family | None:
     )
 
 
+def get_family_by_invite_code_including_deleted(
+    db: Session, invite_code: str
+) -> Family | None:
+    return db.scalar(
+        select(Family).where(func.upper(Family.invite_code) == invite_code.upper())
+    )
+
+
 def list_user_families(db: Session, user_id: int) -> Sequence[Family]:
     """Return all active families the user is a member of."""
     return db.scalars(
@@ -142,6 +150,18 @@ def get_member(db: Session, family_id: int, user_id: int) -> FamilyMember | None
     )
 
 
+def get_member_including_removed(
+    db: Session, family_id: int, user_id: int, *, for_update: bool = False
+) -> FamilyMember | None:
+    query = select(FamilyMember).where(
+        FamilyMember.family_id == family_id,
+        FamilyMember.user_id == user_id,
+    )
+    if for_update:
+        query = query.with_for_update()
+    return db.scalar(query)
+
+
 def get_member_by_id(db: Session, member_id: int) -> FamilyMember | None:
     return db.scalar(
         select(FamilyMember).where(
@@ -173,6 +193,27 @@ def add_member(
     db.add(member)
     db.flush()
     return member
+
+
+def add_or_reactivate_member(
+    db: Session,
+    *,
+    family_id: int,
+    user_id: int,
+    role: FamilyRole = FamilyRole.MEMBER,
+) -> tuple[FamilyMember, bool]:
+    """Create a membership or reactivate its soft-deleted unique row."""
+    member = get_member_including_removed(db, family_id, user_id, for_update=True)
+    if member is None:
+        return add_member(db, family_id=family_id, user_id=user_id, role=role), False
+    if member.deleted_at is None:
+        return member, False
+    member.deleted_at = None
+    member.role = role
+    member.joined_at = _utcnow()
+    db.add(member)
+    db.flush()
+    return member, True
 
 
 def update_member_role(
@@ -279,6 +320,33 @@ def create_invitation(
     db.add(invitation)
     db.flush()
     return invitation
+
+
+def get_pending_targeted_invitation(
+    db: Session,
+    *,
+    family_id: int,
+    invited_user_id: int | None,
+    invited_email: str | None,
+) -> FamilyInvitation | None:
+    if invited_user_id is None and invited_email is None:
+        return None
+    targets = []
+    if invited_user_id is not None:
+        targets.append(FamilyInvitation.invited_user_id == invited_user_id)
+    if invited_email is not None:
+        targets.append(
+            func.lower(FamilyInvitation.invited_email) == invited_email.lower()
+        )
+    return db.scalar(
+        select(FamilyInvitation).where(
+            FamilyInvitation.family_id == family_id,
+            FamilyInvitation.status == InvitationStatus.PENDING,
+            FamilyInvitation.deleted_at.is_(None),
+            FamilyInvitation.expires_at > _utcnow(),
+            or_(*targets),
+        )
+    )
 
 
 def update_invitation_status(

@@ -174,7 +174,107 @@ def test_targeted_invitation_is_visible_only_to_recipient_and_can_be_accepted(db
     saved = db.get(FamilyInvitation, invitation["id"])
     assert saved is not None
     assert saved.status == InvitationStatus.ACCEPTED
-    assert db.query(FamilyMember).filter_by(family_id=family.id, user_id=target.id).one()
+    assert (
+        db.query(FamilyMember).filter_by(family_id=family.id, user_id=target.id).one()
+    )
+
+
+def test_removed_member_can_rejoin_without_duplicate_membership(db):
+    owner = _create_user(db, "rejoin-owner", "rejoin-owner@example.com")
+    target = _create_user(db, "rejoin-target", "rejoin-target@example.com")
+    family = _create_family(db, owner.id, name="Rejoin Family")
+
+    first_join = client.post(
+        f"{API}/family/join",
+        json={"invite_code": family.invite_code},
+        headers=_headers(target.id),
+    )
+    assert first_join.status_code == 200, first_join.json()
+    original = (
+        db.query(FamilyMember).filter_by(family_id=family.id, user_id=target.id).one()
+    )
+    original_id = original.id
+
+    removed = client.delete(
+        f"{API}/family/{family.id}/members/{original_id}",
+        headers=_headers(owner.id),
+    )
+    assert removed.status_code in (200, 204)
+
+    # The original share code remains a valid route back into the family even
+    # though its invitation record was accepted on the first join.
+    db.query(FamilyInvitation).filter_by(family_id=family.id).delete()
+    db.commit()
+    second_join = client.post(
+        f"{API}/family/join",
+        json={"invite_code": family.invite_code},
+        headers=_headers(target.id),
+    )
+    assert second_join.status_code == 200, second_join.json()
+    memberships = (
+        db.query(FamilyMember).filter_by(family_id=family.id, user_id=target.id).all()
+    )
+    assert len(memberships) == 1
+    assert memberships[0].id == original_id
+    assert memberships[0].deleted_at is None
+
+
+def test_invalid_family_code_returns_clear_not_found(db):
+    user = _create_user(db, "invalid-code-user", "invalid-code@example.com")
+    response = client.post(
+        f"{API}/family/join",
+        json={"invite_code": "THIS-CODE-DOES-NOT-EXIST"},
+        headers=_headers(user.id),
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["message"] == (
+        "Invalid family code. Please check the code and try again."
+    )
+
+
+def test_signup_family_code_joins_in_same_request(db):
+    owner = _create_user(db, "signup-owner", "signup-owner@example.com")
+    family = _create_family(db, owner.id, name="Signup Family")
+    email = "signup-family-member@example.com"
+    username = "signup-family-member"
+    db.query(User).filter(User.email == email).delete()
+    db.query(User).filter(User.username == username).delete()
+    db.commit()
+
+    response = client.post(
+        f"{API}/auth/register",
+        json={
+            "username": username,
+            "email": email,
+            "password": "StrongPass123!",
+            "family_code": family.invite_code,
+        },
+    )
+    assert response.status_code == 200, response.json()
+    user = db.query(User).filter_by(email=email).one()
+    member = (
+        db.query(FamilyMember).filter_by(family_id=family.id, user_id=user.id).one()
+    )
+    assert member.deleted_at is None
+
+
+def test_invalid_signup_family_code_does_not_create_account(db):
+    email = "invalid-signup-family@example.com"
+    username = "invalid-signup-family"
+    db.query(User).filter(User.email == email).delete()
+    db.query(User).filter(User.username == username).delete()
+    db.commit()
+    response = client.post(
+        f"{API}/auth/register",
+        json={
+            "username": username,
+            "email": email,
+            "password": "StrongPass123!",
+            "family_code": "NO-SUCH-FAMILY",
+        },
+    )
+    assert response.status_code == 404
+    assert db.query(User).filter_by(email=email).first() is None
 
 
 def test_targeted_invitation_can_be_declined(db):

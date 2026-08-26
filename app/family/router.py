@@ -302,9 +302,7 @@ def list_invitations(family_id: int, db: DbDep, current_user: CurrentUser):
 
 
 @router.post("/invitations/id/{invitation_id}/accept", response_model=Envelope)
-def accept_invitation_by_id(
-    invitation_id: int, db: DbDep, current_user: CurrentUser
-):
+def accept_invitation_by_id(invitation_id: int, db: DbDep, current_user: CurrentUser):
     """Accept a pending targeted invitation owned by the current user."""
     family = service.accept_invitation_by_id(db, invitation_id, current_user.id)
     return Envelope(
@@ -314,9 +312,7 @@ def accept_invitation_by_id(
 
 
 @router.post("/invitations/id/{invitation_id}/decline", response_model=Envelope)
-def decline_invitation_by_id(
-    invitation_id: int, db: DbDep, current_user: CurrentUser
-):
+def decline_invitation_by_id(invitation_id: int, db: DbDep, current_user: CurrentUser):
     """Decline a pending targeted invitation owned by the current user."""
     service.decline_invitation_by_id(db, invitation_id, current_user.id)
     return Envelope(data=None, message="Invitation declined")

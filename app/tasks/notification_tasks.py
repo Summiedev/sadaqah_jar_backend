@@ -52,10 +52,11 @@ def deliver_event_notification(
     """
     db = SessionLocal()
     try:
-        # Check in-app preference
-        if not is_category_enabled(db, user_id, category, channel="in_app"):
+        in_app_enabled = is_category_enabled(db, user_id, category, channel="in_app")
+        push_enabled = is_category_enabled(db, user_id, category, channel="push")
+        if not in_app_enabled and not push_enabled:
             logger.info(
-                "User %s disabled in-app for category %s, skipping",
+                "User %s disabled all delivery channels for category %s",
                 user_id,
                 category,
             )
@@ -71,25 +72,30 @@ def deliver_event_notification(
 
         # Create in-app notification (idempotent) and capture its id so we
         # can include a deep_link in the push payload for direct routing.
-        notification = create_notification(
-            db,
-            user_id,
-            title=title,
-            message=message,
-            category=category,
-            action=action,
-            idempotency_key=idempotency_key,
-        )
-        db.commit()
+        notification = None
+        if in_app_enabled:
+            notification = create_notification(
+                db,
+                user_id,
+                title=title,
+                message=message,
+                category=category,
+                action=action,
+                idempotency_key=idempotency_key,
+            )
+            db.commit()
 
         # Send push if enabled
-        if is_category_enabled(db, user_id, category, channel="push"):
+        if push_enabled:
             merged_data = {"notification_type": notification_type}
             if data:
                 merged_data.update(data)
             # If we created a notification row, include a deep link to it.
             try:
-                merged_data.setdefault("deep_link", f"/notifications/{notification.id}")
+                if notification is not None:
+                    merged_data.setdefault(
+                        "deep_link", f"/notifications/{notification.id}"
+                    )
             except Exception:
                 pass
             send_push_notification(

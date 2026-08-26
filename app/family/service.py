@@ -22,6 +22,7 @@ import secrets
 
 from app.family.exceptions import (
     BusinessRuleException,
+    FamilyMembershipConflictException,
     FamilyNotFoundException,
     FamilyPermissionDeniedException,
     GoalAlreadyCompletedException,
@@ -528,6 +529,10 @@ def remove_member(db: Session, family_id: int, member_id: int, user_id: int) -> 
 
     # Self-removal (leave) is allowed for any member
     if target_member.user_id == user_id:
+        if target_member.role == FamilyRole.OWNER:
+            raise BusinessRuleException(
+                "Transfer ownership or delete the family before leaving"
+            )
         repo.soft_delete_member(db, target_member)
         db.commit()
         _log_and_return(
@@ -587,6 +592,19 @@ def create_invitation(
         invited_user_id = target.id if target else None
         if invited_user_id == user_id:
             raise BusinessRuleException("You cannot invite yourself")
+        if invited_user_id and repo.get_member(db, family_id, invited_user_id):
+            raise FamilyMembershipConflictException(
+                "This person is already a member of the family"
+            )
+        if repo.get_pending_targeted_invitation(
+            db,
+            family_id=family_id,
+            invited_user_id=invited_user_id,
+            invited_email=invited_email,
+        ):
+            raise FamilyMembershipConflictException(
+                "A pending invitation has already been sent to this person"
+            )
 
     invitation = repo.create_invitation(
         db,
@@ -670,9 +688,7 @@ def _require_targeted_invitation_access(
         )
 
 
-def accept_invitation_by_id(
-    db: Session, invitation_id: int, user_id: int
-) -> Family:
+def accept_invitation_by_id(db: Session, invitation_id: int, user_id: int) -> Family:
     invitation = repo.get_invitation_by_id(db, invitation_id)
     if not invitation:
         raise InvitationNotFoundException()
@@ -692,11 +708,13 @@ def cancel_invitation(
     db: Session, family_id: int, invitation_id: int, user_id: int
 ) -> None:
     """Cancel a pending invitation."""
-    _require_permission(db, family_id, user_id, Permission.CANCEL_INVITATION)
-
     invitation = repo.get_invitation_by_id(db, invitation_id)
     if not invitation or invitation.family_id != family_id:
         raise InvitationNotFoundException()
+    if invitation.invited_by != user_id:
+        _require_permission(db, family_id, user_id, Permission.CANCEL_INVITATION)
+    if invitation.status != InvitationStatus.PENDING:
+        raise InvitationExpiredException("Only pending invitations can be cancelled")
 
     repo.update_invitation_status(db, invitation, InvitationStatus.CANCELLED)
     db.commit()
@@ -709,13 +727,20 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
     if not invitation:
         family = repo.get_family_by_invite_code(db, invite_code)
         if not family:
-            raise InvalidInviteCodeException()
+            removed_family = repo.get_family_by_invite_code_including_deleted(
+                db, invite_code
+            )
+            if removed_family:
+                raise FamilyNotFoundException("This family is no longer available")
+            raise InvalidInviteCodeException(
+                "Invalid family code. Please check the code and try again."
+            )
 
         existing = repo.get_member(db, family.id, user_id)
         if existing:
-            raise FamilyPermissionDeniedException("Already a member of this family")
+            raise FamilyMembershipConflictException()
 
-        repo.add_member(db, family_id=family.id, user_id=user_id)
+        repo.add_or_reactivate_member(db, family_id=family.id, user_id=user_id)
         db.commit()
 
         ws_manager.send_family_event_threadsafe(
@@ -741,6 +766,10 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
 
     _require_targeted_invitation_access(db, invitation, user_id)
 
+    family = repo.get_family_by_id(db, invitation.family_id)
+    if not family:
+        raise FamilyNotFoundException("This family is no longer available")
+
     if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         repo.update_invitation_status(db, invitation, InvitationStatus.EXPIRED)
         db.commit()
@@ -749,14 +778,12 @@ def join_family(db: Session, payload: JoinRequest, user_id: int) -> Family:
     # Check if already a member
     existing = repo.get_member(db, invitation.family_id, user_id)
     if existing:
-        raise FamilyPermissionDeniedException("Already a member of this family")
+        raise FamilyMembershipConflictException()
 
     # Add member
-    repo.add_member(db, family_id=invitation.family_id, user_id=user_id)
+    repo.add_or_reactivate_member(db, family_id=invitation.family_id, user_id=user_id)
     repo.update_invitation_status(db, invitation, InvitationStatus.ACCEPTED)
     db.commit()
-
-    family = repo.get_family_by_id(db, invitation.family_id)
 
     # Sync service on the threadpool: schedule onto the main loop (see note in
     # create_family). asyncio.create_task() here would raise and 500 the join.
@@ -801,6 +828,13 @@ def decline_invitation(db: Session, invite_code: str, user_id: int) -> None:
         raise InvalidInviteCodeException()
 
     _require_targeted_invitation_access(db, invitation, user_id)
+
+    if invitation.status != InvitationStatus.PENDING:
+        raise InvitationExpiredException("Invitation is no longer valid")
+    if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+        repo.update_invitation_status(db, invitation, InvitationStatus.EXPIRED)
+        db.commit()
+        raise InvitationExpiredException("Invitation has expired")
 
     repo.update_invitation_status(db, invitation, InvitationStatus.DECLINED)
     db.commit()
@@ -1654,7 +1688,7 @@ def get_leaderboard(
 ) -> list[dict]:
     """Return a simple family leaderboard. Frontend compatibility endpoint."""
     _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
-    members = repo.list_members(db, family_id, include_deleted=False)
+    members = repo.list_members(db, family_id)
     member_user_ids = [m.user_id for m in members if m.user_id]
 
     if not member_user_ids:
@@ -1700,7 +1734,7 @@ def get_leaderboard(
 def get_top_contributor(db: Session, family_id: int, user_id: int) -> dict | None:
     """Return the top contributor for a family. Frontend compatibility endpoint."""
     _require_permission(db, family_id, user_id, Permission.VIEW_ACTIVITY)
-    members = repo.list_members(db, family_id, include_deleted=False)
+    members = repo.list_members(db, family_id)
     member_user_ids = [m.user_id for m in members if m.user_id]
 
     if not member_user_ids:
