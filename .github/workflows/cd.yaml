@@ -42,7 +42,70 @@ jobs:
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
+            set -Eeuo pipefail
             cd /opt/sadaqah-app/sadaqah_jar_backend
+
+            echo "== Disk usage before deployment =="
+            df -h /
+            docker system df
+
+            # These commands only remove resources Docker confirms are unused.
+            # Volumes are intentionally excluded because they hold production data.
+            echo "== Safe Docker cleanup before build =="
+            docker container prune -f || echo "Warning: container cleanup failed; continuing to disk guard."
+            docker image prune -af || echo "Warning: image cleanup failed; continuing to disk guard."
+            docker builder prune -af || echo "Warning: builder cleanup failed; continuing to disk guard."
+            docker network prune -f || echo "Warning: network cleanup failed; continuing to disk guard."
+
+            free_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+            minimum_kb=$((2 * 1024 * 1024))
+            if [ "${free_kb:-0}" -lt "$minimum_kb" ]; then
+              echo "ERROR: less than 2 GiB is available on /. Increase the VPS disk before deploying."
+              df -h /
+              docker system df
+              exit 1
+            fi
+
             git pull origin main
-            docker compose build app
-            docker compose up -d
+            docker compose config >/dev/null
+
+            # Keep PostgreSQL, Redis, MinIO, and Caddy running while the app
+            # containers are rebuilt and replaced.
+            docker compose up -d db redis minio caddy
+            # Build one service at a time to reduce peak layer-export usage on
+            # the small production disk.
+            COMPOSE_PARALLEL_LIMIT=1 docker compose build app worker beat
+            docker compose run --rm app alembic upgrade head
+            docker compose up -d --remove-orphans app worker beat
+
+            for service in app worker beat; do
+              if ! docker compose ps --status running --services | grep -qx "$service"; then
+                echo "ERROR: $service is not running after deployment."
+                docker compose logs --tail=100 "$service"
+                exit 1
+              fi
+            done
+
+            app_container="$(docker compose ps -q app)"
+            app_health=""
+            for attempt in $(seq 1 12); do
+              app_health="$(docker inspect -f '{{.State.Health.Status}}' "$app_container" 2>/dev/null || true)"
+              [ "$app_health" = "healthy" ] && break
+              sleep 5
+            done
+            if [ "$app_health" != "healthy" ]; then
+              echo "ERROR: app health check did not become healthy."
+              docker compose logs --tail=100 app
+              exit 1
+            fi
+
+            # Reclaim stale release images and build cache after the new
+            # containers are running. Never prune volumes here.
+            echo "== Safe Docker cleanup after deployment =="
+            docker image prune -af || echo "Warning: post-deploy image cleanup failed."
+            docker builder prune -af || echo "Warning: post-deploy builder cleanup failed."
+
+            echo "== Deployment status =="
+            docker compose ps
+            df -h /
+            docker system df

@@ -2,7 +2,8 @@ FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN UV_CACHE_DIR=/tmp/uv-cache uv sync --frozen --no-dev \
+    && rm -rf /tmp/uv-cache
 COPY . .
 RUN adduser --disabled-password --gecos "" appuser \
     && chown -R appuser:appuser /app

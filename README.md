@@ -302,11 +302,29 @@ worker. Production remains broker-backed.
 Typical deployment sequence:
 
 ```bash
-docker compose build
-docker compose up -d db redis minio
+# Before building, inspect disk usage and reclaim only unused Docker resources.
+df -h /
+docker system df
+docker container prune -f
+docker image prune -af
+docker builder prune -af
+docker network prune -f
+
+docker compose config
+docker compose up -d db redis minio caddy
+COMPOSE_PARALLEL_LIMIT=1 docker compose build app worker beat
 docker compose run --rm app alembic upgrade head
-docker compose up -d app worker beat
+docker compose up -d --remove-orphans app worker beat
+docker compose ps
+df -h /
+docker system df
 ```
+
+The production CD workflow also stops before a build when less than 2 GiB is
+available on the root filesystem. Cleanup deliberately never prunes Docker
+volumes, so PostgreSQL, Redis, MinIO, and Caddy data remain intact. Prefer the
+workflow for automated deployments so the disk guard and health checks are
+always applied.
 
 Before exposing the API:
 
