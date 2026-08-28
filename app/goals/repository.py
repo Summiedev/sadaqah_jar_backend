@@ -7,9 +7,14 @@ Uses synchronous SQLAlchemy sessions.
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.goals.models import GoalStatus, MonthlyGoalReview, UserGoal
+
+
+class ActiveGoalExistsError(ValueError):
+    """Raised when a user attempts to create a second active goal."""
 
 
 def _utcnow() -> datetime:
@@ -29,6 +34,19 @@ def create_goal(
     subtitle: str | None = None,
     month: str | None = None,
 ) -> UserGoal:
+    active_goal = db.scalar(
+        select(UserGoal)
+        .where(
+            UserGoal.user_id == user_id,
+            UserGoal.status == GoalStatus.ACTIVE,
+            UserGoal.deleted_at.is_(None),
+        )
+        .with_for_update()
+    )
+    if active_goal is not None:
+        raise ActiveGoalExistsError(
+            "You already have an active goal. Edit or complete it before creating another."
+        )
     goal = UserGoal(
         user_id=user_id,
         title=title,
@@ -37,7 +55,58 @@ def create_goal(
         month=month,
     )
     db.add(goal)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ActiveGoalExistsError(
+            "You already have an active goal. Edit or complete it before creating another."
+        ) from exc
+    db.refresh(goal)
+    return goal
+
+
+def replace_goal(
+    db: Session,
+    user_id: int,
+    title: str,
+    acts_target: int,
+    subtitle: str | None = None,
+    month: str | None = None,
+) -> UserGoal:
+    """Archive the current goal and create its successor atomically."""
+    current = db.scalar(
+        select(UserGoal)
+        .where(
+            UserGoal.user_id == user_id,
+            UserGoal.status == GoalStatus.ACTIVE,
+            UserGoal.deleted_at.is_(None),
+        )
+        .with_for_update()
+    )
+    now = _utcnow()
+    if current is not None:
+        current.status = GoalStatus.REPLACED
+        current.updated_at = now
+    goal = UserGoal(
+        user_id=user_id,
+        title=title,
+        subtitle=subtitle,
+        acts_target=acts_target,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(goal)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # The partial unique index is the final concurrency guard. Convert a
+        # race between two create requests into the same domain error as the
+        # pre-flight check instead of leaking a 500 response.
+        db.rollback()
+        raise ActiveGoalExistsError(
+            "You already have an active goal. Edit or complete it before creating another."
+        ) from exc
     db.refresh(goal)
     return goal
 
@@ -140,6 +209,21 @@ def update_goal_fields(
 def update_goal_status(
     db: Session, goal_id: int, user_id: int, status: GoalStatus
 ) -> UserGoal | None:
+    if status == GoalStatus.ACTIVE:
+        active_goal = db.scalar(
+            select(UserGoal)
+            .where(
+                UserGoal.user_id == user_id,
+                UserGoal.status == GoalStatus.ACTIVE,
+                UserGoal.deleted_at.is_(None),
+                UserGoal.id != goal_id,
+            )
+            .with_for_update()
+        )
+        if active_goal is not None:
+            raise ActiveGoalExistsError(
+                "You already have an active goal. Complete or replace it first."
+            )
     goal = get_goal(db, goal_id, user_id)
     if goal is None:
         return None
@@ -147,7 +231,13 @@ def update_goal_status(
     if status == GoalStatus.COMPLETED:
         goal.completed_at = _utcnow()
     goal.updated_at = _utcnow()
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ActiveGoalExistsError(
+            "You already have an active goal. Complete or replace it first."
+        ) from exc
     db.refresh(goal)
     return goal
 

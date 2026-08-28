@@ -9,6 +9,7 @@ from app.core.envelope import Envelope
 from app.db.deps import get_db
 from app.users.dependencies import get_current_user
 from app.users.models import User
+from app.goals import repository
 from app.goals import service
 from app.goals.schemas import (
     GoalCreate,
@@ -36,8 +37,26 @@ def create_goal(
     current_user: CurrentUser,
 ):
     """Create a new personal goal."""
-    result = service.create_goal(db, current_user.id, data)
+    try:
+        result = service.create_goal(db, current_user.id, data)
+    except repository.ActiveGoalExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return Envelope(data=result)
+
+
+@router.post("/{goal_id}/replace", response_model=Envelope, status_code=status.HTTP_201_CREATED)
+def replace_goal(
+    goal_id: int,
+    data: GoalCreate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Replace the active goal while preserving it in goal history."""
+    current = service.get_goal(db, goal_id, current_user.id)
+    if current is None or current.status != "active":
+        raise HTTPException(status_code=404, detail="Active goal not found")
+    result = service.replace_goal(db, current_user.id, data)
+    return Envelope(data=result, message="Goal replaced")
 
 
 @router.get("", response_model=Envelope)
@@ -108,7 +127,10 @@ def update_goal_status(
     current_user: CurrentUser,
 ):
     """Update goal status (active, completed, archived, replaced)."""
-    result = service.update_status(db, goal_id, current_user.id, data.status)
+    try:
+        result = service.update_status(db, goal_id, current_user.id, data.status)
+    except repository.ActiveGoalExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if result is None:
         raise HTTPException(status_code=404, detail="Goal not found")
     return Envelope(data=result)

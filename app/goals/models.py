@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -69,6 +70,13 @@ class UserGoal(Base):
     __table_args__ = (
         Index("ix_user_goals_active", "user_id", "status", "deleted_at"),
         Index("ix_user_goals_month", "user_id", "month", "status"),
+        Index(
+            "uq_user_goals_one_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status = 'active' AND deleted_at IS NULL"),
+            sqlite_where=text("status = 'active' AND deleted_at IS NULL"),
+        ),
     )
 
 

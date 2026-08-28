@@ -13,7 +13,7 @@ from app.models.jar import Jar
 from app.models.sadaqah_act import SadaqahAct
 from app.models.sadaqah_log import SadaqahLog
 from app.models.user import User
-from app.goals.models import UserGoal
+from app.goals.models import GoalStatus, UserGoal
 
 
 client = TestClient(app)
@@ -86,6 +86,9 @@ def _cleanup_family(db, family_id: int) -> None:
 
 
 def _cleanup_user_state(db, user_id: int) -> None:
+    db.query(UserGoal).filter(UserGoal.user_id == user_id).delete(
+        synchronize_session=False
+    )
     db.query(SadaqahLog).filter(SadaqahLog.user_id == user_id).delete(
         synchronize_session=False
     )
@@ -165,6 +168,112 @@ def test_add_star_restores_personal_goal_progress_after_relogin(db):
         )
         _cleanup_user_state(db, user.id)
 
+
+def test_personal_goal_allows_only_one_active_goal(db):
+    user = _create_user(db, "single-active-goal")
+    headers = _auth_header(user.id)
+    try:
+        first = client.post(
+            "/api/v1/goals",
+            json={"title": "Read daily", "acts_target": 10},
+            headers=headers,
+        )
+        assert first.status_code == 201
+
+        second = client.post(
+            "/api/v1/goals",
+            json={"title": "Give sadaqah", "acts_target": 5},
+            headers=headers,
+        )
+        assert second.status_code == 409
+        assert "active goal" in second.json()["error"]["message"]
+        assert (
+            db.query(UserGoal)
+            .filter(
+                UserGoal.user_id == user.id,
+                UserGoal.status == GoalStatus.ACTIVE,
+            )
+            .count()
+            == 1
+        )
+    finally:
+        _cleanup_user_state(db, user.id)
+
+
+def test_completed_goal_can_be_followed_by_a_new_goal(db):
+    user = _create_user(db, "completed-then-next-goal")
+    headers = _auth_header(user.id)
+    try:
+        first = client.post(
+            "/api/v1/goals",
+            json={"title": "First goal", "acts_target": 1},
+            headers=headers,
+        )
+        assert first.status_code == 201
+        first_id = first.json()["data"]["id"]
+
+        completed = client.patch(
+            f"/api/v1/goals/{first_id}/status",
+            json={"status": "completed"},
+            headers=headers,
+        )
+        assert completed.status_code == 200
+
+        second = client.post(
+            "/api/v1/goals",
+            json={"title": "Second goal", "acts_target": 20},
+            headers=headers,
+        )
+        assert second.status_code == 201
+        assert second.json()["data"]["status"] == GoalStatus.ACTIVE.value
+
+        history = client.get("/api/v1/goals", headers=headers)
+        assert history.status_code == 200
+        goals = history.json()["data"]["goals"]
+        assert {goal["status"] for goal in goals} == {
+            GoalStatus.ACTIVE.value,
+            GoalStatus.COMPLETED.value,
+        }
+    finally:
+        _cleanup_user_state(db, user.id)
+
+
+def test_replacing_goal_preserves_history_and_creates_one_active_goal(db):
+    user = _create_user(db, "replace-goal")
+    headers = _auth_header(user.id)
+    try:
+        first = client.post(
+            "/api/v1/goals",
+            json={"title": "Old intention", "acts_target": 10},
+            headers=headers,
+        )
+        assert first.status_code == 201
+        first_id = first.json()["data"]["id"]
+
+        replacement = client.post(
+            f"/api/v1/goals/{first_id}/replace",
+            json={"title": "New intention", "acts_target": 25},
+            headers=headers,
+        )
+        assert replacement.status_code == 201
+        assert replacement.json()["data"]["title"] == "New intention"
+
+        db.expire_all()
+        old = db.get(UserGoal, first_id)
+        assert old is not None
+        assert old.status == GoalStatus.REPLACED
+        assert (
+            db.query(UserGoal)
+            .filter(
+                UserGoal.user_id == user.id,
+                UserGoal.status == GoalStatus.ACTIVE,
+                UserGoal.deleted_at.is_(None),
+            )
+            .count()
+            == 1
+        )
+    finally:
+        _cleanup_user_state(db, user.id)
 
 def test_activity_completion_rejects_non_member_family_id(db):
     owner = _create_user(db, "activity_family_owner")

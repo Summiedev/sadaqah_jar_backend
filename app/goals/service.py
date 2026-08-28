@@ -53,6 +53,18 @@ def create_goal(db: Session, user_id: int, data: GoalCreate) -> GoalResponse:
     return _goal_to_response(goal)
 
 
+def replace_goal(db: Session, user_id: int, data: GoalCreate) -> GoalResponse:
+    goal = repo.replace_goal(
+        db,
+        user_id=user_id,
+        title=data.title,
+        acts_target=data.acts_target,
+        subtitle=data.subtitle,
+        month=data.month,
+    )
+    return _goal_to_response(goal)
+
+
 def get_goal(db: Session, goal_id: int, user_id: int) -> GoalResponse | None:
     goal = repo.get_goal(db, goal_id, user_id)
     if goal is None:

@@ -757,7 +757,11 @@ def google_auth(db: Session, payload: GoogleAuthRequest) -> dict:
 
     google_id = data.get("sub")
     email = data.get("email", "").lower()
-    email_verified = data.get("email_verified") == "true"
+    raw_email_verified = data.get("email_verified")
+    email_verified = raw_email_verified is True or (
+        isinstance(raw_email_verified, str)
+        and raw_email_verified.strip().lower() == "true"
+    )
     token_audience = data.get("aud")
 
     if not google_id or not email:
@@ -790,4 +794,8 @@ def google_auth(db: Session, payload: GoogleAuthRequest) -> dict:
             )
         if user.google_id is None:
             link_google_account(db, user, google_id)
+        if email_verified and not user.email_verified:
+            user.email_verified = True
+            db.add(user)
+            db.commit()
     return _issue_tokens(db, user)

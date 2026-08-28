@@ -37,6 +37,7 @@ dependencies = [
     "typing-inspection==0.4.2",
     "typing_extensions==4.15.0",
     "uvicorn==0.40.0",
+    "websockets==15.0.1",
     "email-validator==2.2.0",
     "wrapt==2.0.1",
     "alembic==1.18.5",
@@ -57,4 +58,3 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "--ignore=test_daily_acts.py --ignore=app/db/test_db.py"
 testpaths = ["app"]
-

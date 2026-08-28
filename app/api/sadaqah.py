@@ -329,7 +329,7 @@ def add_star(
         # client restores both after login, so leaving the goal at zero would
         # hide a real jar balance on a fresh install.
         current_month = today.strftime("%Y-%m")
-        active_goals = (
+        active_goal = (
             db.query(UserGoal)
             .filter(
                 UserGoal.user_id == user_id,
@@ -338,14 +338,17 @@ def add_star(
                 (UserGoal.month.is_(None) | (UserGoal.month == current_month)),
             )
             .with_for_update()
-            .all()
+            .order_by(UserGoal.created_at.desc(), UserGoal.id.desc())
+            .first()
         )
-        for goal in active_goals:
-            goal.acts_done = max(goal.acts_done + 1, active_jar.current_stars)
-            if goal.acts_done >= goal.acts_target:
-                goal.status = GoalStatus.COMPLETED
-                goal.completed_at = now
-            goal.updated_at = now
+        if active_goal is not None:
+            active_goal.acts_done = max(
+                active_goal.acts_done + 1, active_jar.current_stars
+            )
+            if active_goal.acts_done >= active_goal.acts_target:
+                active_goal.status = GoalStatus.COMPLETED
+                active_goal.completed_at = now
+            active_goal.updated_at = now
 
         # Create the log row.
         log = SadaqahLog(
