@@ -44,30 +44,99 @@ jobs:
           script: |
             set -Eeuo pipefail
             cd /opt/sadaqah-app/sadaqah_jar_backend
+            maintenance_started=0
 
-            echo "== Disk usage before deployment =="
+            on_deployment_error() {
+              exit_code=$?
+              if [ "$maintenance_started" -eq 1 ]; then
+                echo "ERROR: the replacement failed during low-space maintenance. app, worker, and beat may need redeployment."
+              fi
+              exit "$exit_code"
+            }
+            trap on_deployment_error ERR
+
+            free_disk_kb() {
+              df -Pk / | awk 'NR == 2 { print $4 }'
+            }
+
+            minimum_disk_kb=$((2 * 1024 * 1024))
+
+            echo "== Initial disk usage =="
             df -h /
             docker system df
 
             # These commands only remove resources Docker confirms are unused.
             # Volumes are intentionally excluded because they hold production data.
-            echo "== Safe Docker cleanup before build =="
+            echo "== Pre-release Docker cleanup =="
             docker container prune -f || echo "Warning: container cleanup failed; continuing to disk guard."
             docker image prune -af || echo "Warning: image cleanup failed; continuing to disk guard."
             docker builder prune -af || echo "Warning: builder cleanup failed; continuing to disk guard."
             docker network prune -f || echo "Warning: network cleanup failed; continuing to disk guard."
 
-            free_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
-            minimum_kb=$((2 * 1024 * 1024))
-            if [ "${free_kb:-0}" -lt "$minimum_kb" ]; then
-              echo "ERROR: less than 2 GiB is available on /. Increase the VPS disk before deploying."
-              df -h /
-              docker system df
-              exit 1
-            fi
-
+            # Validate the release before taking the application
+            # containers down. A pull/config failure therefore preserves the
+            # currently running release.
             git pull origin main
             docker compose config >/dev/null
+
+            free_kb="$(free_disk_kb)"
+            if [ "${free_kb:-0}" -lt "$minimum_disk_kb" ]; then
+              echo "Notice: free disk remains below 2 GiB after normal cleanup."
+              echo "== Low-space application recovery =="
+
+              app_container_image=""
+              worker_container_image=""
+              beat_container_image=""
+              app_container="$(docker compose ps -q app)"
+              worker_container="$(docker compose ps -q worker)"
+              beat_container="$(docker compose ps -q beat)"
+              if [ -n "$app_container" ]; then
+                app_container_image="$(docker inspect -f '{{.Image}}' "$app_container")"
+              fi
+              if [ -n "$worker_container" ]; then
+                worker_container_image="$(docker inspect -f '{{.Image}}' "$worker_container")"
+              fi
+              if [ -n "$beat_container" ]; then
+                beat_container_image="$(docker inspect -f '{{.Image}}' "$beat_container")"
+              fi
+
+              if [ -n "$app_container_image" ] \
+                && [ "$app_container_image" = "$worker_container_image" ] \
+                && [ "$app_container_image" = "$beat_container_image" ]; then
+                echo "app, worker, and beat reference the same backend image."
+                echo "That image cannot be reclaimed until all three containers stop."
+              else
+                echo "Application services reference different image IDs; all three will still be replaced in this emergency maintenance window."
+              fi
+
+              # Beat stops first so it cannot enqueue new periodic tasks while
+              # the worker is completing its current work.
+              maintenance_started=1
+              docker compose stop -t 30 beat
+
+              # Compose stop sends SIGTERM. The 60-second grace period allows
+              # Celery's warm shutdown to finish active tasks. Redis is not
+              # stopped, so queued messages remain in the broker.
+              docker compose stop -t 60 worker
+              docker compose stop -t 30 app
+
+              # Remove only the three application containers. db, redis,
+              # minio, caddy, and all Docker volumes remain untouched.
+              docker compose rm -f app worker beat
+
+              docker image prune -af || echo "Warning: image cleanup failed after application recovery."
+              docker builder prune -af || echo "Warning: builder cleanup failed after application recovery."
+
+              echo "== Disk usage after low-space recovery =="
+              df -h /
+              docker system df
+
+              free_kb="$(free_disk_kb)"
+              if [ "${free_kb:-0}" -lt "$minimum_disk_kb" ]; then
+                echo "ERROR: Insufficient free disk space after removing old application containers and unused images. VPS disk expansion is required."
+                exit 1
+              fi
+            fi
 
             # Keep PostgreSQL, Redis, MinIO, and Caddy running while the app
             # containers are rebuilt and replaced.
@@ -78,7 +147,7 @@ jobs:
             docker compose run --rm app alembic upgrade head
             docker compose up -d --remove-orphans app worker beat
 
-            for service in app worker beat; do
+            for service in app worker beat db redis minio caddy; do
               if ! docker compose ps --status running --services | grep -qx "$service"; then
                 echo "ERROR: $service is not running after deployment."
                 docker compose logs --tail=100 "$service"
@@ -101,7 +170,7 @@ jobs:
 
             # Reclaim stale release images and build cache after the new
             # containers are running. Never prune volumes here.
-            echo "== Safe Docker cleanup after deployment =="
+            echo "== Post-release Docker cleanup =="
             docker image prune -af || echo "Warning: post-deploy image cleanup failed."
             docker builder prune -af || echo "Warning: post-deploy builder cleanup failed."
 
