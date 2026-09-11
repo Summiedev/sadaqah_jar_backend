@@ -134,6 +134,22 @@ def test_authenticated_test_push_reports_missing_device(user):
     assert "No active device" in response.json()["error"]["message"]
 
 
+def test_preference_update_refreshes_current_day_schedule(user):
+    """Enabling reminders must not wait for the next daily beat run."""
+    token = create_access_token({"sub": str(user.id)})
+    with patch(
+        "app.notifications.router.schedule_user_aware_reminders.apply_async"
+    ) as refresh:
+        response = TestClient(app).put(
+            "/api/v1/notifications/preferences",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"all_enabled": True, "frequency": "medium"},
+        )
+
+    assert response.status_code == 200
+    refresh.assert_called_once_with(args=[user.id], queue="reminders")
+
+
 # ---------------------------------------------------------------------------
 # 2. Rapid-fire event deduplication
 # ---------------------------------------------------------------------------

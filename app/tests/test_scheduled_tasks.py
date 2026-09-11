@@ -16,7 +16,7 @@ import pytest
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.jar import Jar
-from app.notifications.models import Notification
+from app.notifications.models import Notification, ScheduledNotification
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
 from app.users.models import UserPreference
@@ -214,6 +214,50 @@ class TestAwareReminderRules:
             key="tahajjud_reminder"
         ).scalar()
         assert all(schedule.template_id != tahajjud_id for schedule in schedules)
+
+    @patch("app.tasks.scheduled_tasks.deliver_scheduled_notification.apply_async")
+    def test_missing_location_queues_full_timezone_fallback(self, mock_enqueue, db, user):
+        from app.tasks.scheduled_tasks import _schedule_timezone_fallbacks
+
+        mock_enqueue.return_value.id = "test-task-id"
+        local_date = date(2026, 8, 20)
+        user.preferences = UserPreference(
+            timezone="Africa/Lagos",
+            notification_preferences=json.dumps({"all_enabled": True}),
+            reminder_preferences=json.dumps({}),
+        )
+        for key, category in (
+            ("morning_adhkar", "adhkar_morning"),
+            ("quran_reminder", "quran"),
+            ("evening_adhkar", "adhkar_evening"),
+        ):
+            self._template(db, key, category)
+        db.commit()
+
+        _schedule_timezone_fallbacks(
+            db=db,
+            user=user,
+            local_date=local_date,
+            timezone_name="Africa/Lagos",
+        )
+
+        rows = (
+            db.query(ScheduledNotification)
+            .filter_by(user_id=user.id, local_date=local_date.isoformat())
+            .all()
+        )
+        keys = {
+            db.get(NotificationTemplate, row.template_id).key
+            for row in rows
+        }
+        assert {"morning_adhkar", "quran_reminder", "evening_adhkar"} <= keys
+        assert "random_sadaqah_prompt" in keys
+        assert mock_enqueue.call_count == len(rows)
+
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session=False)
+        db.commit()
 
     def test_prayer_relative_templates_deduplicate_semantic_group(self, db, user):
         from app.services.prayer_reminder_service import PrayerTimes, schedule_prayer_relative_templates

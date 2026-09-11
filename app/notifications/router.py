@@ -9,6 +9,7 @@ Background workers should consume the service layer directly rather than
 touching these endpoints.
 """
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -32,9 +33,11 @@ from app.notifications.schemas import (
 from app.services.push_notification_service import send_push_notification
 from app.users.models import UserPreference
 import json
+from app.tasks.scheduled_tasks import schedule_user_aware_reminders
 
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+logger = logging.getLogger(__name__)
 
 DbDep = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -223,6 +226,17 @@ def update_notification_preferences(
     pref.notification_preferences = json.dumps(data)
     db.add(pref)
     db.commit()
+    try:
+        # Preference changes must affect today's future reminders too. The
+        # refresh is asynchronous so a slow prayer-time provider cannot make
+        # the settings request feel broken.
+        schedule_user_aware_reminders.apply_async(
+            args=[current_user.id], queue="reminders"
+        )
+    except Exception:
+        logger.exception(
+            "Could not enqueue reminder refresh for user %s", current_user.id
+        )
     state = get_category_state(db, current_user.id)
     state["category_labels"] = CATEGORY_LABELS
     return Envelope(data=state)
