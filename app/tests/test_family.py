@@ -49,6 +49,8 @@ from app.family.models import (
     FamilyRole,
     FamilyInvitation,
     InvitationStatus,
+    FamilyIntention,
+    FamilyIntentionContribution,
 )
 
 client = TestClient(app)
@@ -399,6 +401,65 @@ def test_get_family_detail(db):
     data = resp.json()["data"]
     assert data["name"] == "Detail Fam"
     assert len(data["members"]) >= 1
+    _clean_family(db, family.id)
+
+
+def test_shared_weekly_intention_keeps_member_notes_private(db):
+    owner = _create_user(db, "intention-owner", "intention-owner@test.com")
+    member = _create_user(db, "intention-member", "intention-member@test.com")
+    family = _create_family(db, owner.id, name="Intention Family")
+
+    joined = client.post(
+        f"{API}/family/join",
+        json={"invite_code": family.invite_code},
+        headers=_headers(member.id),
+    )
+    assert joined.status_code == 200
+
+    created = client.put(
+        f"{API}/family/{family.id}/intention",
+        json={"title": "Make room for patience", "prompt": "One small step"},
+        headers=_headers(owner.id),
+    )
+    assert created.status_code == 200
+    assert created.json()["data"]["contributor_count"] == 0
+
+    contributed = client.patch(
+        f"{API}/family/{family.id}/intention/contribution",
+        json={"completed": True, "private_note": "I will pause before replying."},
+        headers=_headers(member.id),
+    )
+    assert contributed.status_code == 200
+    assert contributed.json()["data"]["my_contribution_completed"] is True
+    assert contributed.json()["data"]["contributor_count"] == 1
+
+    owner_view = client.get(
+        f"{API}/family/{family.id}/intention", headers=_headers(owner.id)
+    )
+    assert owner_view.status_code == 200
+    assert owner_view.json()["data"]["my_private_note"] is None
+    assert owner_view.json()["data"]["contributor_count"] == 1
+
+    member_view = client.get(
+        f"{API}/family/{family.id}/intention", headers=_headers(member.id)
+    )
+    assert member_view.json()["data"]["my_private_note"] == "I will pause before replying."
+
+    forbidden = client.put(
+        f"{API}/family/{family.id}/intention",
+        json={"title": "A second intention"},
+        headers=_headers(member.id),
+    )
+    assert forbidden.status_code == 403
+
+    db.query(FamilyIntentionContribution).filter(
+        FamilyIntentionContribution.intention_id.in_(
+            db.query(FamilyIntention.id).filter(FamilyIntention.family_id == family.id)
+        )
+    ).delete(synchronize_session=False)
+    db.query(FamilyIntention).filter(FamilyIntention.family_id == family.id).delete(
+        synchronize_session=False
+    )
     _clean_family(db, family.id)
 
 

@@ -1,4 +1,4 @@
-"""enforce one active personal goal per user."""
+"""repair the one-active-goal index for SQLAlchemy enum storage."""
 
 from typing import Sequence, Union
 
@@ -6,15 +6,26 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "f1a2b3c4d5e6"
-down_revision: Union[str, Sequence[str], None] = "d4e5f6a7b8c9"
+revision: str = "f7b8c9d0e1f2"
+down_revision: Union[str, Sequence[str], None] = "f6a7b8c9d0e1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Older installations may contain multiple active rows. Preserve the
-    # newest goal and keep the others in history before adding the constraint.
+    # Older deployments may already have the predicate from f1...; remove it
+    # before rebuilding the index with the value actually stored by
+    # sa.Enum(GoalStatus, native_enum=False).
+    op.drop_index("uq_user_goals_one_active", table_name="user_goals")
+    op.execute(
+        sa.text(
+            """
+            UPDATE user_goals
+            SET status = UPPER(status), updated_at = CURRENT_TIMESTAMP
+            WHERE status IN ('active', 'completed', 'archived', 'replaced')
+            """
+        )
+    )
     op.execute(
         sa.text(
             """
@@ -48,3 +59,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("uq_user_goals_one_active", table_name="user_goals")
+    op.create_index(
+        "uq_user_goals_one_active",
+        "user_goals",
+        ["user_id"],
+        unique=True,
+        postgresql_where=sa.text("status = 'ACTIVE' AND deleted_at IS NULL"),
+        sqlite_where=sa.text("status = 'ACTIVE' AND deleted_at IS NULL"),
+    )

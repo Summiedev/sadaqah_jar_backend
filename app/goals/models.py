@@ -74,8 +74,10 @@ class UserGoal(Base):
             "uq_user_goals_one_active",
             "user_id",
             unique=True,
-            postgresql_where=text("status = 'active' AND deleted_at IS NULL"),
-            sqlite_where=text("status = 'active' AND deleted_at IS NULL"),
+            # SQLAlchemy persists GoalStatus member names (ACTIVE, COMPLETED,
+            # ...) for this legacy non-native enum column.
+            postgresql_where=text("status = 'ACTIVE' AND deleted_at IS NULL"),
+            sqlite_where=text("status = 'ACTIVE' AND deleted_at IS NULL"),
         ),
     )
 

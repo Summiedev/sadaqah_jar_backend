@@ -328,14 +328,12 @@ def add_star(
         # Keep the jar and personal-goal progress in one transaction. The
         # client restores both after login, so leaving the goal at zero would
         # hide a real jar balance on a fresh install.
-        current_month = today.strftime("%Y-%m")
         active_goal = (
             db.query(UserGoal)
             .filter(
                 UserGoal.user_id == user_id,
                 UserGoal.status == GoalStatus.ACTIVE,
                 UserGoal.deleted_at.is_(None),
-                (UserGoal.month.is_(None) | (UserGoal.month == current_month)),
             )
             .with_for_update()
             .order_by(UserGoal.created_at.desc(), UserGoal.id.desc())

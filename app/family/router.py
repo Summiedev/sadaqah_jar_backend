@@ -34,6 +34,8 @@ from app.family.schemas import (
     FamilyGoalMilestoneCreate,
     FamilyGoalMilestoneUpdate,
     InvitationCreate,
+    FamilyIntentionCreate,
+    FamilyIntentionContributionUpdate,
 )
 
 router = APIRouter(prefix="/family", tags=["family"])
@@ -200,6 +202,45 @@ def get_top_contributor(family_id: int, db: DbDep, current_user: CurrentUser):
     """Top contributor for a family."""
     data = service.get_top_contributor(db, family_id, current_user.id)
     return Envelope(data=data)
+
+
+@router.get("/{family_id}/intention", response_model=Envelope)
+def get_current_intention(
+    family_id: int, db: DbDep, current_user: CurrentUser
+):
+    """Return this week's shared intention and only this member's private note."""
+    intention = service.get_current_intention(db, family_id, current_user.id)
+    return Envelope(data=intention.model_dump(mode="json") if intention else None)
+
+
+@router.put("/{family_id}/intention", response_model=Envelope)
+def set_current_intention(
+    family_id: int,
+    payload: FamilyIntentionCreate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Create or update the one shared intention for the current week."""
+    intention = service.set_current_intention(
+        db, family_id, payload, current_user.id
+    )
+    return Envelope(data=intention.model_dump(mode="json"), message="Intention saved")
+
+
+@router.patch("/{family_id}/intention/contribution", response_model=Envelope)
+def update_intention_contribution(
+    family_id: int,
+    payload: FamilyIntentionContributionUpdate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    """Save a member's private contribution to this week's intention."""
+    intention = service.update_intention_contribution(
+        db, family_id, payload, current_user.id
+    )
+    return Envelope(
+        data=intention.model_dump(mode="json"), message="Contribution saved"
+    )
 
 
 # ---------------------------------------------------------------------------

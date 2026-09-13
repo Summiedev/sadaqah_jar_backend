@@ -4,6 +4,7 @@ from threading import Barrier
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from app.core.security import create_access_token, hash_password
 from app.db.session import SessionLocal, engine
@@ -140,7 +141,9 @@ def test_add_star_restores_personal_goal_progress_after_relogin(db):
         title="Keep going",
         acts_target=10,
         acts_done=0,
-        month=None,
+        # The active goal is durable even if its legacy monthly label is from
+        # an earlier month. New acts must continue to advance it.
+        month="2020-01",
     )
     db.add(goal)
     db.commit()
@@ -252,16 +255,32 @@ def test_replacing_goal_preserves_history_and_creates_one_active_goal(db):
 
         replacement = client.post(
             f"/api/v1/goals/{first_id}/replace",
-            json={"title": "New intention", "acts_target": 25},
+            json={
+                "title": "New intention",
+                "acts_target": 25,
+                "month": "2026-09",
+            },
             headers=headers,
         )
         assert replacement.status_code == 201
         assert replacement.json()["data"]["title"] == "New intention"
+        assert replacement.json()["data"]["month"] == "2026-09"
 
         db.expire_all()
         old = db.get(UserGoal, first_id)
         assert old is not None
         assert old.status == GoalStatus.REPLACED
+        historical_edit = client.patch(
+            f"/api/v1/goals/{first_id}",
+            json={"title": "Do not mutate history", "acts_target": 30},
+            headers=headers,
+        )
+        assert historical_edit.status_code == 404
+        historical_delete = client.delete(
+            f"/api/v1/goals/{first_id}",
+            headers=headers,
+        )
+        assert historical_delete.status_code == 204
         assert (
             db.query(UserGoal)
             .filter(
@@ -274,6 +293,75 @@ def test_replacing_goal_preserves_history_and_creates_one_active_goal(db):
         )
     finally:
         _cleanup_user_state(db, user.id)
+
+
+def test_active_goal_must_be_completed_or_replaced_before_delete(db):
+    user = _create_user(db, "active-goal-delete")
+    headers = _auth_header(user.id)
+    try:
+        created = client.post(
+            "/api/v1/goals",
+            json={"title": "Keep this intention", "acts_target": 10},
+            headers=headers,
+        )
+        assert created.status_code == 201
+        goal_id = created.json()["data"]["id"]
+
+        deleted = client.delete(f"/api/v1/goals/{goal_id}", headers=headers)
+        assert deleted.status_code == 409
+        assert "complete or replace" in deleted.json()["error"]["message"].lower()
+    finally:
+        _cleanup_user_state(db, user.id)
+
+
+def test_active_goal_cannot_bypass_complete_or_replace_workflow(db):
+    user = _create_user(db, "active-goal-transition")
+    headers = _auth_header(user.id)
+    try:
+        created = client.post(
+            "/api/v1/goals",
+            json={"title": "Keep this intention", "acts_target": 10},
+            headers=headers,
+        )
+        assert created.status_code == 201
+        goal_id = created.json()["data"]["id"]
+
+        archived = client.patch(
+            f"/api/v1/goals/{goal_id}/status",
+            json={"status": "archived"},
+            headers=headers,
+        )
+        assert archived.status_code == 409
+        assert "complete" in archived.json()["error"]["message"].lower()
+    finally:
+        _cleanup_user_state(db, user.id)
+
+
+def test_database_index_allows_only_one_active_goal(db):
+    user = _create_user(db, "active-goal-index")
+    try:
+        db.add_all(
+            [
+                UserGoal(
+                    user_id=user.id,
+                    title="First",
+                    acts_target=10,
+                    status=GoalStatus.ACTIVE,
+                ),
+                UserGoal(
+                    user_id=user.id,
+                    title="Second",
+                    acts_target=10,
+                    status=GoalStatus.ACTIVE,
+                ),
+            ]
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+    finally:
+        _cleanup_user_state(db, user.id)
+
 
 def test_activity_completion_rejects_non_member_family_id(db):
     owner = _create_user(db, "activity_family_owner")

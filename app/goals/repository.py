@@ -17,6 +17,14 @@ class ActiveGoalExistsError(ValueError):
     """Raised when a user attempts to create a second active goal."""
 
 
+class ActiveGoalDeleteError(ValueError):
+    """Raised when an active goal is deleted instead of completed/replaced."""
+
+
+class ActiveGoalTransitionError(ValueError):
+    """Raised when an active goal bypasses the complete/replace workflow."""
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -88,11 +96,15 @@ def replace_goal(
     if current is not None:
         current.status = GoalStatus.REPLACED
         current.updated_at = now
+    effective_month = month
+    if effective_month is None and current is not None:
+        effective_month = current.month
     goal = UserGoal(
         user_id=user_id,
         title=title,
         subtitle=subtitle,
         acts_target=acts_target,
+        month=effective_month,
         created_at=now,
         updated_at=now,
     )
@@ -171,7 +183,7 @@ def update_goal_progress(
     db: Session, goal_id: int, user_id: int, acts_done: int
 ) -> UserGoal | None:
     goal = get_goal(db, goal_id, user_id)
-    if goal is None:
+    if goal is None or goal.status != GoalStatus.ACTIVE:
         return None
     goal.acts_done = acts_done
     if acts_done >= goal.acts_target and goal.status == GoalStatus.ACTIVE:
@@ -192,7 +204,7 @@ def update_goal_fields(
     acts_target: int | None = None,
 ) -> UserGoal | None:
     goal = get_goal(db, goal_id, user_id)
-    if goal is None:
+    if goal is None or goal.status != GoalStatus.ACTIVE:
         return None
     if title is not None:
         goal.title = title
@@ -209,6 +221,18 @@ def update_goal_fields(
 def update_goal_status(
     db: Session, goal_id: int, user_id: int, status: GoalStatus
 ) -> UserGoal | None:
+    goal = get_goal(db, goal_id, user_id)
+    if goal is None:
+        return None
+    if goal.status != GoalStatus.ACTIVE and status != goal.status:
+        return None
+    if goal.status == GoalStatus.ACTIVE and status not in (
+        GoalStatus.ACTIVE,
+        GoalStatus.COMPLETED,
+    ):
+        raise ActiveGoalTransitionError(
+            "Complete the active goal or use replace before starting another one."
+        )
     if status == GoalStatus.ACTIVE:
         active_goal = db.scalar(
             select(UserGoal)
@@ -224,9 +248,6 @@ def update_goal_status(
             raise ActiveGoalExistsError(
                 "You already have an active goal. Complete or replace it first."
             )
-    goal = get_goal(db, goal_id, user_id)
-    if goal is None:
-        return None
     goal.status = status
     if status == GoalStatus.COMPLETED:
         goal.completed_at = _utcnow()
@@ -246,6 +267,10 @@ def delete_goal(db: Session, goal_id: int, user_id: int) -> bool:
     goal = get_goal(db, goal_id, user_id)
     if goal is None:
         return False
+    if goal.status == GoalStatus.ACTIVE:
+        raise ActiveGoalDeleteError(
+            "Complete or replace your active goal instead of deleting it."
+        )
     goal.deleted_at = _utcnow()
     db.commit()
     return True

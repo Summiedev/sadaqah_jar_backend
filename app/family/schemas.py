@@ -3,7 +3,7 @@
 Follows the response envelope convention from app.core.envelope.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum as PyEnum
 from typing import Any
 
@@ -157,6 +157,40 @@ class FamilyDetailResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class FamilyIntentionCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    prompt: str | None = Field(None, max_length=2000)
+
+    @field_validator("title", "prompt")
+    @classmethod
+    def trim_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+
+class FamilyIntentionContributionUpdate(BaseModel):
+    completed: bool = False
+    private_note: str | None = Field(None, max_length=4000)
+
+    @field_validator("private_note")
+    @classmethod
+    def trim_note(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+
+class FamilyIntentionResponse(BaseModel):
+    id: int
+    family_id: int
+    week_start: date
+    title: str
+    prompt: str | None = None
+    contributor_count: int = 0
+    my_contribution_completed: bool = False
+    my_private_note: str | None = None
+    created_by: int
+    created_at: datetime
+    updated_at: datetime
 
 
 # ---------------------------------------------------------------------------

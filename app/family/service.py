@@ -16,7 +16,7 @@ These are logged to the activity timeline and prepared for future event bus cons
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 import secrets
 
@@ -55,6 +55,8 @@ from app.family.models import (
     FamilyReflection,
     FamilyReflectionComment,
     FamilySettings,
+    FamilyIntention,
+    FamilyIntentionContribution,
 )
 from app.models.sadaqah_log import SadaqahLog
 from app.core.ws_manager import manager as ws_manager
@@ -86,6 +88,9 @@ from app.family.schemas import (
     ActivityResponse,
     ActivityPage,
     InvitationCreate,
+    FamilyIntentionCreate,
+    FamilyIntentionContributionUpdate,
+    FamilyIntentionResponse,
 )
 
 
@@ -124,6 +129,7 @@ class Permission:
     ANSWER_PRAYER = "answer_prayer"  # mark own prayer as answered
     CREATE_REFLECTION = "create_reflection"
     MANAGE_SETTINGS = "manage_settings"
+    MANAGE_SHARED_INTENTION = "manage_shared_intention"
     VIEW_ACTIVITY = "view_activity"
     VIEW_MEMBERS = "view_members"
     LEAVE_FAMILY = "leave_family"
@@ -141,6 +147,7 @@ ROLE_PERMISSIONS: dict[FamilyRole, set[str]] = {
         Permission.ANSWER_PRAYER,
         Permission.CREATE_REFLECTION,
         Permission.MANAGE_SETTINGS,
+        Permission.MANAGE_SHARED_INTENTION,
         Permission.VIEW_ACTIVITY,
         Permission.VIEW_MEMBERS,
         Permission.LEAVE_FAMILY,
@@ -154,6 +161,7 @@ ROLE_PERMISSIONS: dict[FamilyRole, set[str]] = {
         Permission.ANSWER_PRAYER,
         Permission.CREATE_REFLECTION,
         Permission.MANAGE_SETTINGS,
+        Permission.MANAGE_SHARED_INTENTION,
         Permission.VIEW_ACTIVITY,
         Permission.VIEW_MEMBERS,
         Permission.LEAVE_FAMILY,
@@ -421,6 +429,140 @@ def list_user_families(db: Session, user_id: int) -> list[FamilyResponse]:
         )
 
     return results
+
+
+def _current_week_start() -> date:
+    today = datetime.now(timezone.utc).date()
+    return today - timedelta(days=today.weekday())
+
+
+def _intention_response(
+    db: Session, intention: FamilyIntention, user_id: int
+) -> FamilyIntentionResponse:
+    mine = (
+        db.query(FamilyIntentionContribution)
+        .filter(
+            FamilyIntentionContribution.intention_id == intention.id,
+            FamilyIntentionContribution.user_id == user_id,
+        )
+        .first()
+    )
+    contributor_count = (
+        db.query(func.count(FamilyIntentionContribution.id))
+        .filter(
+            FamilyIntentionContribution.intention_id == intention.id,
+            FamilyIntentionContribution.completed.is_(True),
+        )
+        .scalar()
+        or 0
+    )
+    return FamilyIntentionResponse(
+        id=intention.id,
+        family_id=intention.family_id,
+        week_start=intention.week_start,
+        title=intention.title,
+        prompt=intention.prompt,
+        contributor_count=int(contributor_count),
+        my_contribution_completed=bool(mine and mine.completed),
+        my_private_note=mine.private_note if mine else None,
+        created_by=intention.created_by,
+        created_at=intention.created_at,
+        updated_at=intention.updated_at,
+    )
+
+
+def get_current_intention(
+    db: Session, family_id: int, user_id: int
+) -> FamilyIntentionResponse | None:
+    _require_family_access(db, family_id, user_id)
+    intention = (
+        db.query(FamilyIntention)
+        .filter(
+            FamilyIntention.family_id == family_id,
+            FamilyIntention.week_start == _current_week_start(),
+            FamilyIntention.deleted_at.is_(None),
+        )
+        .first()
+    )
+    return _intention_response(db, intention, user_id) if intention else None
+
+
+def set_current_intention(
+    db: Session,
+    family_id: int,
+    payload: FamilyIntentionCreate,
+    user_id: int,
+) -> FamilyIntentionResponse:
+    _require_permission(db, family_id, user_id, Permission.MANAGE_SHARED_INTENTION)
+    week_start = _current_week_start()
+    intention = (
+        db.query(FamilyIntention)
+        .filter(
+            FamilyIntention.family_id == family_id,
+            FamilyIntention.week_start == week_start,
+        )
+        .first()
+    )
+    if intention and intention.deleted_at is not None:
+        intention.deleted_at = None
+    if intention:
+        intention.title = payload.title
+        intention.prompt = payload.prompt
+        intention.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    else:
+        intention = FamilyIntention(
+            family_id=family_id,
+            week_start=week_start,
+            title=payload.title,
+            prompt=payload.prompt,
+            created_by=user_id,
+        )
+        db.add(intention)
+    db.commit()
+    db.refresh(intention)
+    return _intention_response(db, intention, user_id)
+
+
+def update_intention_contribution(
+    db: Session,
+    family_id: int,
+    payload: FamilyIntentionContributionUpdate,
+    user_id: int,
+) -> FamilyIntentionResponse:
+    _require_family_access(db, family_id, user_id)
+    intention = (
+        db.query(FamilyIntention)
+        .filter(
+            FamilyIntention.family_id == family_id,
+            FamilyIntention.week_start == _current_week_start(),
+            FamilyIntention.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not intention:
+        raise BusinessRuleException("Your family has not chosen an intention yet")
+    contribution = (
+        db.query(FamilyIntentionContribution)
+        .filter(
+            FamilyIntentionContribution.intention_id == intention.id,
+            FamilyIntentionContribution.user_id == user_id,
+        )
+        .first()
+    )
+    if not contribution:
+        contribution = FamilyIntentionContribution(
+            intention_id=intention.id,
+            user_id=user_id,
+            completed=payload.completed,
+            private_note=payload.private_note,
+        )
+        db.add(contribution)
+    else:
+        contribution.completed = payload.completed
+        contribution.private_note = payload.private_note
+    db.commit()
+    db.refresh(intention)
+    return _intention_response(db, intention, user_id)
 
 
 def update_family(

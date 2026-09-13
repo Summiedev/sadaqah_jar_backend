@@ -7,11 +7,12 @@ Every model follows the conventions established in app/users/models.py:
 - native_enum=False for SQLAlchemy Enum
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -130,6 +131,9 @@ class Family(Base):
         back_populates="family",
         uselist=False,
         cascade="all, delete-orphan",
+    )
+    intentions = relationship(
+        "FamilyIntention", back_populates="family", cascade="all, delete-orphan"
     )
 
 
@@ -549,6 +553,94 @@ class FamilySettings(Base):
     )
 
     family = relationship("Family", back_populates="settings")
+
+
+# ---------------------------------------------------------------------------
+# FamilyIntention
+# ---------------------------------------------------------------------------
+
+
+class FamilyIntention(Base):
+    """The single shared intention a family carries during a given week."""
+
+    __tablename__ = "family_intentions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    family_id: Mapped[int] = mapped_column(
+        ForeignKey("families.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
+
+    family = relationship("Family", back_populates="intentions")
+    contributions = relationship(
+        "FamilyIntentionContribution",
+        back_populates="intention",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "family_id", "week_start", name="uq_family_intention_week"
+        ),
+        Index("ix_family_intentions_current", "family_id", "week_start", "deleted_at"),
+    )
+
+
+class FamilyIntentionContribution(Base):
+    """A private member contribution to the family's shared intention.
+
+    The note is deliberately never included in other members' responses.
+    Only the aggregate contributor count is shared with the family.
+    """
+
+    __tablename__ = "family_intention_contributions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    intention_id: Mapped[int] = mapped_column(
+        ForeignKey("family_intentions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    private_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    intention = relationship(
+        "FamilyIntention", back_populates="contributions"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "intention_id", "user_id", name="uq_family_intention_contributor"
+        ),
+        Index(
+            "ix_family_intention_contributions_user",
+            "user_id",
+            "intention_id",
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

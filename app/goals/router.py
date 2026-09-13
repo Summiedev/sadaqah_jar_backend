@@ -55,7 +55,10 @@ def replace_goal(
     current = service.get_goal(db, goal_id, current_user.id)
     if current is None or current.status != "active":
         raise HTTPException(status_code=404, detail="Active goal not found")
-    result = service.replace_goal(db, current_user.id, data)
+    try:
+        result = service.replace_goal(db, current_user.id, data)
+    except repository.ActiveGoalExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return Envelope(data=result, message="Goal replaced")
 
 
@@ -131,6 +134,8 @@ def update_goal_status(
         result = service.update_status(db, goal_id, current_user.id, data.status)
     except repository.ActiveGoalExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except repository.ActiveGoalTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if result is None:
         raise HTTPException(status_code=404, detail="Goal not found")
     return Envelope(data=result)
@@ -143,7 +148,10 @@ def delete_goal(
     current_user: CurrentUser,
 ):
     """Soft-delete a goal."""
-    deleted = service.delete_goal(db, goal_id, current_user.id)
+    try:
+        deleted = service.delete_goal(db, goal_id, current_user.id)
+    except repository.ActiveGoalDeleteError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="Goal not found")
 
