@@ -312,7 +312,8 @@ docker network prune -f
 
 docker compose config
 docker compose up -d db redis minio caddy
-COMPOSE_PARALLEL_LIMIT=1 docker compose build app worker beat
+# Build the one shared backend image. app, worker, and beat reuse it.
+docker compose build app
 docker compose run --rm app alembic upgrade head
 docker compose up -d --remove-orphans app worker beat
 docker compose ps

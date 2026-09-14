@@ -1,8 +1,12 @@
+x-backend: &backend
+  image: sadaqah_jar_backend:latest
+  restart: unless-stopped
+  env_file: .env
+
 services:
   app:
+    <<: *backend
     build: .
-    restart: unless-stopped
-    env_file: .env
     environment:
       FCM_SERVICE_ACCOUNT_PATH: ${FCM_SERVICE_ACCOUNT_PATH:-/opt/secure/mizan-97a67-firebase-adminsdk-fbsvc-219c32ed91.json}
     volumes:
@@ -23,9 +27,7 @@ services:
       retries: 3
 
   worker:
-    build: .
-    restart: unless-stopped
-    env_file: .env
+    <<: *backend
     environment:
       FCM_SERVICE_ACCOUNT_PATH: ${FCM_SERVICE_ACCOUNT_PATH:-/opt/secure/mizan-97a67-firebase-adminsdk-fbsvc-219c32ed91.json}
     volumes:
@@ -40,9 +42,7 @@ services:
         condition: service_started
 
   beat:
-    build: .
-    restart: unless-stopped
-    env_file: .env
+    <<: *backend
     command: celery -A app.core.celery_app.celery_app beat --loglevel=INFO
     depends_on:
       db:

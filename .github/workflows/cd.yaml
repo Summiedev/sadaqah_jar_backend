@@ -141,9 +141,10 @@ jobs:
             # Keep PostgreSQL, Redis, MinIO, and Caddy running while the app
             # containers are rebuilt and replaced.
             docker compose up -d db redis minio caddy
-            # Build one service at a time to reduce peak layer-export usage on
-            # the small production disk.
-            COMPOSE_PARALLEL_LIMIT=1 docker compose build app worker beat
+            # app builds the single shared backend image used by app, worker,
+            # and beat. Building the three services separately would export
+            # the same large .venv layers three times on this small VPS.
+            docker compose build app
             docker compose run --rm app alembic upgrade head
             docker compose up -d --remove-orphans app worker beat
 
