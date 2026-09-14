@@ -49,6 +49,10 @@ def create_notification(
         action=action,
         idempotency_key=idempotency_key,
     )
+    return _notification_response(notification)
+
+
+def _notification_response(notification) -> NotificationResponse:
     return NotificationResponse(
         id=notification.id,
         category=notification.category,
@@ -81,18 +85,7 @@ def list_notifications(
         db, user_id, unread=unread, limit=limit, offset=offset
     )
     return (
-        [
-            NotificationResponse(
-                id=n.id,
-                category=n.category,
-                title=n.title,
-                message=n.message,
-                action=n.action,
-                is_read=n.is_read,
-                created_at=n.created_at,
-            )
-            for n in rows
-        ],
+        [_notification_response(n) for n in rows],
         total,
     )
 
@@ -103,15 +96,7 @@ def get_notification(
     notification = repo.get_notification(db, notification_id, user_id)
     if not notification:
         raise NotificationNotFoundException("Notification not found")
-    return NotificationResponse(
-        id=notification.id,
-        category=notification.category,
-        title=notification.title,
-        message=notification.message,
-        action=notification.action,
-        is_read=notification.is_read,
-        created_at=notification.created_at,
-    )
+    return _notification_response(notification)
 
 
 def mark_read(
@@ -120,15 +105,7 @@ def mark_read(
     notification = repo.mark_notification_read(db, notification_id, user_id)
     if notification is None:
         raise NotificationNotFoundException("Notification not found")
-    return NotificationResponse(
-        id=notification.id,
-        category=notification.category,
-        title=notification.title,
-        message=notification.message,
-        action=notification.action,
-        is_read=notification.is_read,
-        created_at=notification.created_at,
-    )
+    return _notification_response(notification)
 
 
 def mark_all_read(db: Session, user_id: int) -> int:

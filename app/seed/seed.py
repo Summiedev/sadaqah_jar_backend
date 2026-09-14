@@ -863,7 +863,7 @@ class DatabaseSeeder:
             (
                 "morning_adhkar",
                 "Morning adhkar",
-                "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×",
+                "{arabic}\n{translation}\n{source} · Repeat {repeat_count}×\nA gentle start: recite with presence and carry this remembrance into your morning.",
                 "adhkar",
                 {
                     "anchor": "fajr",
@@ -934,8 +934,8 @@ class DatabaseSeeder:
             ),
             (
                 "quran_reminder",
-                "A moment with the Quran",
-                "Open the Quran today, even for a few verses, and let it settle in your heart.",
+                "A page with the Quran",
+                "Take a few quiet minutes with the Quran today. Even one page is a meaningful step.",
                 "reading",
                 {"anchor": "maghrib", "offset_minutes": 30},
             ),
@@ -1153,7 +1153,7 @@ class DatabaseSeeder:
             (
                 "reflection_prompt",
                 "{title}",
-                "{message}",
+                "{message}\nWrite one honest line in Mizan, then choose one small action to carry forward.",
                 "reflection",
                 {
                     "anchor": "isha",
@@ -1182,7 +1182,7 @@ class DatabaseSeeder:
             (
                 "random_sadaqah_prompt",
                 "A small sadaqah",
-                "{title}. {message}",
+                "{title}. {message} A small act, offered sincerely, is never small with Allah.",
                 "charity",
                 {
                     "content_source": "good_deeds",

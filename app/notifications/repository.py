@@ -93,6 +93,7 @@ def mark_notification_read(
     notification = get_notification(db, notification_id, user_id)
     if notification is not None and not notification.is_read:
         notification.is_read = True
+        notification.read_at = _utcnow()
         db.commit()
         db.refresh(notification)
     return notification
@@ -102,7 +103,10 @@ def mark_all_notifications_read(db: Session, user_id: int) -> int:
     result = (
         db.query(Notification)
         .filter(Notification.user_id == user_id, Notification.is_read.is_(False))
-        .update({"is_read": True}, synchronize_session=False)
+        .update(
+            {"is_read": True, "read_at": _utcnow()},
+            synchronize_session=False,
+        )
     )
     db.commit()
     return result

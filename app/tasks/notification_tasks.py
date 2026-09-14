@@ -96,6 +96,7 @@ def deliver_event_notification(
                     merged_data.setdefault(
                         "deep_link", f"/notifications/{notification.id}"
                     )
+                    merged_data.setdefault("notification_id", str(notification.id))
             except Exception:
                 pass
             send_push_notification(

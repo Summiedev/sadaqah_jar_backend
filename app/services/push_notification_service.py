@@ -115,6 +115,9 @@ def send_push_notification(
                         notification=messaging.AndroidNotification(
                             channel_id="mizan_reminders_v2",
                             icon="ic_stat_mizan",
+                            # Keep reminders visible in Android's status shade
+                            # with the same warm brand accent used by Mizan.
+                            color="#A96F43",
                             sound="default",
                         ),
                     ),

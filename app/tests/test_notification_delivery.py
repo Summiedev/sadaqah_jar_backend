@@ -336,3 +336,28 @@ class TestDeliveryIdempotency:
             .count()
             == 0
         )
+
+
+def test_viewing_notification_sets_read_timestamp_without_delivery_side_effect(db, user):
+    notification = Notification(
+        user_id=user.id,
+        category="reflection",
+        title="A quiet pause",
+        message="Write one honest line when you are ready.",
+        status="created",
+    )
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    token = create_access_token({"sub": str(user.id)})
+
+    response = TestClient(app).patch(
+        f"/api/v1/notifications/{notification.id}/read",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    db.refresh(notification)
+    assert notification.is_read is True
+    assert notification.read_at is not None
+    assert notification.delivered_at is None

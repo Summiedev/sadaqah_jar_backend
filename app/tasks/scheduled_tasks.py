@@ -373,6 +373,17 @@ def _schedule_timezone_rhythm(*, db, user_id: int, local_date, timezone_name: st
         ("quran_reminder", time(14, 0)),
         ("evening_adhkar", time(18, 30)),
     ]
+    # Keep one reflective pause, but vary its time predictably by user/day so
+    # the same person does not receive it at exactly the same minute every day.
+    # The stable digest also makes retries idempotent and keeps the rhythm calm.
+    digest = hashlib.sha256(f"reflection:{user_id}:{local_date}".encode()).hexdigest()
+    reflection_minutes = 19 * 60 + int(digest[:8], 16) % 120
+    slots.append(
+        (
+            "reflection_prompt",
+            time(reflection_minutes // 60, reflection_minutes % 60),
+        )
+    )
     if local_date.weekday() == 4 and _is_friday_enabled(user):
         slots.extend((("friday_reminder", time(9, 0)), ("friday_kahf_reminder", time(15, 0))))
     if _explicit_reminder_enabled(user, "tahajjud", default=False):
@@ -529,6 +540,7 @@ def _apply_rhythm_deep_links(db) -> None:
         "friday_reminder": "/journey",
         "friday_expanded": "/journey",
         "tahajjud_reminder": "/home",
+        "reflection_prompt": "/journey?tab=reflection",
         "random_sadaqah_prompt": "/home?open=sadaqah",
     }
     changed = False
@@ -636,6 +648,7 @@ def deliver_scheduled_notification(self, schedule_id: int):
                 "category": template.category,
                 "template_key": template.key,
                 "deep_link": deep_link or f"/notifications/{notification.id}",
+                "notification_id": str(notification.id),
             },
         )
         if delivered:
