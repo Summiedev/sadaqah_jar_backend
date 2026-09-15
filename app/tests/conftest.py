@@ -1,18 +1,12 @@
-from pathlib import Path
+import atexit
 import os
 import sys
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-_TEST_DB_DIR = PROJECT_ROOT / ".pytest_tmp"
-_TEST_DB_DIR.mkdir(exist_ok=True)
-_TEST_DB_PATH = _TEST_DB_DIR / "test.db"
-if _TEST_DB_PATH.exists():
-    _TEST_DB_PATH.unlink()
-
-os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{_TEST_DB_PATH.as_posix()}"
 os.environ.setdefault("APP_NAME", "Mizan Test API")
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6399/15")
@@ -25,6 +19,9 @@ from app.db.session import engine  # noqa: E402
 from app.core.celery_app import celery_app  # noqa: E402
 
 Base.metadata.create_all(bind=engine)
+
+
+atexit.register(engine.dispose)
 
 # Tests must exercise notification task execution without requiring a live
 # Redis worker. Production remains broker-backed; eager mode is isolated to

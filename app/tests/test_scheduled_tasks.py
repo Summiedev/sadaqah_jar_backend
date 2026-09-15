@@ -271,7 +271,7 @@ class TestAwareReminderRules:
             templates[key] = template
         db.query(ScheduledNotification).filter_by(
             user_id=user.id, local_date=local_date.isoformat()
-        ).delete(synchronize_session=False)
+        ).delete(synchronize_session="fetch")
         user.preferences = UserPreference(
             timezone="Africa/Lagos", reminder_preferences=json.dumps({})
         )
@@ -295,7 +295,7 @@ class TestAwareReminderRules:
 
         db.query(ScheduledNotification).filter_by(
             user_id=user.id, local_date=local_date.isoformat()
-        ).delete(synchronize_session=False)
+        ).delete(synchronize_session="fetch")
         user.preferences.reminder_preferences = json.dumps(
             {"nawafil_after_salah": True}
         )
@@ -346,7 +346,7 @@ class TestAwareReminderRules:
 
         db.query(ScheduledNotification).filter_by(
             user_id=user.id, local_date=local_date.isoformat()
-        ).delete(synchronize_session=False)
+        ).delete(synchronize_session="fetch")
         db.commit()
 
     def test_all_five_salah_reminders_use_local_times_and_individual_offset(

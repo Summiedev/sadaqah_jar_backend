@@ -1,15 +1,16 @@
-from pathlib import Path
+import atexit
 import os
+import tempfile
+from pathlib import Path
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
-_TEST_DB_DIR = PROJECT_ROOT / ".pytest_tmp"
-_TEST_DB_DIR.mkdir(exist_ok=True)
-_TEST_DB_PATH = _TEST_DB_DIR / "test.db"
-if _TEST_DB_PATH.exists():
-    _TEST_DB_PATH.unlink()
+_TEST_DB_FD, _TEST_DB_NAME = tempfile.mkstemp(prefix="mizan-pytest-", suffix=".db")
+os.close(_TEST_DB_FD)
+_TEST_DB_PATH = Path(_TEST_DB_NAME)
+atexit.register(lambda: _TEST_DB_PATH.unlink(missing_ok=True))
 
 # Seed the settings the app requires at import time so the suite is hermetic:
 # it must run in CI (or a fresh clone) without a populated `.env` and without
@@ -22,6 +23,7 @@ os.environ.setdefault("ENV", "test")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-that-is-at-least-32-chars-long")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 
 
 @pytest.fixture(autouse=True)
