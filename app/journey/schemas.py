@@ -1,6 +1,7 @@
 """Journey domain Pydantic schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -71,3 +72,14 @@ class QuranProgressResponse(QuranProgressPayload):
     last_read_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PrayerCompletionUpdate(BaseModel):
+    local_date: date
+    prayer_name: Literal["fajr", "dhuhr", "asr", "maghrib", "isha"]
+    completed: bool
+
+
+class PrayerCompletionState(BaseModel):
+    local_date: date
+    completed_prayers: list[str]

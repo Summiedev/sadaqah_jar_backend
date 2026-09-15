@@ -1,6 +1,6 @@
 """Journey domain service layer."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,8 @@ from app.journey.schemas import (
     AdhkarFavoriteResponse,
     QuranProgressPayload,
     QuranProgressResponse,
+    PrayerCompletionState,
+    PrayerCompletionUpdate,
 )
 
 
@@ -299,3 +301,27 @@ def get_quran_progress(db: Session, user_id: int) -> QuranProgressResponse | Non
         page=progress.page,
         last_read_at=progress.last_read_at,
     )
+
+
+def get_prayer_completions(
+    db: Session, user_id: int, local_date: date
+) -> PrayerCompletionState:
+    rows = repo.list_prayer_completions(db, user_id, local_date)
+    return PrayerCompletionState(
+        local_date=local_date,
+        completed_prayers=[row.prayer_name for row in rows],
+    )
+
+
+def set_prayer_completion(
+    db: Session, user_id: int, payload: PrayerCompletionUpdate
+) -> PrayerCompletionState:
+    repo.set_prayer_completion(
+        db,
+        user_id,
+        payload.local_date,
+        payload.prayer_name,
+        payload.completed,
+    )
+    db.commit()
+    return get_prayer_completions(db, user_id, payload.local_date)

@@ -43,6 +43,14 @@ DbDep = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+def _load_reminder_preferences(raw: str | None) -> dict:
+    try:
+        value = json.loads(raw or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 # ---------------------------------------------------------------------------
 # User notification inbox
 # ---------------------------------------------------------------------------
@@ -223,6 +231,10 @@ def update_notification_preferences(
         data["categories"] = categories
     if payload.quiet_hours is not None:
         data["quiet_hours"] = payload.quiet_hours.model_dump()
+    reminder_preferences = _load_reminder_preferences(pref.reminder_preferences)
+    if payload.reminder_preferences is not None:
+        reminder_preferences.update(payload.reminder_preferences)
+        pref.reminder_preferences = json.dumps(reminder_preferences)
     pref.notification_preferences = json.dumps(data)
     db.add(pref)
     db.commit()

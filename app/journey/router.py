@@ -5,6 +5,7 @@ Only user-state endpoints are exposed. Static catalogue content
 and never touches this API.
 """
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -20,6 +21,7 @@ from app.journey.schemas import (
     ReadingProgressResponse,
     ReflectionCreate,
     ReflectionUpdate,
+    PrayerCompletionUpdate,
 )
 
 router = APIRouter(prefix="/journey", tags=["journey"])
@@ -179,3 +181,23 @@ def save_quran_progress(
 def get_quran_progress(db: DbDep, current_user: CurrentUser):
     progress = service.get_quran_progress(db, current_user.id)
     return Envelope(data=progress)
+
+
+@router.get("/prayers/progress", response_model=Envelope)
+def get_prayer_completions(
+    db: DbDep,
+    current_user: CurrentUser,
+    local_date: date = Query(...),
+):
+    state = service.get_prayer_completions(db, current_user.id, local_date)
+    return Envelope(data=state)
+
+
+@router.put("/prayers/progress", response_model=Envelope)
+def set_prayer_completion(
+    payload: PrayerCompletionUpdate,
+    db: DbDep,
+    current_user: CurrentUser,
+):
+    state = service.set_prayer_completion(db, current_user.id, payload)
+    return Envelope(data=state, message="Prayer progress saved")

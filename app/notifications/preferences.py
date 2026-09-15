@@ -45,6 +45,14 @@ ALL_CATEGORIES = {
     "system",
 }
 
+_CATEGORY_FALLBACKS = {
+    "prayer_fardh": "prayer",
+    "prayer_nafl": "prayer",
+    "adhkar_morning": "adhkar",
+    "adhkar_evening": "adhkar",
+    "quran": "reading",
+}
+
 
 def _load_prefs(prefs: UserPreference | None) -> dict:
     if prefs is None:
@@ -86,6 +94,8 @@ def is_category_enabled(
     category_prefs = prefs.get("categories", {})
     if isinstance(category_prefs, dict):
         cat = category_prefs.get(category)
+        if cat is None:
+            cat = category_prefs.get(_CATEGORY_FALLBACKS.get(category, ""))
         if isinstance(cat, dict):
             return bool(cat.get(channel, True))
         if isinstance(cat, bool):
@@ -172,8 +182,14 @@ def get_category_state(db: Session, user_id: int) -> dict:
         "frequency": prefs.get("frequency", "medium"),
         "quiet_hours": prefs.get("quiet_hours", {"enabled": False}),
         "categories": {
-            category: bool(categories.get(category, True))
+            category: bool(
+                categories.get(
+                    category,
+                    categories.get(_CATEGORY_FALLBACKS.get(category, ""), True),
+                )
+            )
             for category in ALL_CATEGORIES
         },
+        "reminder_preferences": _load_reminder_prefs(user.preferences),
     }
     return state

@@ -14,6 +14,7 @@ class NotificationPreferencesUpdate(BaseModel):
     frequency: str | None = Field(None, pattern="^(low|medium|high)$")
     categories: dict[str, bool] | None = None
     quiet_hours: QuietHoursUpdate | None = None
+    reminder_preferences: dict[str, object] | None = None
 
 
 class NotificationPreferencesState(BaseModel):
@@ -22,3 +23,4 @@ class NotificationPreferencesState(BaseModel):
     quiet_hours: QuietHoursUpdate = QuietHoursUpdate()
     categories: dict[str, bool] = {}
     category_labels: dict[str, str] = {}
+    reminder_preferences: dict[str, object] = {}

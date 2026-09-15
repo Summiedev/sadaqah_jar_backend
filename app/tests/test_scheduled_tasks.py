@@ -8,8 +8,9 @@ Tests for scheduled_tasks.py - targets audit-flagged bugs:
 """
 
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -20,7 +21,7 @@ from app.notifications.models import Notification, ScheduledNotification
 from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
 from app.users.models import UserPreference
-from app.journey.models import JourneyQuranProgress
+from app.journey.models import JourneyPrayerCompletion, JourneyQuranProgress
 from app.notifications.models import NotificationTemplate, SchedulingStrategy
 
 
@@ -187,6 +188,124 @@ class TestAwareReminderRules:
         db.add(progress)
         db.commit()
         assert _should_skip_for_user(db, user, template, local_date=date(2026, 8, 21))
+
+    def test_completed_salah_suppresses_only_its_own_reminder(self, db, user):
+        from app.tasks.scheduled_tasks import _should_skip_for_user
+
+        user.preferences = UserPreference(timezone="Africa/Lagos")
+        fajr = self._template(db, "fajr_reminder", "prayer_fardh")
+        dhuhr = self._template(db, "dhuhr_reminder", "prayer_fardh")
+        db.add(
+            JourneyPrayerCompletion(
+                user_id=user.id,
+                local_date=date(2026, 8, 21),
+                prayer_name="fajr",
+                completed_at=datetime(2026, 8, 21, 5, 30),
+            )
+        )
+        db.commit()
+
+        assert _should_skip_for_user(
+            db, user, fajr, local_date=date(2026, 8, 21)
+        )
+        assert not _should_skip_for_user(
+            db, user, dhuhr, local_date=date(2026, 8, 21)
+        )
+        db.query(JourneyPrayerCompletion).filter_by(user_id=user.id).delete()
+        db.commit()
+
+    def test_salah_reminder_can_be_disabled_individually(self, db, user):
+        from app.tasks.scheduled_tasks import _should_skip_for_user
+
+        user.preferences = UserPreference(
+            timezone="Africa/Lagos",
+            reminder_preferences=json.dumps(
+                {"prayer_reminders": {"asr": {"enabled": False}}}
+            ),
+        )
+        asr = self._template(db, "asr_reminder", "prayer_fardh")
+        maghrib = self._template(db, "maghrib_reminder", "prayer_fardh")
+        db.commit()
+
+        assert _should_skip_for_user(db, user, asr, local_date=date(2026, 8, 21))
+        assert not _should_skip_for_user(
+            db, user, maghrib, local_date=date(2026, 8, 21)
+        )
+
+    def test_all_five_salah_reminders_use_local_times_and_individual_offset(
+        self, db, user
+    ):
+        from app.services.prayer_reminder_service import (
+            PrayerTimes,
+            schedule_prayer_relative_templates,
+        )
+
+        local_date = date(2026, 8, 21)
+        zone = ZoneInfo("Africa/Lagos")
+        anchors = {
+            "fajr": datetime(2026, 8, 21, 5, 10, tzinfo=zone),
+            "sunrise": datetime(2026, 8, 21, 6, 20, tzinfo=zone),
+            "duha_start": datetime(2026, 8, 21, 6, 35, tzinfo=zone),
+            "duha_end": datetime(2026, 8, 21, 11, 50, tzinfo=zone),
+            "zuhr": datetime(2026, 8, 21, 12, 0, tzinfo=zone),
+            "asr": datetime(2026, 8, 21, 15, 20, tzinfo=zone),
+            "maghrib": datetime(2026, 8, 21, 18, 40, tzinfo=zone),
+            "isha": datetime(2026, 8, 21, 19, 50, tzinfo=zone),
+        }
+        prayer_times = PrayerTimes(**anchors)
+        user.preferences = UserPreference(timezone="Africa/Lagos")
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session=False)
+        db.commit()
+        for key, anchor in (
+            ("fajr_reminder", "fajr"),
+            ("dhuhr_reminder", "zuhr"),
+            ("asr_reminder", "asr"),
+            ("maghrib_reminder", "maghrib"),
+            ("isha_reminder", "isha"),
+        ):
+            template = self._template(db, key, "prayer_fardh")
+            template.strategy_config = json.dumps(
+                {"anchor": anchor, "offset_minutes": 0}
+            )
+        db.commit()
+
+        schedules = schedule_prayer_relative_templates(
+            db,
+            user_id=user.id,
+            local_date=local_date,
+            prayer_times=prayer_times,
+            reminder_preferences={
+                "prayer_reminders": {"fajr": {"offset_minutes": -5}}
+            },
+        )
+        salah_keys = {
+            "fajr_reminder",
+            "dhuhr_reminder",
+            "asr_reminder",
+            "maghrib_reminder",
+            "isha_reminder",
+        }
+        by_key = {
+            template.key: schedule
+            for schedule in schedules
+            if (template := db.get(NotificationTemplate, schedule.template_id))
+            and template.key in salah_keys
+        }
+
+        assert salah_keys <= by_key.keys()
+        assert by_key["fajr_reminder"].scheduled_for == (
+            anchors["fajr"] - timedelta(minutes=5)
+        ).astimezone(timezone.utc).replace(tzinfo=None)
+        assert by_key["dhuhr_reminder"].scheduled_for == anchors[
+            "zuhr"
+        ].astimezone(timezone.utc).replace(tzinfo=None)
+
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session=False)
+        db.commit()
 
     def test_missing_timezone_uses_utc_rhythm_and_tahajjud_stays_off(self, db, user):
         from app.tasks.scheduled_tasks import _schedule_timezone_rhythm

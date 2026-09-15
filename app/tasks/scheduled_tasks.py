@@ -11,6 +11,8 @@ from app.models.sadaqah_act import SadaqahAct
 from app.models.user import User
 from app.models.sadaqah_log import SadaqahLog
 from app.journey.models import JourneyAdhkarProgress, JourneyQuranProgress
+from app.journey.models import JourneyPrayerCompletion
+from app.models.adhkar import Adhkar, TimeOfDay
 from app.notifications.models import NotificationTemplate, ScheduledNotification, SchedulingStrategy
 from app.services.analytics_service import compute_weekly_stats
 from app.services.notification_service import create_notification
@@ -126,7 +128,11 @@ def _schedule_reminders_for_user(
             user.latitude, user.longitude, local_date, timezone_name
         )
         schedules = schedule_prayer_relative_templates(
-            db, user_id=user.id, local_date=local_date, prayer_times=times
+            db,
+            user_id=user.id,
+            local_date=local_date,
+            prayer_times=times,
+            reminder_preferences=_preference_document(user, "reminder_preferences"),
         )
         random_sadaqah = _schedule_random_sadaqah(
             db,
@@ -137,6 +143,13 @@ def _schedule_reminders_for_user(
         if random_sadaqah is not None:
             db.add(random_sadaqah)
             schedules.append(random_sadaqah)
+        _apply_custom_reminder_times(
+            db,
+            schedules,
+            user=user,
+            local_date=local_date,
+            timezone_name=timezone_name,
+        )
         filtered = _filter_schedules_for_user(
             db, user, schedules, local_date=local_date
         )
@@ -149,6 +162,8 @@ def _schedule_reminders_for_user(
             ]
         db.commit()
         for schedule in filtered:
+            if schedule.celery_task_id:
+                celery_app.control.revoke(schedule.celery_task_id, terminate=False)
             result = deliver_scheduled_notification.apply_async(
                 args=[schedule.id],
                 eta=schedule.scheduled_for.replace(tzinfo=timezone.utc),
@@ -190,6 +205,8 @@ def _enqueue_filtered_schedules(db, schedules, user_id: int) -> None:
     db.add_all(schedules)
     db.commit()
     for schedule in schedules:
+        if schedule.celery_task_id:
+            celery_app.control.revoke(schedule.celery_task_id, terminate=False)
         result = deliver_scheduled_notification.apply_async(
             args=[schedule.id],
             eta=schedule.scheduled_for.replace(tzinfo=timezone.utc),
@@ -241,11 +258,33 @@ def _filter_schedules_for_user(
 ) -> list[ScheduledNotification]:
     """Apply category, opt-in, completion and frequency rules consistently."""
     frequency = get_frequency(db, user.id)
-    filtered = []
+    core_categories = {
+        "prayer_fardh",
+        "adhkar_morning",
+        "adhkar_evening",
+        "quran",
+    }
+    category_priority = {
+        "prayer_fardh": 0,
+        "adhkar_morning": 1,
+        "adhkar_evening": 1,
+        "quran": 2,
+        "prayer_nafl": 3,
+    }
+    max_per_category = {
+        "prayer_fardh": 5,
+        "prayer_nafl": 2,
+        "adhkar_morning": 1,
+        "adhkar_evening": 1,
+        "quran": 1,
+    }
+    daily_limit = {"low": 8, "medium": 10, "high": 12}.get(frequency, 10)
+    candidates = []
     for schedule in schedules:
         template = db.get(NotificationTemplate, schedule.template_id)
         if template is None:
             continue
+        category = _reminder_category(template)
         if _should_skip_for_user(db, user, template, local_date=local_date):
             # Prayer-relative schedules are already in the session. Preserve
             # the existing audit trail for those rows; unsaved fallback rows
@@ -253,26 +292,26 @@ def _filter_schedules_for_user(
             if schedule in db:
                 schedule.status = "cancelled"
             continue
-        if not is_category_enabled(db, user.id, template.category):
+        if not is_category_enabled(db, user.id, category):
             if schedule in db:
                 schedule.status = "cancelled"
             continue
-        if frequency == "low" and template.category not in {
-            "prayer_fardh",
-            "prayer",
-            "adhkar_morning",
-            "adhkar_evening",
-            "adhkar",
-        }:
-            # Use a stable hash so retries do not randomly add/remove the
-            # same user's reminder within one day.
-            digest = hashlib.sha256(
-                f"frequency:{user.id}:{local_date}:{template.key}".encode()
-            ).hexdigest()
-            if int(digest[:2], 16) < 128:
-                if schedule in db:
-                    schedule.status = "cancelled"
-                continue
+        if frequency == "low" and category not in core_categories:
+            if schedule in db:
+                schedule.status = "cancelled"
+            continue
+        candidates.append((category_priority.get(category, 4), schedule, category))
+
+    candidates.sort(key=lambda item: (item[0], item[1].scheduled_for))
+    category_counts: dict[str, int] = {}
+    filtered = []
+    for _, schedule, category in candidates:
+        limit = max_per_category.get(category, 1)
+        if category_counts.get(category, 0) >= limit or len(filtered) >= daily_limit:
+            if schedule in db:
+                schedule.status = "cancelled"
+            continue
+        category_counts[category] = category_counts.get(category, 0) + 1
         filtered.append(schedule)
     return filtered
 
@@ -295,6 +334,85 @@ def _preference_document(user: User, field: str) -> dict:
     except (TypeError, json.JSONDecodeError):
         return {}
     return value if isinstance(value, dict) else {}
+
+
+_SALAH_TEMPLATE_NAMES = {
+    "fajr_reminder": "fajr",
+    "pre_fajr": "fajr",
+    "dhuhr_reminder": "dhuhr",
+    "pre_dhuhr": "dhuhr",
+    "asr_reminder": "asr",
+    "maghrib_reminder": "maghrib",
+    "pre_maghrib": "maghrib",
+    "isha_reminder": "isha",
+    "pre_isha": "isha",
+}
+
+_REMINDER_CATEGORY_OVERRIDES = {
+    "morning_adhkar": "adhkar_morning",
+    "morning_adhkar_expanded": "adhkar_morning",
+    "evening_adhkar": "adhkar_evening",
+    "evening_adhkar_expanded": "adhkar_evening",
+    "quran_reminder": "quran",
+    "quran_verse": "quran",
+    "salatul_duha": "prayer_nafl",
+    "duha_reminder": "prayer_nafl",
+    "witr_reminder": "prayer_nafl",
+    "witr_reminder_expanded": "prayer_nafl",
+    **{key: "prayer_fardh" for key in _SALAH_TEMPLATE_NAMES},
+}
+
+
+def _reminder_category(template: NotificationTemplate) -> str:
+    return _REMINDER_CATEGORY_OVERRIDES.get(template.key, template.category)
+
+
+def _prayer_reminder_enabled(user: User, prayer_name: str) -> bool:
+    prefs = _preference_document(user, "reminder_preferences")
+    reminders = prefs.get("prayer_reminders", {})
+    value = reminders.get(prayer_name, {}) if isinstance(reminders, dict) else {}
+    if isinstance(value, bool):
+        return value
+    return value.get("enabled", True) if isinstance(value, dict) else True
+
+
+def _custom_reminder_time(user: User, key: str) -> time | None:
+    prefs = _preference_document(user, "reminder_preferences")
+    values = prefs.get("daily_times", {})
+    raw = values.get(key) if isinstance(values, dict) else None
+    if not isinstance(raw, str):
+        return None
+    try:
+        return time.fromisoformat(raw)
+    except ValueError:
+        logger.warning("Ignoring invalid custom reminder time for %s", key)
+        return None
+
+
+def _apply_custom_reminder_times(
+    db, schedules, *, user: User, local_date, timezone_name: str
+) -> None:
+    zone = ZoneInfo(timezone_name)
+    keys = {
+        "morning_adhkar": "morning_adhkar",
+        "morning_adhkar_expanded": "morning_adhkar",
+        "evening_adhkar": "evening_adhkar",
+        "evening_adhkar_expanded": "evening_adhkar",
+        "quran_reminder": "quran",
+        "quran_verse": "quran",
+    }
+    for schedule in schedules:
+        template = db.get(NotificationTemplate, schedule.template_id)
+        if template is None:
+            continue
+        setting_key = keys.get(template.key)
+        if setting_key is None:
+            continue
+        setting = _custom_reminder_time(user, setting_key)
+        if setting is not None:
+            schedule.scheduled_for = datetime.combine(
+                local_date, setting, tzinfo=zone
+            ).astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _explicit_reminder_enabled(user: User, key: str, *, default: bool) -> bool:
@@ -325,19 +443,34 @@ def _has_local_activity(db, user_id: int, local_date, *, kind: str, timezone_nam
             JourneyQuranProgress.last_read_at >= start,
             JourneyQuranProgress.last_read_at < end,
         ).first() is not None
-    if kind == "adhkar":
-        return db.query(JourneyAdhkarProgress.id).filter(
+    if kind in {"adhkar", "adhkar_morning", "adhkar_evening"}:
+        query = db.query(JourneyAdhkarProgress.id).join(
+            Adhkar, Adhkar.id == JourneyAdhkarProgress.adhkar_id
+        ).filter(
             JourneyAdhkarProgress.user_id == user_id,
             JourneyAdhkarProgress.updated_at >= start,
             JourneyAdhkarProgress.updated_at < end,
             JourneyAdhkarProgress.count > 0,
-        ).first() is not None
+        )
+        if kind == "adhkar_morning":
+            query = query.filter(Adhkar.time_of_day == TimeOfDay.morning)
+        elif kind == "adhkar_evening":
+            query = query.filter(Adhkar.time_of_day == TimeOfDay.evening)
+        return query.first() is not None
     if kind == "charity":
         return db.query(SadaqahLog.id).filter(
             SadaqahLog.user_id == user_id,
             SadaqahLog.date == local_date,
         ).first() is not None
     return False
+
+
+def _has_prayer_completion(db, user_id: int, local_date, prayer_name: str) -> bool:
+    return db.query(JourneyPrayerCompletion.id).filter(
+        JourneyPrayerCompletion.user_id == user_id,
+        JourneyPrayerCompletion.local_date == local_date,
+        JourneyPrayerCompletion.prayer_name == prayer_name,
+    ).first() is not None
 
 
 def _should_skip_for_user(db, user: User, template: NotificationTemplate, *, local_date) -> bool:
@@ -348,16 +481,27 @@ def _should_skip_for_user(db, user: User, template: NotificationTemplate, *, loc
         user, "tahajjud", default=False
     ):
         return True
+    prayer_name = _SALAH_TEMPLATE_NAMES.get(template.key)
+    if prayer_name and (
+        not _prayer_reminder_enabled(user, prayer_name)
+        or _has_prayer_completion(db, user.id, local_date, prayer_name)
+    ):
+        return True
     timezone_name = _valid_timezone_name(user.preferences.timezone if user.preferences else None)
-    if template.category in {"quran", "reading"} and _has_local_activity(
+    category = _reminder_category(template)
+    if category in {"quran", "reading"} and _has_local_activity(
         db, user.id, local_date, kind="quran", timezone_name=timezone_name
     ):
         return True
-    if template.category in {"adhkar", "adhkar_morning", "adhkar_evening"} and _has_local_activity(
-        db, user.id, local_date, kind="adhkar", timezone_name=timezone_name
+    adhkar_kind = (
+        category if category in {"adhkar_morning", "adhkar_evening"} else
+        "adhkar" if category == "adhkar" else None
+    )
+    if adhkar_kind and _has_local_activity(
+        db, user.id, local_date, kind=adhkar_kind, timezone_name=timezone_name
     ):
         return True
-    return template.category == "charity" and _has_local_activity(
+    return category == "charity" and _has_local_activity(
         db, user.id, local_date, kind="charity", timezone_name=timezone_name
     )
 
@@ -369,9 +513,9 @@ def _schedule_timezone_rhythm(*, db, user_id: int, local_date, timezone_name: st
     if user is None:
         return []
     slots = [
-        ("morning_adhkar", time(8, 0)),
-        ("quran_reminder", time(14, 0)),
-        ("evening_adhkar", time(18, 30)),
+        ("morning_adhkar", _custom_reminder_time(user, "morning_adhkar") or time(8, 0)),
+        ("quran_reminder", _custom_reminder_time(user, "quran") or time(14, 0)),
+        ("evening_adhkar", _custom_reminder_time(user, "evening_adhkar") or time(18, 30)),
     ]
     # Keep one reflective pause, but vary its time predictably by user/day so
     # the same person does not receive it at exactly the same minute every day.
@@ -396,17 +540,25 @@ def _schedule_timezone_rhythm(*, db, user_id: int, local_date, timezone_name: st
         ).first()
         if template is None or _should_skip_for_user(db, user, template, local_date=local_date):
             continue
-        if not is_category_enabled(db, user_id, template.category):
+        if not is_category_enabled(db, user_id, _reminder_category(template)):
             continue
-        if db.query(ScheduledNotification).filter_by(
+        scheduled_for = datetime.combine(local_date, local_time, tzinfo=zone).astimezone(
+            timezone.utc
+        ).replace(tzinfo=None)
+        existing = db.query(ScheduledNotification).filter_by(
             user_id=user_id, template_id=template.id, local_date=local_date.isoformat()
-        ).first() is not None:
+        ).first()
+        if existing is not None:
+            if existing.status == "cancelled":
+                existing.status = "scheduled"
+                existing.scheduled_for = scheduled_for
+                schedules.append(existing)
             continue
         schedules.append(ScheduledNotification(
             user_id=user_id,
             template_id=template.id,
             local_date=local_date.isoformat(),
-            scheduled_for=datetime.combine(local_date, local_time, tzinfo=zone).astimezone(timezone.utc).replace(tzinfo=None),
+            scheduled_for=scheduled_for,
         ))
     return schedules
 
@@ -569,8 +721,13 @@ def _map_category_to_notification_type(category: str) -> str:
         "reflection": "reflection",
         "family": "family_activity",
         "prayer": "prayer_request",
+        "prayer_fardh": "prayer_request",
+        "prayer_nafl": "prayer_request",
         "adhkar": "adhkar",
+        "adhkar_morning": "adhkar",
+        "adhkar_evening": "adhkar",
         "reading": "reading_progress",
+        "quran": "reading_progress",
         "islamic_occasions": "friday",
         "journey": "goal_progress",
     }
@@ -615,7 +772,8 @@ def deliver_scheduled_notification(self, schedule_id: int):
             return
         # Re-check preferences and completion at delivery time. A reminder
         # queued before a user changed settings must never bypass that choice.
-        if not is_category_enabled(db, schedule.user_id, template.category) or _should_skip_for_user(
+        category = _reminder_category(template)
+        if not is_category_enabled(db, schedule.user_id, category) or _should_skip_for_user(
             db, user, template, local_date=schedule_date
         ):
             schedule.status = "cancelled"
@@ -628,10 +786,10 @@ def deliver_scheduled_notification(self, schedule_id: int):
             schedule.user_id,
             title=title,
             message=message,
-            category=template.category,
+            category=category,
             idempotency_key=idempotency_key,
         )
-        notification_type = _map_category_to_notification_type(template.category)
+        notification_type = _map_category_to_notification_type(category)
         template_config = {}
         try:
             template_config = json.loads(template.strategy_config or "{}")
@@ -645,7 +803,7 @@ def deliver_scheduled_notification(self, schedule_id: int):
             body=message,
             notification_type=notification_type,
             data={
-                "category": template.category,
+                "category": category,
                 "template_key": template.key,
                 "deep_link": deep_link or f"/notifications/{notification.id}",
                 "notification_id": str(notification.id),

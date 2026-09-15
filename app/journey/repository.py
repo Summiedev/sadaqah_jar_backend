@@ -1,6 +1,7 @@
 """Journey domain repository layer."""
 
 from datetime import datetime, timezone
+from datetime import date as date_type
 from typing import Sequence
 
 from sqlalchemy import select, func
@@ -12,6 +13,7 @@ from app.journey.models import (
     JourneyAdhkarFavorite,
     JourneyQuranProgress,
     JourneyReadingProgress,
+    JourneyPrayerCompletion,
 )
 
 
@@ -260,3 +262,48 @@ def get_quran_progress(db: Session, user_id: int) -> JourneyQuranProgress | None
         .where(JourneyQuranProgress.user_id == user_id)
         .limit(1)
     )
+
+
+def list_prayer_completions(
+    db: Session, user_id: int, local_date: date_type
+) -> Sequence[JourneyPrayerCompletion]:
+    return db.scalars(
+        select(JourneyPrayerCompletion)
+        .where(
+            JourneyPrayerCompletion.user_id == user_id,
+            JourneyPrayerCompletion.local_date == local_date,
+        )
+        .order_by(JourneyPrayerCompletion.prayer_name)
+    ).all()
+
+
+def set_prayer_completion(
+    db: Session,
+    user_id: int,
+    local_date: date_type,
+    prayer_name: str,
+    completed: bool,
+) -> None:
+    row = db.scalar(
+        select(JourneyPrayerCompletion).where(
+            JourneyPrayerCompletion.user_id == user_id,
+            JourneyPrayerCompletion.local_date == local_date,
+            JourneyPrayerCompletion.prayer_name == prayer_name,
+        )
+    )
+    if completed:
+        now = _utcnow()
+        if row is None:
+            db.add(
+                JourneyPrayerCompletion(
+                    user_id=user_id,
+                    local_date=local_date,
+                    prayer_name=prayer_name,
+                    completed_at=now,
+                )
+            )
+        else:
+            row.completed_at = now
+    elif row is not None:
+        db.delete(row)
+    db.flush()

@@ -5,10 +5,11 @@ Only user-specific state is persisted here. Static Islamic content
 frontend bundle and is not stored relationally.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -104,4 +105,23 @@ class JourneyQuranProgress(Base, TimestampMixin):
 
     __table_args__ = (
         UniqueConstraint("user_id", name="uq_journey_quran_progress_user"),
+    )
+
+
+class JourneyPrayerCompletion(Base, TimestampMixin):
+    __tablename__ = "journey_prayer_completions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    prayer_name: Mapped[str] = mapped_column(String(12), nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "local_date", "prayer_name", name="uq_journey_prayer_day"
+        ),
+        Index("ix_journey_prayer_user_date", "user_id", "local_date"),
     )

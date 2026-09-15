@@ -9,6 +9,7 @@ from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.notifications.models import Notification
 from app.notifications.preferences import (
+    get_category_state,
     is_category_enabled,
     is_in_quiet_hours,
     should_delay_for_quiet_hours,
@@ -68,6 +69,17 @@ class TestCategoryEnabled:
     def test_global_channel_toggle(self, db, user):
         _set_prefs(db, user, {"push_enabled": False})
         assert is_category_enabled(db, user.id, "prayer") is False
+
+    def test_renamed_reminder_categories_inherit_legacy_preferences(self, db, user):
+        _set_prefs(db, user, {"categories": {"adhkar": False, "reading": False}})
+
+        assert is_category_enabled(db, user.id, "adhkar_morning") is False
+        assert is_category_enabled(db, user.id, "adhkar_evening") is False
+        assert is_category_enabled(db, user.id, "quran") is False
+        categories = get_category_state(db, user.id)["categories"]
+        assert categories["adhkar_morning"] is False
+        assert categories["adhkar_evening"] is False
+        assert categories["quran"] is False
 
 
 class TestQuietHours:
