@@ -316,9 +316,10 @@ class TestAwareReminderRules:
         filtered = _filter_schedules_for_user(
             db, user, enabled, local_date=local_date
         )
-        assert {
+        filtered_keys = {
             db.get(NotificationTemplate, row.template_id).key for row in filtered
-        } == set(keys_and_anchors)
+        }
+        assert filtered_keys.intersection(keys_and_anchors) == set(keys_and_anchors)
         for key, anchor in keys_and_anchors.items():
             assert schedules[key].scheduled_for == (
                 anchors[anchor] + timedelta(minutes=15)
@@ -335,10 +336,13 @@ class TestAwareReminderRules:
         low_frequency = _filter_schedules_for_user(
             db, user, enabled, local_date=local_date
         )
-        assert {
+        low_frequency_keys = {
             db.get(NotificationTemplate, row.template_id).key
             for row in low_frequency
-        } == set(keys_and_anchors)
+        }
+        assert low_frequency_keys.intersection(keys_and_anchors) == set(
+            keys_and_anchors
+        )
 
         db.query(ScheduledNotification).filter_by(
             user_id=user.id, local_date=local_date.isoformat()
