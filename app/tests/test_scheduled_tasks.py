@@ -232,6 +232,119 @@ class TestAwareReminderRules:
             db, user, maghrib, local_date=date(2026, 8, 21)
         )
 
+    def test_nawafil_after_salah_is_opt_in_and_limited_to_allowed_prayers(
+        self, db, user
+    ):
+        from app.services.prayer_reminder_service import (
+            PrayerTimes,
+            schedule_prayer_relative_templates,
+        )
+        from app.tasks.scheduled_tasks import (
+            _filter_schedules_for_user,
+            _should_skip_for_user,
+        )
+
+        local_date = date(2026, 8, 21)
+        zone = ZoneInfo("Africa/Lagos")
+        anchors = {
+            "fajr": datetime(2026, 8, 21, 5, 10, tzinfo=zone),
+            "sunrise": datetime(2026, 8, 21, 6, 20, tzinfo=zone),
+            "duha_start": datetime(2026, 8, 21, 6, 35, tzinfo=zone),
+            "duha_end": datetime(2026, 8, 21, 11, 50, tzinfo=zone),
+            "zuhr": datetime(2026, 8, 21, 12, 0, tzinfo=zone),
+            "asr": datetime(2026, 8, 21, 15, 20, tzinfo=zone),
+            "maghrib": datetime(2026, 8, 21, 18, 40, tzinfo=zone),
+            "isha": datetime(2026, 8, 21, 19, 50, tzinfo=zone),
+        }
+        prayer_times = PrayerTimes(**anchors)
+        keys_and_anchors = {
+            "nawafil_after_dhuhr": "zuhr",
+            "nawafil_after_maghrib": "maghrib",
+            "nawafil_after_isha": "isha",
+        }
+        templates = {}
+        for key, anchor in keys_and_anchors.items():
+            template = self._template(db, key, "prayer_nafl")
+            template.strategy_config = json.dumps(
+                {"anchor": anchor, "offset_minutes": 15}
+            )
+            templates[key] = template
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session=False)
+        user.preferences = UserPreference(
+            timezone="Africa/Lagos", reminder_preferences=json.dumps({})
+        )
+        db.commit()
+
+        disabled = schedule_prayer_relative_templates(
+            db,
+            user_id=user.id,
+            local_date=local_date,
+            prayer_times=prayer_times,
+            reminder_preferences={},
+        )
+        assert not any(
+            db.get(NotificationTemplate, row.template_id).key in keys_and_anchors
+            for row in disabled
+        )
+        assert all(
+            _should_skip_for_user(db, user, template, local_date=local_date)
+            for template in templates.values()
+        )
+
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session=False)
+        user.preferences.reminder_preferences = json.dumps(
+            {"nawafil_after_salah": True}
+        )
+        db.commit()
+        enabled = schedule_prayer_relative_templates(
+            db,
+            user_id=user.id,
+            local_date=local_date,
+            prayer_times=prayer_times,
+            reminder_preferences={"nawafil_after_salah": True},
+        )
+        schedules = {
+            db.get(NotificationTemplate, row.template_id).key: row
+            for row in enabled
+            if db.get(NotificationTemplate, row.template_id).key in keys_and_anchors
+        }
+        assert set(schedules) == set(keys_and_anchors)
+        filtered = _filter_schedules_for_user(
+            db, user, enabled, local_date=local_date
+        )
+        assert {
+            db.get(NotificationTemplate, row.template_id).key for row in filtered
+        } == set(keys_and_anchors)
+        for key, anchor in keys_and_anchors.items():
+            assert schedules[key].scheduled_for == (
+                anchors[anchor] + timedelta(minutes=15)
+            ).astimezone(timezone.utc).replace(tzinfo=None)
+            assert not _should_skip_for_user(
+                db, user, templates[key], local_date=local_date
+            )
+        assert not any("fajr" in key or "asr" in key for key in schedules)
+
+        user.preferences.notification_preferences = json.dumps(
+            {"frequency": "low"}
+        )
+        db.commit()
+        low_frequency = _filter_schedules_for_user(
+            db, user, enabled, local_date=local_date
+        )
+        assert {
+            db.get(NotificationTemplate, row.template_id).key
+            for row in low_frequency
+        } == set(keys_and_anchors)
+
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session=False)
+        db.commit()
+
     def test_all_five_salah_reminders_use_local_times_and_individual_offset(
         self, db, user
     ):

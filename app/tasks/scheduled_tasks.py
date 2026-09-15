@@ -279,6 +279,14 @@ def _filter_schedules_for_user(
         "quran": 1,
     }
     daily_limit = {"low": 8, "medium": 10, "high": 12}.get(frequency, 10)
+    nawafil_after_salah_enabled = _explicit_reminder_enabled(
+        user, "nawafil_after_salah", default=False
+    )
+    if nawafil_after_salah_enabled:
+        # The opt-in explicitly requests all three prayer-relative reminders;
+        # leave room for them without raising unrelated Nafl traffic.
+        max_per_category["prayer_nafl"] = 5
+        daily_limit += 3
     candidates = []
     for schedule in schedules:
         template = db.get(NotificationTemplate, schedule.template_id)
@@ -296,7 +304,20 @@ def _filter_schedules_for_user(
             if schedule in db:
                 schedule.status = "cancelled"
             continue
-        if frequency == "low" and category not in core_categories:
+        is_opted_in_post_salah_nawafil = (
+            nawafil_after_salah_enabled
+            and template.key
+            in {
+                "nawafil_after_dhuhr",
+                "nawafil_after_maghrib",
+                "nawafil_after_isha",
+            }
+        )
+        if (
+            frequency == "low"
+            and category not in core_categories
+            and not is_opted_in_post_salah_nawafil
+        ):
             if schedule in db:
                 schedule.status = "cancelled"
             continue
@@ -359,6 +380,9 @@ _REMINDER_CATEGORY_OVERRIDES = {
     "duha_reminder": "prayer_nafl",
     "witr_reminder": "prayer_nafl",
     "witr_reminder_expanded": "prayer_nafl",
+    "nawafil_after_dhuhr": "prayer_nafl",
+    "nawafil_after_maghrib": "prayer_nafl",
+    "nawafil_after_isha": "prayer_nafl",
     **{key: "prayer_fardh" for key in _SALAH_TEMPLATE_NAMES},
 }
 
@@ -479,6 +503,14 @@ def _should_skip_for_user(db, user: User, template: NotificationTemplate, *, loc
             return True
     if template.key == "tahajjud_reminder" and not _explicit_reminder_enabled(
         user, "tahajjud", default=False
+    ):
+        return True
+    if template.key in {
+        "nawafil_after_dhuhr",
+        "nawafil_after_maghrib",
+        "nawafil_after_isha",
+    } and not _explicit_reminder_enabled(
+        user, "nawafil_after_salah", default=False
     ):
         return True
     prayer_name = _SALAH_TEMPLATE_NAMES.get(template.key)
@@ -692,6 +724,9 @@ def _apply_rhythm_deep_links(db) -> None:
         "friday_reminder": "/journey",
         "friday_expanded": "/journey",
         "tahajjud_reminder": "/home",
+        "nawafil_after_dhuhr": "/home",
+        "nawafil_after_maghrib": "/home",
+        "nawafil_after_isha": "/home",
         "reflection_prompt": "/journey?tab=reflection",
         "random_sadaqah_prompt": "/home?open=sadaqah",
     }

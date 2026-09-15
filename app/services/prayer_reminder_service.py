@@ -92,6 +92,12 @@ def schedule_prayer_relative_templates(
         key=lambda template: _TEMPLATE_GROUPS.get(template.key, (template.key, 99)),
     )
     for template in templates:
+        if template.key in {
+            "nawafil_after_dhuhr",
+            "nawafil_after_maghrib",
+            "nawafil_after_isha",
+        } and not bool((reminder_preferences or {}).get("nawafil_after_salah", False)):
+            continue
         group = _TEMPLATE_GROUPS.get(template.key)
         if group is not None and group[0] in groups_seen:
             continue

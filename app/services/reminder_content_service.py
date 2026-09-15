@@ -104,6 +104,18 @@ _GENTLE_COPY = {
         ("A Moment for Duha", "If you can, take a little time for the Duha prayer."),
         ("Duha, When You Can", "A quiet two rak'ahs can be a gentle pause in your morning."),
     ),
+    "nawafil_after_dhuhr": (
+        ("A Quiet Moment for Nawafil", "If it suits your day, take a few minutes for voluntary prayer after Dhuhr."),
+        ("After Dhuhr", "There is room for a little extra prayer, whenever you feel ready."),
+    ),
+    "nawafil_after_maghrib": (
+        ("A Quiet Moment for Nawafil", "If it suits your day, take a few minutes for voluntary prayer after Maghrib."),
+        ("After Maghrib", "A little extra prayer can be a peaceful way to begin the evening."),
+    ),
+    "nawafil_after_isha": (
+        ("A Quiet Moment for Nawafil", "If it suits your day, take a few minutes for voluntary prayer after Isha."),
+        ("After Isha", "Make room for a little extra prayer before settling into the night."),
+    ),
 }
 
 
