@@ -10,6 +10,7 @@ from app.core.security import create_access_token, hash_password
 from app.db.session import SessionLocal
 from app.journey.models import JourneyReflection
 from app.main import app
+from app.goals.models import GoalStatus, UserGoal
 from app.models.user import Role, User
 from app.sadaqah.models import ActivityCompletion, ActivityContext, ActivityType
 
@@ -55,6 +56,16 @@ def test_history_contains_existing_reflections_and_activity(db):
             note="Checked in on a neighbour",
         )
     )
+    db.add(
+        UserGoal(
+            user_id=user.id,
+            title="Read with consistency",
+            acts_target=7,
+            acts_done=7,
+            status=GoalStatus.COMPLETED,
+            completed_at=occurred,
+        )
+    )
     db.commit()
     token = create_access_token({"sub": str(user.id), "role": user.role.name})
 
@@ -65,10 +76,12 @@ def test_history_contains_existing_reflections_and_activity(db):
 
     assert response.status_code == 200
     items = response.json()["data"]
-    assert {item["kind"] for item in items} >= {"reflection", "activity"}
+    assert {item["kind"] for item in items} >= {"reflection", "activity", "goal"}
     assert any(item["title"] == "A quiet note" for item in items)
     assert any("kindness" in item["title"] for item in items)
+    assert any(item["title"] == "Completed goal: Read with consistency" for item in items)
 
+    db.query(UserGoal).filter_by(user_id=user.id).delete(synchronize_session=False)
     db.query(ActivityCompletion).filter_by(user_id=user.id).delete(
         synchronize_session=False
     )

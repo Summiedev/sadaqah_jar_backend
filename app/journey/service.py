@@ -36,6 +36,8 @@ from app.journey.schemas import (
 from app.models.sadaqah_act import SadaqahAct
 from app.models.sadaqah_log import SadaqahLog
 from app.sadaqah.models import ActivityCompletion
+from app.goals.models import UserGoal
+from app.family.models import FamilyActivity
 
 
 def _utcnow() -> datetime:
@@ -468,6 +470,55 @@ def list_history(
                 occurred_at=item.last_read_at,
                 reference_id=item.book_id,
                 metadata={"chapter": item.chapter_number},
+            )
+        )
+
+    goals = db.scalars(
+        select(UserGoal).where(
+            UserGoal.user_id == user_id,
+            UserGoal.deleted_at.is_(None),
+        )
+    ).all()
+    for item in goals:
+        status = getattr(item.status, "value", str(item.status)).lower()
+        occurred_at = item.completed_at or item.created_at
+        events.append(
+            JourneyHistoryItem(
+                id=f"goal:{item.id}",
+                kind="goal",
+                title=(
+                    f"Completed goal: {item.title}"
+                    if status == "completed"
+                    else f"Goal {status}: {item.title}"
+                ),
+                description=f"{item.acts_done} of {item.acts_target} actions",
+                occurred_at=occurred_at,
+                reference_id=item.id,
+                metadata={"status": status},
+            )
+        )
+
+    family_rows = db.scalars(
+        select(FamilyActivity).where(FamilyActivity.actor_id == user_id)
+    ).all()
+    for item in family_rows:
+        event_type = getattr(item.event_type, "value", str(item.event_type))
+        # A family act is already represented by ActivityCompletion. Keeping
+        # both would show the same action twice in Journey history.
+        if event_type == "act.added":
+            continue
+        events.append(
+            JourneyHistoryItem(
+                id=f"family:{item.id}",
+                kind="family",
+                title=event_type.replace(".", " ").replace("_", " ").title(),
+                occurred_at=item.created_at,
+                reference_id=item.id,
+                metadata={
+                    "family_id": item.family_id,
+                    "event_type": event_type,
+                    **(item.extra or {}),
+                },
             )
         )
 
