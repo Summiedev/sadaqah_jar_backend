@@ -9,6 +9,7 @@ from fastapi import WebSocket
 import redis
 
 from app.core.cache import redis_client
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,14 @@ class ConnectionManager:
 
     def stop_pubsub_listener(self) -> None:
         self._listener_stop.set()
+        thread = self._listener_thread
+        if (
+            thread is not None
+            and thread.is_alive()
+            and thread is not threading.current_thread()
+        ):
+            thread.join(timeout=2)
+        self._listener_thread = None
 
     def _publish_remote_event(self, scope: str, key: int, data: dict) -> None:
         try:
@@ -68,39 +77,70 @@ class ConnectionManager:
             logger.warning("ws redis publish failed; local delivery only: %s", exc)
 
     def _listen_for_remote_events(self) -> None:
-        pubsub = redis_client.pubsub(ignore_subscribe_messages=True)
-        try:
-            pubsub.subscribe(WS_EVENTS_CHANNEL)
-            for message in pubsub.listen():
-                if self._listener_stop.is_set():
-                    break
-                try:
-                    payload = json.loads(message["data"])
-                    if payload.get("source") == self._instance_id:
-                        continue
-                    scope = payload.get("scope")
-                    key = int(payload.get("key"))
-                    data = payload.get("data") or {}
-                    loop = self._loop
-                    if loop is None or loop.is_closed():
-                        continue
-                    if scope == "user":
-                        asyncio.run_coroutine_threadsafe(
-                            self.send_user_event(key, data, publish=False), loop
-                        )
-                    elif scope == "family":
-                        asyncio.run_coroutine_threadsafe(
-                            self.send_family_event(key, data, publish=False), loop
-                        )
-                except Exception:
-                    logger.debug("Invalid ws pubsub message", exc_info=True)
-        except redis.RedisError as exc:
-            logger.warning("ws redis listener stopped: %s", exc)
-        finally:
+        """Relay cross-process events until application shutdown.
+
+        The shared cache client intentionally has a short two-second socket
+        timeout so HTTP requests fail quickly when Redis is unavailable. A
+        blocking Pub/Sub listener has different semantics: an idle channel is
+        normal, not a timeout. Use a dedicated connection without a read
+        timeout, poll at one-second intervals so shutdown stays responsive,
+        and reconnect after transient Redis failures.
+        """
+        while not self._listener_stop.is_set():
+            listener_client = None
+            pubsub = None
             try:
-                pubsub.close()
-            except Exception:
-                pass
+                listener_client = redis.Redis.from_url(
+                    settings.REDIS_URL,
+                    socket_connect_timeout=2,
+                    socket_timeout=None,
+                    health_check_interval=30,
+                )
+                pubsub = listener_client.pubsub(ignore_subscribe_messages=True)
+                pubsub.subscribe(WS_EVENTS_CHANNEL)
+                while not self._listener_stop.is_set():
+                    message = pubsub.get_message(timeout=1.0)
+                    if message is None:
+                        continue
+                    self._dispatch_remote_message(message)
+            except redis.RedisError as exc:
+                if not self._listener_stop.is_set():
+                    logger.warning("ws redis listener reconnecting: %s", exc)
+            finally:
+                try:
+                    if pubsub is not None:
+                        pubsub.close()
+                except Exception:
+                    pass
+                try:
+                    if listener_client is not None:
+                        listener_client.close()
+                except Exception:
+                    pass
+            if not self._listener_stop.is_set():
+                self._listener_stop.wait(2)
+
+    def _dispatch_remote_message(self, message: dict) -> None:
+        try:
+            payload = json.loads(message["data"])
+            if payload.get("source") == self._instance_id:
+                return
+            scope = payload.get("scope")
+            key = int(payload.get("key"))
+            data = payload.get("data") or {}
+            loop = self._loop
+            if loop is None or loop.is_closed():
+                return
+            if scope == "user":
+                asyncio.run_coroutine_threadsafe(
+                    self.send_user_event(key, data, publish=False), loop
+                )
+            elif scope == "family":
+                asyncio.run_coroutine_threadsafe(
+                    self.send_family_event(key, data, publish=False), loop
+                )
+        except Exception:
+            logger.debug("Invalid ws pubsub message", exc_info=True)
 
     def send_user_event_threadsafe(self, user_id: int, data: dict) -> None:
         """Schedule a user event from a synchronous (threadpool) context.

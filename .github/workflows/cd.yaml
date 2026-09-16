@@ -158,13 +158,19 @@ jobs:
 
             app_container="$(docker compose ps -q app)"
             app_health=""
-            for attempt in $(seq 1 12); do
+            for attempt in $(seq 1 24); do
               app_health="$(docker inspect -f '{{.State.Health.Status}}' "$app_container" 2>/dev/null || true)"
               [ "$app_health" = "healthy" ] && break
               sleep 5
             done
             if [ "$app_health" != "healthy" ]; then
               echo "ERROR: app health check did not become healthy."
+              echo "== Compose status at health failure =="
+              docker compose ps || true
+              echo "== Docker health probe history =="
+              docker inspect -f '{{range .State.Health.Log}}{{println .End "exit=" .ExitCode .Output}}{{end}}' "$app_container" || true
+              echo "== Direct in-container health probe =="
+              docker compose exec -T app python -c "import urllib.request; response = urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5); print(response.status, response.read().decode())" || true
               docker compose logs --tail=100 app
               exit 1
             fi
