@@ -2,9 +2,17 @@
 
 from datetime import date, datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.journey import repository as repo
+from app.journey.models import (
+    JourneyAdhkarProgress,
+    JourneyPrayerCompletion,
+    JourneyQuranProgress,
+    JourneyReadingProgress,
+    JourneyReflection,
+)
 from app.journey.exceptions import (
     FavoriteConflictException,
     FavoriteNotFoundException,
@@ -22,7 +30,12 @@ from app.journey.schemas import (
     QuranProgressResponse,
     PrayerCompletionState,
     PrayerCompletionUpdate,
+    JourneyHistoryItem,
+    JourneyHistoryPage,
 )
+from app.models.sadaqah_act import SadaqahAct
+from app.models.sadaqah_log import SadaqahLog
+from app.sadaqah.models import ActivityCompletion
 
 
 def _utcnow() -> datetime:
@@ -325,3 +338,141 @@ def set_prayer_completion(
     )
     db.commit()
     return get_prayer_completions(db, user_id, payload.local_date)
+
+
+def list_history(
+    db: Session, user_id: int, *, limit: int = 100, offset: int = 0
+) -> JourneyHistoryPage:
+    """Build one chronological view over the user's existing activity tables."""
+    events: list[JourneyHistoryItem] = []
+
+    reflections = db.scalars(
+        select(JourneyReflection).where(
+            JourneyReflection.user_id == user_id,
+            JourneyReflection.deleted_at.is_(None),
+        )
+    ).all()
+    for item in reflections:
+        events.append(
+            JourneyHistoryItem(
+                id=f"reflection:{item.id}",
+                kind="reflection",
+                title=item.title or "Reflection",
+                description=item.body,
+                occurred_at=item.date or item.created_at,
+                reference_id=item.id,
+                metadata={"mood": item.mood, "private": item.is_private},
+            )
+        )
+
+    completions = db.scalars(
+        select(ActivityCompletion).where(
+            ActivityCompletion.user_id == user_id,
+            ActivityCompletion.deleted_at.is_(None),
+        )
+    ).all()
+    for item in completions:
+        activity = getattr(item.activity_type, "value", str(item.activity_type))
+        events.append(
+            JourneyHistoryItem(
+                id=f"activity:{item.id}",
+                kind="activity",
+                title=f"Completed {activity.replace('_', ' ')}",
+                description=item.note,
+                occurred_at=item.completed_at,
+                reference_id=item.id,
+                metadata={
+                    "activity_type": activity,
+                    "context": getattr(item.context, "value", str(item.context)),
+                },
+            )
+        )
+
+    legacy_rows = db.execute(
+        select(SadaqahLog, SadaqahAct.title)
+        .join(SadaqahAct, SadaqahAct.id == SadaqahLog.act_id)
+        .where(SadaqahLog.user_id == user_id)
+    ).all()
+    for log, act_title in legacy_rows:
+        events.append(
+            JourneyHistoryItem(
+                id=f"sadaqah:{log.id}",
+                kind="sadaqah",
+                title=act_title or "Sadaqah recorded",
+                description=log.note,
+                occurred_at=log.created_at,
+                reference_id=log.id,
+                metadata={"stars": log.stars_earned},
+            )
+        )
+
+    prayer_rows = db.scalars(
+        select(JourneyPrayerCompletion).where(
+            JourneyPrayerCompletion.user_id == user_id
+        )
+    ).all()
+    for item in prayer_rows:
+        events.append(
+            JourneyHistoryItem(
+                id=f"prayer:{item.id}",
+                kind="prayer",
+                title=f"{item.prayer_name.title()} completed",
+                occurred_at=item.completed_at,
+                reference_id=item.id,
+                metadata={"local_date": item.local_date.isoformat()},
+            )
+        )
+
+    adhkar_rows = db.scalars(
+        select(JourneyAdhkarProgress).where(JourneyAdhkarProgress.user_id == user_id)
+    ).all()
+    for item in adhkar_rows:
+        events.append(
+            JourneyHistoryItem(
+                id=f"adhkar:{item.id}",
+                kind="adhkar",
+                title="Adhkar progress updated",
+                description=f"Count: {item.count}",
+                occurred_at=item.updated_at,
+                reference_id=item.adhkar_id,
+                metadata={"count": item.count},
+            )
+        )
+
+    quran = db.scalar(
+        select(JourneyQuranProgress).where(JourneyQuranProgress.user_id == user_id)
+    )
+    if quran:
+        events.append(
+            JourneyHistoryItem(
+                id=f"quran:{quran.id}",
+                kind="quran",
+                title="Quran reading progress saved",
+                description=f"Page {quran.page}, verse {quran.verse_key}",
+                occurred_at=quran.last_read_at,
+                reference_id=quran.id,
+                metadata={"page": quran.page, "surah_id": quran.surah_id},
+            )
+        )
+
+    reading_rows = db.scalars(
+        select(JourneyReadingProgress).where(JourneyReadingProgress.user_id == user_id)
+    ).all()
+    for item in reading_rows:
+        events.append(
+            JourneyHistoryItem(
+                id=f"book:{item.id}",
+                kind="book",
+                title="Book reading progress saved",
+                description=f"Chapter {item.chapter_number}",
+                occurred_at=item.last_read_at,
+                reference_id=item.book_id,
+                metadata={"chapter": item.chapter_number},
+            )
+        )
+
+    events.sort(key=lambda item: item.occurred_at, reverse=True)
+    total = len(events)
+    return JourneyHistoryPage(
+        data=events[offset : offset + limit], total=total, limit=limit, offset=offset
+    )

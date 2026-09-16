@@ -35,6 +35,8 @@ router = APIRouter(prefix="/admin/books", tags=["Admin Books"])
 
 
 def _serialize(book) -> dict:
+    pages = getattr(book, "pages", None) or []
+    chapters = getattr(book, "chapters", None) or []
     return {
         "id": book.id,
         "title": book.title,
@@ -48,7 +50,8 @@ def _serialize(book) -> dict:
         "language": book.language,
         "published": book.published,
         "sort_order": book.sort_order,
-        "page_count": getattr(book, "page_count", 0),
+        "page_count": len(pages),
+        "chapter_count": len(chapters),
     }
 
 
@@ -63,11 +66,17 @@ def _key_from_url(raw_url: str | None, bucket: str) -> str | None:
 
 
 def _signed_url(raw_url: str | None) -> str | None:
-    bucket = _get_bucket()
+    try:
+        bucket = _get_bucket()
+    except HTTPException:
+        return raw_url
     key = _key_from_url(raw_url, bucket)
     if not key:
         return raw_url
-    return get_presigned_url(bucket=bucket, key=key, expires_in=3600)
+    try:
+        return get_presigned_url(bucket=bucket, key=key, expires_in=3600)
+    except HTTPException:
+        return raw_url
 
 
 def _detail_payload(book_detail) -> dict:

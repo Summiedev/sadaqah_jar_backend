@@ -70,10 +70,13 @@ def _serialize_charity(charity: Charity) -> dict:
 def list_charities(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    include_inactive: bool = Query(default=True),
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
-    query = db.query(Charity).filter(Charity.is_active).order_by(Charity.id.desc())
+    query = db.query(Charity).order_by(Charity.id.desc())
+    if not include_inactive:
+        query = query.filter(Charity.is_active)
     total = query.count()
     rows = query.offset(offset).limit(limit).all()
     return {
@@ -109,6 +112,7 @@ def create_charity(
         status=payload.status,
         deadline=payload.deadline,
         is_published=payload.is_published,
+        is_active=payload.is_active,
         is_verified=True,
         is_featured=payload.is_featured,
     )

@@ -424,6 +424,129 @@ class TestAwareReminderRules:
         ).delete(synchronize_session=False)
         db.commit()
 
+    def test_disabling_salah_cancels_an_existing_pending_schedule(self, db, user):
+        from app.services.prayer_reminder_service import (
+            PrayerTimes,
+            schedule_prayer_relative_templates,
+        )
+        from app.tasks.scheduled_tasks import _filter_schedules_for_user
+
+        local_date = date(2026, 8, 21)
+        zone = ZoneInfo("Africa/Lagos")
+        prayer_times = PrayerTimes(
+            fajr=datetime(2026, 8, 21, 5, 10, tzinfo=zone),
+            sunrise=datetime(2026, 8, 21, 6, 20, tzinfo=zone),
+            duha_start=datetime(2026, 8, 21, 6, 35, tzinfo=zone),
+            duha_end=datetime(2026, 8, 21, 11, 50, tzinfo=zone),
+            zuhr=datetime(2026, 8, 21, 12, 0, tzinfo=zone),
+            asr=datetime(2026, 8, 21, 15, 20, tzinfo=zone),
+            maghrib=datetime(2026, 8, 21, 18, 40, tzinfo=zone),
+            isha=datetime(2026, 8, 21, 19, 50, tzinfo=zone),
+        )
+        template = self._template(db, "dhuhr_reminder", "prayer_fardh")
+        template.strategy_config = json.dumps(
+            {"anchor": "zuhr", "offset_minutes": 0}
+        )
+        user.preferences = UserPreference(timezone="Africa/Lagos")
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session="fetch")
+        db.commit()
+
+        first = schedule_prayer_relative_templates(
+            db,
+            user_id=user.id,
+            local_date=local_date,
+            prayer_times=prayer_times,
+            reminder_preferences={},
+        )
+        db.commit()
+        pending = next(
+            row
+            for row in first
+            if db.get(NotificationTemplate, row.template_id).key == "dhuhr_reminder"
+        )
+
+        user.preferences.reminder_preferences = json.dumps(
+            {"prayer_reminders": {"dhuhr": {"enabled": False}}}
+        )
+        db.commit()
+        second = schedule_prayer_relative_templates(
+            db,
+            user_id=user.id,
+            local_date=local_date,
+            prayer_times=prayer_times,
+            reminder_preferences={
+                "prayer_reminders": {"dhuhr": {"enabled": False}}
+            },
+        )
+        _filter_schedules_for_user(db, user, second, local_date=local_date)
+        db.commit()
+
+        assert pending.status == "cancelled"
+
+    def test_prayer_time_changes_update_pending_schedule(self, db, user):
+        from app.services.prayer_reminder_service import (
+            PrayerTimes,
+            schedule_prayer_relative_templates,
+        )
+
+        local_date = date(2026, 8, 21)
+        lagos = ZoneInfo("Africa/Lagos")
+        utc = ZoneInfo("UTC")
+
+        def times(zone, hour):
+            return PrayerTimes(
+                fajr=datetime(2026, 8, 21, 5, 10, tzinfo=zone),
+                sunrise=datetime(2026, 8, 21, 6, 20, tzinfo=zone),
+                duha_start=datetime(2026, 8, 21, 6, 35, tzinfo=zone),
+                duha_end=datetime(2026, 8, 21, 11, 50, tzinfo=zone),
+                zuhr=datetime(2026, 8, 21, hour, 0, tzinfo=zone),
+                asr=datetime(2026, 8, 21, 15, 20, tzinfo=zone),
+                maghrib=datetime(2026, 8, 21, 18, 40, tzinfo=zone),
+                isha=datetime(2026, 8, 21, 19, 50, tzinfo=zone),
+            )
+
+        self._template(db, "dhuhr_reminder", "prayer_fardh").strategy_config = (
+            json.dumps({"anchor": "zuhr", "offset_minutes": 0})
+        )
+        user.preferences = UserPreference(timezone="Africa/Lagos")
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session="fetch")
+        db.commit()
+        first = schedule_prayer_relative_templates(
+            db,
+            user_id=user.id,
+            local_date=local_date,
+            prayer_times=times(lagos, 12),
+            reminder_preferences={},
+        )
+        db.commit()
+        first_row = next(
+            row
+            for row in first
+            if db.get(NotificationTemplate, row.template_id).key == "dhuhr_reminder"
+        )
+        original_due = first_row.scheduled_for
+
+        changed = schedule_prayer_relative_templates(
+            db,
+            user_id=user.id,
+            local_date=local_date,
+            prayer_times=times(utc, 13),
+            reminder_preferences={},
+        )
+        db.commit()
+        changed_row = next(
+            row
+            for row in changed
+            if db.get(NotificationTemplate, row.template_id).key == "dhuhr_reminder"
+        )
+
+        assert changed_row.scheduled_for != original_due
+        assert changed_row.scheduled_for == datetime(2026, 8, 21, 13, 0)
+
     def test_missing_timezone_uses_utc_rhythm_and_tahajjud_stays_off(self, db, user):
         from app.tasks.scheduled_tasks import _schedule_timezone_rhythm
 

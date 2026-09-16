@@ -35,6 +35,20 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 # ---------------------------------------------------------------------------
 
 
+@router.get("/history", response_model=Envelope)
+def get_history(
+    db: DbDep,
+    current_user: CurrentUser,
+    limit: int = Query(100, ge=1, le=250),
+    offset: int = Query(0, ge=0),
+):
+    page = service.list_history(db, current_user.id, limit=limit, offset=offset)
+    return Envelope(
+        data=page.data,
+        meta=Meta(total=page.total, has_more=page.total > offset + limit),
+    )
+
+
 @router.get("/reflections", response_model=Envelope)
 def list_reflections(
     db: DbDep,

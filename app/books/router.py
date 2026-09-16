@@ -39,10 +39,19 @@ def _signed_url(raw_url: str | None) -> str | None:
 
 def _public_book_payload(book, *, include_download_link: bool = True) -> dict:
     payload = book.model_dump()
+    if payload.get("cover_url"):
+        payload["cover_url"] = _signed_url(payload.get("cover_url"))
     if include_download_link and payload.get("file_url"):
         payload["file_url"] = f"/books/{book.id}/file/download"
     for page in payload.get("pages", []) or []:
-        page["image_url"] = _signed_url(page.get("image_url")) or ""
+        page_number = page.get("page_number")
+        if page_number is not None:
+            # Keep the API URL stable. A presigned object URL would expire in
+            # the user's cached book metadata and make a later page impossible
+            # to fetch. The endpoint below signs the object at request time.
+            page["image_url"] = f"/books/{book.id}/pages/{page_number}/image"
+        else:
+            page["image_url"] = _signed_url(page.get("image_url")) or ""
     return payload
 
 
@@ -53,10 +62,7 @@ def list_books(
     result = service.list_books(db, offset=offset, limit=limit, published_only=True)
     data = []
     for book in result.data:
-        payload = book.model_dump()
-        if payload.get("file_url"):
-            payload["file_url"] = f"/books/{book.id}/file/download"
-        data.append(payload)
+        data.append(_public_book_payload(book))
     return Envelope(
         data=data,
         meta=Meta(total=result.total, limit=result.limit, offset=result.offset),
@@ -109,6 +115,29 @@ def download_book_file(book_id: int, db: DbDep):
     key = _key_from_url(book.file_url, bucket)
     if not key:
         raise HTTPException(status_code=404, detail="Invalid file URL")
+    return RedirectResponse(
+        url=get_presigned_url(bucket=bucket, key=key, expires_in=3600)
+    )
+
+
+@router.get("/{book_id}/pages/{page_number}/image")
+def download_book_page(book_id: int, page_number: int, db: DbDep):
+    """Redirect to a fresh signed URL for one published book page."""
+    book = repo.get_book(db, book_id, published_only=True)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    page = next(
+        (item for item in repo.list_pages(db, book_id) if item.page_number == page_number),
+        None,
+    )
+    if not page:
+        raise HTTPException(status_code=404, detail="Book page not found")
+    bucket = _get_bucket()
+    key = _key_from_url(page.image_url, bucket)
+    if not key:
+        # Retain support for legacy/external page URLs while avoiding a stale
+        # presigned URL in the public book payload.
+        return RedirectResponse(url=page.image_url)
     return RedirectResponse(
         url=get_presigned_url(bucket=bucket, key=key, expires_in=3600)
     )

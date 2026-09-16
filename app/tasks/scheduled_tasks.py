@@ -28,6 +28,15 @@ from app.services.streak_service import validate_streak
 logger = logging.getLogger(__name__)
 
 
+_PENDING_SCHEDULE_STATUSES = {"scheduled", "queued"}
+
+
+def _cancel_pending_schedule(schedule: ScheduledNotification) -> None:
+    """Cancel pending work without rewriting delivered reminder history."""
+    if schedule.status in _PENDING_SCHEDULE_STATUSES:
+        schedule.status = "cancelled"
+
+
 @celery_app.task
 def generate_daily_acts():
     db = SessionLocal()
@@ -298,11 +307,11 @@ def _filter_schedules_for_user(
             # the existing audit trail for those rows; unsaved fallback rows
             # are simply omitted below.
             if schedule in db:
-                schedule.status = "cancelled"
+                _cancel_pending_schedule(schedule)
             continue
         if not is_category_enabled(db, user.id, category):
             if schedule in db:
-                schedule.status = "cancelled"
+                _cancel_pending_schedule(schedule)
             continue
         is_opted_in_post_salah_nawafil = (
             nawafil_after_salah_enabled
@@ -319,7 +328,7 @@ def _filter_schedules_for_user(
             and not is_opted_in_post_salah_nawafil
         ):
             if schedule in db:
-                schedule.status = "cancelled"
+                _cancel_pending_schedule(schedule)
             continue
         candidates.append((category_priority.get(category, 4), schedule, category))
 
@@ -330,7 +339,7 @@ def _filter_schedules_for_user(
         limit = max_per_category.get(category, 1)
         if category_counts.get(category, 0) >= limit or len(filtered) >= daily_limit:
             if schedule in db:
-                schedule.status = "cancelled"
+                _cancel_pending_schedule(schedule)
             continue
         category_counts[category] = category_counts.get(category, 0) + 1
         filtered.append(schedule)

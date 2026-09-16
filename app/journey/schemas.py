@@ -83,3 +83,20 @@ class PrayerCompletionUpdate(BaseModel):
 class PrayerCompletionState(BaseModel):
     local_date: date
     completed_prayers: list[str]
+
+
+class JourneyHistoryItem(BaseModel):
+    id: str
+    kind: str
+    title: str
+    description: str | None = None
+    occurred_at: datetime
+    reference_id: int | None = None
+    metadata: dict[str, str | int | bool | None] = Field(default_factory=dict)
+
+
+class JourneyHistoryPage(BaseModel):
+    data: list[JourneyHistoryItem]
+    total: int
+    limit: int
+    offset: int

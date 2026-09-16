@@ -22,7 +22,7 @@ from app.core.security import create_access_token, hash_password
 from app.db.session import SessionLocal
 from app.main import app
 from app.models.user import User, Role
-from app.books.models import Book, BookChapter
+from app.books.models import Book, BookChapter, BookPage
 
 client = TestClient(app)
 
@@ -90,6 +90,37 @@ def test_list_books_returns_published_only(db):
 
 
 def test_get_book_detail(db):
+    _clean_books(db)
+
+
+def test_public_book_page_url_is_stable_for_later_offline_fetches(db):
+    _clean_books(db)
+    book = Book(
+        title="Image Book",
+        author="Author",
+        category="faith",
+        published=True,
+        sort_order=1,
+    )
+    db.add(book)
+    db.commit()
+    db.refresh(book)
+    db.add(
+        BookPage(
+            book_id=book.id,
+            page_number=3,
+            image_url="http://minio:9000/mizan/books/1/page.jpg",
+            image_type="image/jpeg",
+        )
+    )
+    db.commit()
+
+    response = client.get(f"{API}/books/{book.id}")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["pages"][0]["image_url"] == (
+        f"/books/{book.id}/pages/3/image"
+    )
     _clean_books(db)
     book = Book(
         title="Detail Test",

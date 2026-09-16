@@ -7,6 +7,7 @@ class Base(DeclarativeBase):
 
 # Import all models so Base.metadata is populated.
 import app.models.badge  # noqa: E402,F401
+import app.models.broadcast  # noqa: E402,F401
 import app.models.charity  # noqa: E402,F401
 import app.models.donation_intent  # noqa: E402,F401
 import app.models.evidence  # noqa: E402,F401

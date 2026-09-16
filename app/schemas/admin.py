@@ -24,6 +24,7 @@ class CharityCreate(BaseModel):
     )
     deadline: date | None = None
     is_published: bool = True
+    is_active: bool = True
     is_featured: bool = False
 
     model_config = ConfigDict(extra="forbid")

@@ -35,6 +35,8 @@ from app.api.websocket import router as websocket_router
 from app.api.admin_analytics import router as admin_analytics_router
 from app.api.admin_books import router as admin_books_router
 from app.api.admin_charities import router as admin_charities_router
+from app.api.admin_broadcasts import router as admin_broadcasts_router
+from app.api.broadcasts import router as broadcasts_router
 from app.api.admin_evidence import router as admin_evidence_router
 from app.api.admin_leaderboard_seasons import router as admin_leaderboard_seasons_router
 from app.journey.router import router as journey_router
@@ -57,6 +59,7 @@ for router in (
     book_bookmarks_router,
     leaderboard_router,
     notifications_router,
+    broadcasts_router,
     quran_router,
     sadaqah_router,
     activities_router,
@@ -67,6 +70,7 @@ for router in (
     admin_analytics_router,
     admin_books_router,
     admin_charities_router,
+    admin_broadcasts_router,
     admin_evidence_router,
     admin_leaderboard_seasons_router,
     journey_router,
