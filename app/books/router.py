@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.core.envelope import Envelope, Meta
+from app.core.cache import cache_json, get_cached_json
 from app.db.deps import get_db
 from app.books import service
 from app.books import repository as repo
@@ -15,6 +16,7 @@ from app.services.storage import get_presigned_url, _get_bucket
 router = APIRouter(prefix="/books", tags=["books"])
 
 DbDep = Annotated[Session, Depends(get_db)]
+_BOOK_CACHE_TTL = 5 * 60
 
 
 def _key_from_url(raw_url: str | None, bucket: str) -> str | None:
@@ -59,22 +61,35 @@ def _public_book_payload(book, *, include_download_link: bool = True) -> dict:
 def list_books(
     db: DbDep, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)
 ):
+    cache_key = f"catalogue:books:list:{limit}:{offset}:v1"
+    cached = get_cached_json(cache_key)
+    if cached is not None:
+        return cached
     result = service.list_books(db, offset=offset, limit=limit, published_only=True)
     data = []
     for book in result.data:
         data.append(_public_book_payload(book))
-    return Envelope(
+    response = Envelope(
         data=data,
         meta=Meta(total=result.total, limit=result.limit, offset=result.offset),
     )
+    payload = response.model_dump(mode="json")
+    cache_json(cache_key, payload, ttl=_BOOK_CACHE_TTL)
+    return response
 
 
 @router.get("/{book_id}", response_model=Envelope)
 def get_book(book_id: int, db: DbDep):
+    cache_key = f"catalogue:book:{book_id}:v1"
+    cached = get_cached_json(cache_key)
+    if cached is not None:
+        return cached
     book = service.get_book_detail(db, book_id, published_only=True)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    return Envelope(data=_public_book_payload(book))
+    response = Envelope(data=_public_book_payload(book))
+    cache_json(cache_key, response.model_dump(mode="json"), ttl=_BOOK_CACHE_TTL)
+    return response
 
 
 @router.get("/{book_id}/chapters", response_model=Envelope)

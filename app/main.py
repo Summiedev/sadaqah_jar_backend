@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -14,7 +15,7 @@ from app.core.exception_handlers import (
     general_exception_handler,
     http_exception_handler,
 )
-from app.core.observability import set_request_id
+from app.core.observability import request_metrics, set_request_id, start_timer
 from app.core.logger import logger
 
 
@@ -24,6 +25,28 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         set_request_id(request_id)
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
+        return response
+
+
+class RequestMetricsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        started = start_timer()
+        try:
+            response = await call_next(request)
+        except Exception:
+            request_metrics.record_request(
+                request.method,
+                request.url.path,
+                500,
+                start_timer() - started,
+            )
+            raise
+        request_metrics.record_request(
+            request.method,
+            request.url.path,
+            response.status_code,
+            start_timer() - started,
+        )
         return response
 
 
@@ -96,6 +119,7 @@ app = FastAPI(
 )
 
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(RequestMetricsMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 if settings.CORS_ORIGINS:
@@ -113,6 +137,12 @@ app.include_router(api_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/metrics", include_in_schema=False, response_class=PlainTextResponse)
+def metrics():
+    """Expose aggregate process metrics for an internal scraper."""
+    return request_metrics.prometheus()
 
 
 @app.get("/readiness")
@@ -146,6 +176,20 @@ def readiness():
     except Exception:
         logger.exception("Readiness Redis check failed")
         checks["redis"] = "unavailable"
+
+    if settings.CELERY_READINESS_REQUIRED:
+        try:
+            from app.core.celery_app import celery_app
+
+            workers = celery_app.control.inspect(
+                timeout=settings.CELERY_INSPECT_TIMEOUT_SECONDS
+            ).ping()
+            checks["celery"] = "ok" if workers else "no_worker"
+        except Exception:
+            logger.exception("Readiness Celery worker check failed")
+            checks["celery"] = "unavailable"
+    else:
+        checks["celery"] = "not_checked"
 
     try:
         from app.services.push_notification_service import validate_push_configuration

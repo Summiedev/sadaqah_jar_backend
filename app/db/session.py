@@ -18,7 +18,7 @@ else:
         pool_size=getattr(settings, "DB_POOL_SIZE", 10),
         max_overflow=getattr(settings, "DB_MAX_OVERFLOW", 20),
         pool_timeout=getattr(settings, "DB_POOL_TIMEOUT", 30),
-        pool_recycle=1800,
+        pool_recycle=getattr(settings, "DB_POOL_RECYCLE", 1800),
     )
     # Postgres statement-timeout backstop: any single query that runs longer
     # than this is aborted by the server, so a slow/blocked query (e.g. under

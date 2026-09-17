@@ -10,6 +10,7 @@ celery_app = Celery(
     include=[
         "app.tasks.scheduled_tasks",
         "app.tasks.notification_tasks",
+        "app.tasks.monitoring_tasks",
     ],
 )
 
@@ -51,6 +52,11 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=0, minute=0, day_of_week=0),
         "options": {"queue": "analytics"},
     },
+    "monitor-celery-queues": {
+        "task": "app.tasks.monitoring_tasks.monitor_celery_queues",
+        "schedule": crontab(minute="*/5"),
+        "options": {"queue": "analytics"},
+    },
 }
 
 celery_app.conf.task_routes = {
@@ -61,6 +67,7 @@ celery_app.conf.task_routes = {
     "app.tasks.scheduled_tasks.schedule_daily_prayer_reminders": {"queue": "reminders"},
     "app.tasks.scheduled_tasks.generate_daily_acts": {"queue": "analytics"},
     "app.tasks.scheduled_tasks.aggregate_weekly_stats": {"queue": "analytics"},
+    "app.tasks.monitoring_tasks.monitor_celery_queues": {"queue": "analytics"},
 }
 
 # ``include`` above guarantees both task modules are imported by every
@@ -83,3 +90,9 @@ celery_app.autodiscover_tasks(["app.tasks"])
 # ``celery_app`` from this module.
 from app.tasks import notification_tasks as _notification_tasks  # noqa: E402,F401
 from app.tasks import scheduled_tasks as _scheduled_tasks  # noqa: E402,F401
+from app.tasks import monitoring_tasks as _monitoring_tasks  # noqa: E402,F401
+
+# Register signal handlers when the API process constructs the Celery app too;
+# task failures from the worker and publication/runtime failures are then
+# visible through the same Redis counters and container logs.
+from app.core import celery_monitor as _celery_monitor  # noqa: E402,F401

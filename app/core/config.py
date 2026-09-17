@@ -29,6 +29,18 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     CORS_ORIGINS: Annotated[list[str], NoDecode] = []
 
+    # Keep database and Redis concurrency bounded on the small production
+    # VPS. These are explicit settings so deployment can tune capacity without
+    # changing application code.
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: float = 30.0
+    DB_POOL_RECYCLE: int = 1800
+    DB_STATEMENT_TIMEOUT_MS: int = 15000
+    REDIS_MAX_CONNECTIONS: int = 50
+    CELERY_READINESS_REQUIRED: bool = False
+    CELERY_INSPECT_TIMEOUT_SECONDS: float = 0.5
+
     # SMTP / email settings (used for verification & password-reset emails)
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 587

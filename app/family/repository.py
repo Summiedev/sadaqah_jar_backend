@@ -28,6 +28,7 @@ from app.family.models import (
     FamilyRole,
     InvitationStatus,
 )
+from app.users.models import User
 
 
 def _utcnow() -> datetime:
@@ -66,6 +67,78 @@ def list_user_families(db: Session, user_id: int) -> Sequence[Family]:
     """Return all active families the user is a member of."""
     return db.scalars(
         select(Family)
+        .join(FamilyMember, FamilyMember.family_id == Family.id)
+        .where(
+            FamilyMember.user_id == user_id,
+            FamilyMember.deleted_at.is_(None),
+            Family.deleted_at.is_(None),
+        )
+        .order_by(Family.created_at.desc())
+    ).all()
+
+
+def list_user_family_summaries(db: Session, user_id: int) -> Sequence[tuple]:
+    """Return family cards with their aggregates in one database query.
+
+    The old service loaded families first and then queried members, goals and
+    activity once per family. These correlated subqueries keep the same
+    response semantics while allowing the database to use the family-scoped
+    indexes and avoiding an N+1 request pattern.
+    """
+    member_count = (
+        select(func.count(FamilyMember.id))
+        .where(
+            FamilyMember.family_id == Family.id,
+            FamilyMember.deleted_at.is_(None),
+        )
+        .correlate(Family)
+        .scalar_subquery()
+    )
+    goal_filter = (
+        FamilyGoal.family_id == Family.id,
+        FamilyGoal.deleted_at.is_(None),
+        FamilyGoal.is_archived.is_(False),
+    )
+
+    def preferred_goal_value(column):
+        return (
+            select(column)
+            .where(*goal_filter)
+            .order_by(
+                FamilyGoal.completed_at.is_(None).desc(),
+                FamilyGoal.created_at.desc(),
+                FamilyGoal.id.desc(),
+            )
+            .limit(1)
+            .correlate(Family)
+            .scalar_subquery()
+        )
+
+    goal_count = (
+        select(func.count(FamilyGoal.id))
+        .where(*goal_filter)
+        .correlate(Family)
+        .scalar_subquery()
+    )
+    last_activity = (
+        select(FamilyActivity.event_type)
+        .where(FamilyActivity.family_id == Family.id)
+        .order_by(FamilyActivity.created_at.desc(), FamilyActivity.id.desc())
+        .limit(1)
+        .correlate(Family)
+        .scalar_subquery()
+    )
+
+    return db.execute(
+        select(
+            Family,
+            member_count.label("member_count"),
+            goal_count.label("goal_count"),
+            preferred_goal_value(FamilyGoal.title).label("goal_label"),
+            preferred_goal_value(FamilyGoal.acts_done).label("acts_done"),
+            preferred_goal_value(FamilyGoal.acts_target).label("acts_target"),
+            last_activity.label("last_activity"),
+        )
         .join(FamilyMember, FamilyMember.family_id == Family.id)
         .where(
             FamilyMember.user_id == user_id,
@@ -174,6 +247,21 @@ def get_member_by_id(db: Session, member_id: int) -> FamilyMember | None:
 def list_members(db: Session, family_id: int) -> Sequence[FamilyMember]:
     return db.scalars(
         select(FamilyMember)
+        .where(
+            FamilyMember.family_id == family_id,
+            FamilyMember.deleted_at.is_(None),
+        )
+        .order_by(FamilyMember.joined_at.asc())
+    ).all()
+
+
+def list_members_with_usernames(
+    db: Session, family_id: int
+) -> Sequence[tuple[FamilyMember, str]]:
+    """Load the active members and display names in one query."""
+    return db.execute(
+        select(FamilyMember, User.username)
+        .join(User, User.id == FamilyMember.user_id)
         .where(
             FamilyMember.family_id == family_id,
             FamilyMember.deleted_at.is_(None),

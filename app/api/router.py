@@ -39,6 +39,7 @@ from app.api.admin_broadcasts import router as admin_broadcasts_router
 from app.api.broadcasts import router as broadcasts_router
 from app.api.admin_evidence import router as admin_evidence_router
 from app.api.admin_leaderboard_seasons import router as admin_leaderboard_seasons_router
+from app.api.admin_ops import router as admin_ops_router
 from app.journey.router import router as journey_router
 from app.users.router import auth_router, router as users_router
 
@@ -73,6 +74,7 @@ for router in (
     admin_broadcasts_router,
     admin_evidence_router,
     admin_leaderboard_seasons_router,
+    admin_ops_router,
     journey_router,
     goals_router,
 ):

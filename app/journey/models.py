@@ -124,4 +124,5 @@ class JourneyPrayerCompletion(Base, TimestampMixin):
             "user_id", "local_date", "prayer_name", name="uq_journey_prayer_day"
         ),
         Index("ix_journey_prayer_user_date", "user_id", "local_date"),
+        Index("ix_journey_prayer_user_completed", "user_id", "completed_at"),
     )

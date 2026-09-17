@@ -1,6 +1,7 @@
 """Journey domain Pydantic schemas."""
 
 from datetime import date, datetime
+from typing import Any
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -92,7 +93,10 @@ class JourneyHistoryItem(BaseModel):
     description: str | None = None
     occurred_at: datetime
     reference_id: int | None = None
-    metadata: dict[str, str | int | bool | None] = Field(default_factory=dict)
+    # Activity metadata can contain structured family event details. It is
+    # diagnostic/display data, not a second domain model, so keep the history
+    # contract JSON-compatible instead of rejecting an otherwise valid event.
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class JourneyHistoryPage(BaseModel):

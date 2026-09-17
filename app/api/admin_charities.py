@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_admin
+from app.core.cache import invalidate_cache_pattern
 from app.db.session import get_db
 from app.models.charity import Charity
 from app.schemas.admin import CharityCreate, CharityUpdate
@@ -19,6 +20,11 @@ from app.services.file_validation import (
 )
 
 router = APIRouter(prefix="/admin/charities", tags=["Admin Charities"])
+
+
+def _invalidate_public_charity_cache() -> None:
+    invalidate_cache_pattern("catalogue:charities:*")
+    invalidate_cache_pattern("catalogue:charity:*")
 
 
 def _object_url(bucket: str, key: str) -> str:
@@ -119,6 +125,7 @@ def create_charity(
 
     db.add(charity)
     db.commit()
+    _invalidate_public_charity_cache()
     db.refresh(charity)
 
     return _serialize_charity(charity)
@@ -178,6 +185,7 @@ def update_charity(
         charity.is_featured = payload.is_featured
 
     db.commit()
+    _invalidate_public_charity_cache()
     db.refresh(charity)
     return _serialize_charity(charity)
 
@@ -213,6 +221,7 @@ def deactivate_charity(
     charity.is_published = False
     charity.status = "closed"
     db.commit()
+    _invalidate_public_charity_cache()
 
     return {"message": "Charity deactivated"}
 
@@ -244,6 +253,7 @@ def delete_charity(
     charity.is_published = False
     charity.status = "closed"
     db.commit()
+    _invalidate_public_charity_cache()
 
     return {"message": "Charity deleted"}
 
@@ -298,6 +308,7 @@ async def upload_charity_images(
     charity.image_urls = urls
     db.add(charity)
     db.commit()
+    _invalidate_public_charity_cache()
     db.refresh(charity)
     return _serialize_charity(charity)
 
@@ -354,6 +365,7 @@ async def upload_charity_evidence(
     charity.evidence_urls = urls
     db.add(charity)
     db.commit()
+    _invalidate_public_charity_cache()
     db.refresh(charity)
     return _serialize_charity(charity)
 
@@ -369,5 +381,6 @@ def feature_charity(
 
     charity.is_featured = True
     db.commit()
+    _invalidate_public_charity_cache()
 
     return {"message": "Charity featured"}

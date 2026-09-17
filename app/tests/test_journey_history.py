@@ -81,6 +81,15 @@ def test_history_contains_existing_reflections_and_activity(db):
     assert any("kindness" in item["title"] for item in items)
     assert any(item["title"] == "Completed goal: Read with consistency" for item in items)
 
+    paged = client.get(
+        f"{API}/journey/history?limit=1&offset=1",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert paged.status_code == 200
+    assert len(paged.json()["data"]) == 1
+    assert paged.json()["meta"]["total"] >= 3
+    assert paged.json()["meta"]["has_more"] is True
+
     db.query(UserGoal).filter_by(user_id=user.id).delete(synchronize_session=False)
     db.query(ActivityCompletion).filter_by(user_id=user.id).delete(
         synchronize_session=False

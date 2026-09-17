@@ -77,6 +77,15 @@ def test_readiness_reports_dependency_status():
     assert {"database", "redis", "push"}.issubset(body["checks"])
 
 
+def test_metrics_exposes_normalized_request_counters():
+    client.get("/health")
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "mizan_http_requests_total" in response.text
+    assert 'path="/health"' in response.text
+
+
 def test_register_username_taken_returns_409(db):
     _clean("collision1@example.com", "collision-user")
     _clean("collision2@example.com", "collision-user")

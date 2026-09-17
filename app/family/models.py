@@ -519,6 +519,7 @@ class FamilyActivity(Base):
 
     __table_args__ = (
         Index("ix_family_activities_timeline", "family_id", "created_at", "id"),
+        Index("ix_family_activities_actor_created", "actor_id", "created_at", "id"),
         UniqueConstraint("request_id", name="uq_family_activity_request_id"),
     )
 

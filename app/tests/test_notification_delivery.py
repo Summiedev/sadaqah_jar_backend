@@ -150,6 +150,28 @@ def test_preference_update_refreshes_current_day_schedule(user):
     refresh.assert_called_once_with(args=[user.id], queue="reminders")
 
 
+def test_location_registration_refreshes_current_day_prayer_schedule(user):
+    """A newly available location must leave the timezone fallback path."""
+    token = create_access_token({"sub": str(user.id)})
+    with patch(
+        "app.tasks.scheduled_tasks.schedule_user_aware_reminders.apply_async"
+    ) as refresh:
+        response = TestClient(app).post(
+            "/api/v1/users/me/push-token",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "device_id": "prayer-device",
+                "platform": "android",
+                "push_token": "fcm-test-token",
+                "time_zone": "Africa/Lagos",
+                "coords": {"latitude": 6.5244, "longitude": 3.3792},
+            },
+        )
+
+    assert response.status_code == 200
+    refresh.assert_called_once_with(args=[user.id], queue="reminders")
+
+
 # ---------------------------------------------------------------------------
 # 2. Rapid-fire event deduplication
 # ---------------------------------------------------------------------------

@@ -334,12 +334,11 @@ def get_family_detail(
     """Get family detail with members and goals."""
     family = _require_family_access(db, family_id, user_id)
 
-    members = repo.list_members(db, family_id)
+    members = repo.list_members_with_usernames(db, family_id)
     goals = repo.list_family_goals(db, family_id)
 
     member_responses = []
-    for m in members:
-        username = _get_username(db, m.user_id)
+    for m, username in members:
         member_responses.append(
             FamilyMemberResponse(
                 id=m.id,
@@ -382,19 +381,18 @@ def get_family_detail(
 
 def list_user_families(db: Session, user_id: int) -> list[FamilyResponse]:
     """List all families the user belongs to."""
-    families = repo.list_user_families(db, user_id)
-
     results = []
-    for family in families:
-        member_count = repo.count_family_members(db, family.id)
-        goals = repo.list_family_goals(db, family.id)
-        goal_count = len(goals)
-        active_goal = next(
-            (goal for goal in goals if not goal.is_archived and not goal.completed_at),
-            goals[0] if goals else None,
-        )
-        acts_done = active_goal.acts_done if active_goal else 0
-        acts_target = active_goal.acts_target if active_goal else 0
+    for (
+        family,
+        member_count,
+        goal_count,
+        goal_label,
+        acts_done,
+        acts_target,
+        last_activity,
+    ) in repo.list_user_family_summaries(db, user_id):
+        acts_done = acts_done or 0
+        acts_target = acts_target or 0
         progress = (acts_done / acts_target) if acts_target > 0 else 0.0
         now = datetime.now(timezone.utc)
         if now.month == 12:
@@ -402,12 +400,6 @@ def list_user_families(db: Session, user_id: int) -> list[FamilyResponse]:
         else:
             next_month = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
         days_remaining = max(0, (next_month.date() - now.date()).days)
-
-        # Get last activity
-        activities, _ = repo.list_activities(db, family.id, limit=1)
-        last_activity = None
-        if activities:
-            last_activity = activities[0].event_type.value
 
         results.append(
             FamilyResponse(
@@ -417,12 +409,12 @@ def list_user_families(db: Session, user_id: int) -> list[FamilyResponse]:
                 invite_code=family.invite_code,
                 member_count=member_count,
                 goal_count=goal_count,
-                goal_label=active_goal.title if active_goal else None,
+                goal_label=goal_label,
                 acts_done=acts_done,
                 acts_target=acts_target,
                 progress=round(progress, 4),
-                days_remaining=days_remaining if active_goal else None,
-                last_activity=last_activity,
+                days_remaining=days_remaining if goal_label else None,
+                last_activity=getattr(last_activity, "value", last_activity),
                 created_by=family.created_by,
                 created_at=family.created_at,
             )
@@ -1762,7 +1754,7 @@ def list_activities(
                 actor_id=a.actor_id,
                 actor_name=actor_name,
                 event_type=a.event_type,
-                metadata=a.extra,
+                extra=a.extra,
                 created_at=a.created_at,
             )
         )

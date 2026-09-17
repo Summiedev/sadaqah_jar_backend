@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timezone
 
 import httpx
@@ -60,6 +61,24 @@ from app.users.schemas import (
     UserRegister,
 )
 from app.users.validators import validate_email, validate_username
+
+
+logger = logging.getLogger(__name__)
+
+
+def _enqueue_reminder_refresh(user_id: int) -> None:
+    """Refresh today's local schedule after location/timezone changes.
+
+    The import stays local because the scheduled-task module imports user
+    models. A broker outage must not turn a successful profile/device update
+    into a failed request; the daily Beat reconciliation remains a fallback.
+    """
+    try:
+        from app.tasks.scheduled_tasks import schedule_user_aware_reminders
+
+        schedule_user_aware_reminders.apply_async(args=[user_id], queue="reminders")
+    except Exception:
+        logger.exception("Could not enqueue reminder refresh for user %s", user_id)
 
 
 def _resolve_registration_family(db: Session, code: str, email: str):
@@ -245,6 +264,7 @@ def get_profile(db: Session, user: User) -> UserProfileResponse:
 def update_profile(
     db: Session, user: User, payload: UserProfileUpdate
 ) -> UserProfileResponse:
+    reminder_refresh_required = False
     if payload.username is not None:
         username = validate_username(payload.username)
         if username is None:
@@ -268,8 +288,15 @@ def update_profile(
         user.avatar_data = payload.avatar_data.strip() or None
     if payload.timezone is not None:
         prefs = repo.get_or_create_preferences(db, user)
-        prefs.timezone = payload.timezone.strip() or None
+        timezone_name = payload.timezone.strip() or None
+        reminder_refresh_required = reminder_refresh_required or (
+            prefs.timezone != timezone_name
+        )
+        prefs.timezone = timezone_name
     if payload.latitude is not None:
+        reminder_refresh_required = reminder_refresh_required or (
+            user.latitude != payload.latitude or user.longitude != payload.longitude
+        )
         user.latitude = payload.latitude
         user.longitude = payload.longitude
     if payload.locale is not None:
@@ -279,6 +306,8 @@ def update_profile(
     db.add(user)
     db.commit()
     db.refresh(user)
+    if reminder_refresh_required:
+        _enqueue_reminder_refresh(user.id)
     return _profile_response(db, user)
 
 
@@ -425,12 +454,20 @@ def register_push_token(db: Session, user: User, payload: PushTokenRequest) -> d
     # deliveries (prayer reminders, quiet-hours, etc.). We store timezone on the
     # user's preferences and coordinates on the user record.
     updated = False
+    reminder_refresh_required = False
     if getattr(payload, "timezone", None) is not None:
         prefs = repo.get_or_create_preferences(db, user)
-        prefs.timezone = payload.timezone.strip() or None
+        timezone_name = payload.timezone.strip() or None
+        reminder_refresh_required = reminder_refresh_required or (
+            prefs.timezone != timezone_name
+        )
+        prefs.timezone = timezone_name
         db.add(prefs)
         updated = True
     if getattr(payload, "latitude", None) is not None:
+        reminder_refresh_required = reminder_refresh_required or (
+            user.latitude != payload.latitude or user.longitude != payload.longitude
+        )
         user.latitude = payload.latitude
         user.longitude = payload.longitude
         db.add(user)
@@ -438,6 +475,9 @@ def register_push_token(db: Session, user: User, payload: PushTokenRequest) -> d
 
     if updated:
         db.commit()
+
+    if reminder_refresh_required:
+        _enqueue_reminder_refresh(user.id)
 
     return {"status": "ok"}
 

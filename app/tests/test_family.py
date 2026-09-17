@@ -28,6 +28,7 @@ Frontend source of truth — covers every endpoint the frontend app calls:
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -384,6 +385,50 @@ def test_list_families(db):
     assert resp.status_code == 200
     names = [f["name"] for f in resp.json()["data"]]
     assert "Listed" in names
+    _clean_family(db, family.id)
+
+
+def test_family_activity_flow_is_authenticated_and_returns_new_activity(db):
+    suffix = uuid4().hex
+    owner = _create_user(db, f"activity_owner_{suffix}", f"activity_{suffix}@test.com")
+    family = _create_family(db, owner.id, name=f"Activity Family {suffix}")
+    db.add(
+        FamilyGoal(
+            family_id=family.id,
+            created_by=owner.id,
+            title="Small acts",
+            acts_target=10,
+        )
+    )
+    db.commit()
+
+    created = client.post(
+        f"{API}/family/{family.id}/add-act",
+        headers=_headers(owner.id),
+        json={"act_type": "kindness", "note": "Checked in on a neighbour"},
+    )
+    assert created.status_code == 200
+
+    unauthenticated = client.get(f"{API}/family/{family.id}/activity")
+    assert unauthenticated.status_code == 401
+
+    activity = client.get(
+        f"{API}/family/{family.id}/activity", headers=_headers(owner.id)
+    )
+    assert activity.status_code == 200
+    rows = activity.json()["data"]
+    assert rows
+    assert rows[0]["event_type"] == "act.added"
+    assert rows[0]["extra"]["act_type"] == "kindness"
+
+    # Family events are also read by the aggregated Journey history endpoint.
+    # A malformed family event must never make the user's whole history blank.
+    history = client.get(f"{API}/journey/history", headers=_headers(owner.id))
+    assert history.status_code == 200
+    assert any(item["kind"] == "family" for item in history.json()["data"])
+
+    # The family delete cascades its activity rows; keep the test database
+    # isolated for the following family tests.
     _clean_family(db, family.id)
 
 

@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
+from app.core.cache import cache_json, get_cached_json
 from app.core.rate_limit import check_rate_limit_key
 from app.db.session import get_db
 from app.models.charity import Charity
 from app.services.storage import get_presigned_url, _get_bucket
 
 router = APIRouter(prefix="/charities", tags=["Charities"])
+_CHARITY_CACHE_TTL = 5 * 60
 
 
 def _enforce_public_rate_limit(request: Request, limit: int = 30, period: int = 60):
@@ -49,6 +51,10 @@ def list_charities(
     db: Session = Depends(get_db),
 ):
     _enforce_public_rate_limit(request)
+    cache_key = f"catalogue:charities:list:{category or '*'}:{limit}:{offset}:v1"
+    cached = get_cached_json(cache_key)
+    if cached is not None:
+        return cached
     query = db.query(Charity).filter(
         Charity.is_verified, Charity.is_active, Charity.is_published
     )
@@ -56,7 +62,7 @@ def list_charities(
         query = query.filter(Charity.category == category)
     total = query.count()
     rows = query.order_by(Charity.name).limit(limit).offset(offset).all()
-    return {
+    response = {
         "total": total,
         "limit": limit,
         "offset": offset,
@@ -86,11 +92,17 @@ def list_charities(
             for row in rows
         ],
     }
+    cache_json(cache_key, response, ttl=_CHARITY_CACHE_TTL)
+    return response
 
 
 @router.get("/featured")
 def featured_charities(request: Request, db: Session = Depends(get_db)):
     _enforce_public_rate_limit(request)
+    cache_key = "catalogue:charities:featured:v1"
+    cached = get_cached_json(cache_key)
+    if cached is not None:
+        return cached
     rows = (
         db.query(Charity)
         .filter(
@@ -101,7 +113,7 @@ def featured_charities(request: Request, db: Session = Depends(get_db)):
         )
         .all()
     )
-    return [
+    response = [
         {
             "id": row.id,
             "name": row.name,
@@ -126,11 +138,17 @@ def featured_charities(request: Request, db: Session = Depends(get_db)):
         }
         for row in rows
     ]
+    cache_json(cache_key, response, ttl=_CHARITY_CACHE_TTL)
+    return response
 
 
 @router.get("/{charity_id}")
 def get_charity(charity_id: int, request: Request, db: Session = Depends(get_db)):
     _enforce_public_rate_limit(request)
+    cache_key = f"catalogue:charity:{charity_id}:v1"
+    cached = get_cached_json(cache_key)
+    if cached is not None:
+        return cached
     charity = (
         db.query(Charity)
         .filter(
@@ -143,7 +161,7 @@ def get_charity(charity_id: int, request: Request, db: Session = Depends(get_db)
     )
     if not charity:
         raise HTTPException(status_code=404, detail="Charity not found")
-    return {
+    response = {
         "id": charity.id,
         "name": charity.name,
         "title": charity.title,
@@ -170,3 +188,5 @@ def get_charity(charity_id: int, request: Request, db: Session = Depends(get_db)
         "is_verified": charity.is_verified,
         "is_active": charity.is_active,
     }
+    cache_json(cache_key, response, ttl=_CHARITY_CACHE_TTL)
+    return response

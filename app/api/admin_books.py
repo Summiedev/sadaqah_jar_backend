@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_admin
+from app.core.cache import invalidate_cache_pattern
 from app.db.session import get_db
 from app.books import service
 from app.books import repository as repo
@@ -32,6 +33,11 @@ from app.services.file_validation import (
 )
 
 router = APIRouter(prefix="/admin/books", tags=["Admin Books"])
+
+
+def _invalidate_public_book_cache() -> None:
+    invalidate_cache_pattern("catalogue:books:*")
+    invalidate_cache_pattern("catalogue:book:*")
 
 
 def _serialize(book) -> dict:
@@ -150,6 +156,7 @@ def create_admin_book(
         )
     book = service.create_book(db, payload)
     db.commit()
+    _invalidate_public_book_cache()
     return _serialize(book)
 
 
@@ -217,6 +224,7 @@ async def upload_book_file(
         ),
     )
     db.commit()
+    _invalidate_public_book_cache()
     return _serialize(updated)
 
 
@@ -260,6 +268,7 @@ async def upload_book_cover(
         db, book_id, BookUpdate(cover_url=_object_url(bucket, key))
     )
     db.commit()
+    _invalidate_public_book_cache()
     return _serialize(updated)
 
 
@@ -330,6 +339,7 @@ async def upload_book_pages(
         db.flush()
     updated = service.get_book_detail(db, book_id)
     db.commit()
+    _invalidate_public_book_cache()
     return _serialize(updated)
 
 
@@ -376,6 +386,7 @@ def update_admin_book(
                 detail="Upload readable content before publishing this book",
             )
     db.commit()
+    _invalidate_public_book_cache()
     return _serialize(book)
 
 
@@ -410,6 +421,7 @@ def delete_admin_book(
                     pass
     service.delete_book(db, book_id)
     db.commit()
+    _invalidate_public_book_cache()
     return {"message": "Book deleted"}
 
 
@@ -439,6 +451,7 @@ def create_admin_chapter(
     if not chapter:
         raise HTTPException(status_code=404, detail="Book not found")
     db.commit()
+    _invalidate_public_book_cache()
     return _serialize_chapter(chapter)
 
 
@@ -454,6 +467,7 @@ def update_admin_chapter(
     if not chapter:
         raise HTTPException(status_code=404, detail="Chapter not found")
     db.commit()
+    _invalidate_public_book_cache()
     return _serialize_chapter(chapter)
 
 
@@ -466,4 +480,5 @@ def delete_admin_chapter(
 ):
     service.delete_chapter(db, chapter_id)
     db.commit()
+    _invalidate_public_book_cache()
     return {"message": "Chapter deleted"}
