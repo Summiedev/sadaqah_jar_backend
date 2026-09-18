@@ -73,10 +73,25 @@ jobs:
             docker builder prune -af || echo "Warning: builder cleanup failed; continuing to disk guard."
             docker network prune -f || echo "Warning: network cleanup failed; continuing to disk guard."
 
-            # Validate the release before taking the application
-            # containers down. A pull/config failure therefore preserves the
-            # currently running release.
-            git pull origin main
+            # The server checkout is release state, not a workspace for
+            # production edits. Refuse to merge over local changes because
+            # doing so can silently lose a hotfix or leave a mixed release.
+            # Preserve the currently running containers and fail before any
+            # application maintenance if the checkout is dirty.
+            echo "== Repository preflight =="
+            if ! git diff --quiet \
+              || ! git diff --cached --quiet \
+              || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+              echo "ERROR: the deployment checkout contains local changes."
+              echo "Commit, stash, or remove them on the VPS before retrying."
+              git status --short
+              exit 1
+            fi
+
+            # Fast-forward only: the server must deploy an exact commit from
+            # origin/main and must never create a merge commit in production.
+            git fetch origin main
+            git merge --ff-only origin/main
             docker compose config >/dev/null
 
             free_kb="$(free_disk_kb)"
