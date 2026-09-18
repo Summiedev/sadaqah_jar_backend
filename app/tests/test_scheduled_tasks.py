@@ -605,13 +605,72 @@ class TestAwareReminderRules:
             .filter_by(user_id=user.id, local_date=local_date.isoformat())
             .all()
         )
-        keys = {
-            db.get(NotificationTemplate, row.template_id).key
-            for row in rows
-        }
+        keys = {db.get(NotificationTemplate, row.template_id).key for row in rows}
         assert {"morning_adhkar", "quran_reminder", "evening_adhkar"} <= keys
         assert "random_sadaqah_prompt" in keys
         assert mock_enqueue.call_count == len(rows)
+
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session=False)
+        db.commit()
+
+    @patch("app.tasks.scheduled_tasks.deliver_scheduled_notification.apply_async")
+    def test_missing_location_does_not_schedule_salah_or_nawafil(
+        self, mock_enqueue, db, user
+    ):
+        from app.tasks.scheduled_tasks import _schedule_reminders_for_user
+
+        mock_enqueue.return_value.id = "test-task-id"
+        local_date = datetime.now(ZoneInfo("Africa/Lagos")).date()
+        user.latitude = None
+        user.longitude = None
+        user.preferences = UserPreference(
+            timezone="Africa/Lagos",
+            notification_preferences=json.dumps({"all_enabled": True}),
+            reminder_preferences=json.dumps({"nawafil_after_salah": True}),
+        )
+        for key, category in (
+            ("fajr_reminder", "prayer_fardh"),
+            ("dhuhr_reminder", "prayer_fardh"),
+            ("asr_reminder", "prayer_fardh"),
+            ("maghrib_reminder", "prayer_fardh"),
+            ("isha_reminder", "prayer_fardh"),
+            ("nawafil_after_dhuhr", "prayer_nafl"),
+            ("nawafil_after_maghrib", "prayer_nafl"),
+            ("nawafil_after_isha", "prayer_nafl"),
+        ):
+            self._template(db, key, category)
+        db.commit()
+
+        db.query(ScheduledNotification).filter_by(
+            user_id=user.id, local_date=local_date.isoformat()
+        ).delete(synchronize_session=False)
+        db.commit()
+
+        _schedule_reminders_for_user(db, user)
+
+        rows = (
+            db.query(ScheduledNotification)
+            .filter_by(user_id=user.id, local_date=local_date.isoformat())
+            .all()
+        )
+        prayer_keys = {
+            db.get(NotificationTemplate, row.template_id).key
+            for row in rows
+            if db.get(NotificationTemplate, row.template_id).key
+            in {
+                "fajr_reminder",
+                "dhuhr_reminder",
+                "asr_reminder",
+                "maghrib_reminder",
+                "isha_reminder",
+                "nawafil_after_dhuhr",
+                "nawafil_after_maghrib",
+                "nawafil_after_isha",
+            }
+        }
+        assert prayer_keys == set()
 
         db.query(ScheduledNotification).filter_by(
             user_id=user.id, local_date=local_date.isoformat()

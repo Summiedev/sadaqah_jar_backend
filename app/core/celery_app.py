@@ -65,6 +65,10 @@ celery_app.conf.task_routes = {
         "queue": "notifications"
     },
     "app.tasks.scheduled_tasks.schedule_daily_prayer_reminders": {"queue": "reminders"},
+    # Preference/location changes enqueue this task explicitly today. Keep the
+    # route here too so a future caller cannot accidentally send a schedule
+    # refresh to the default worker queue.
+    "app.tasks.scheduled_tasks.schedule_user_aware_reminders": {"queue": "reminders"},
     "app.tasks.scheduled_tasks.generate_daily_acts": {"queue": "analytics"},
     "app.tasks.scheduled_tasks.aggregate_weekly_stats": {"queue": "analytics"},
     "app.tasks.monitoring_tasks.monitor_celery_queues": {"queue": "analytics"},

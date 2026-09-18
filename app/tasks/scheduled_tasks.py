@@ -125,6 +125,17 @@ def _schedule_reminders_for_user(
         # still give the user the time-aware daily rhythm using their saved
         # timezone, so a missing location does not make reminders a no-op.
         if user.latitude is None or user.longitude is None:
+            _cancel_prayer_relative_schedules(
+                db=db,
+                user_id=user.id,
+                local_date=local_date,
+            )
+            logger.warning(
+                "Skipping Salah/Nawafil reminders for user %s: no saved location; "
+                "grant location access or set a manual location",
+                user.id,
+            )
+            db.commit()
             _schedule_timezone_fallbacks(
                 db=db,
                 user=user,
@@ -169,6 +180,23 @@ def _schedule_reminders_for_user(
                 for schedule in filtered
                 if schedule.scheduled_for > now_utc
             ]
+        prayer_keys = []
+        for schedule in filtered:
+            template = db.get(NotificationTemplate, schedule.template_id)
+            if template is not None and _reminder_category(template) in {
+                "prayer_fardh",
+                "prayer_nafl",
+            }:
+                prayer_keys.append(template.key)
+        logger.info(
+            "Prayer reminder schedule refreshed for user %s: %d candidates, %d "
+            "deliveries (%s), local date %s",
+            user.id,
+            len(schedules),
+            len(filtered),
+            ", ".join(prayer_keys) or "no prayer reminders",
+            local_date,
+        )
         db.commit()
         for schedule in filtered:
             if schedule.celery_task_id:
@@ -205,6 +233,27 @@ def _schedule_reminders_for_user(
             "Unexpected error while scheduling aware reminders for user %s",
             user.id,
         )
+
+
+def _cancel_prayer_relative_schedules(*, db, user_id: int, local_date) -> None:
+    """Prevent stale location-based prayer ETAs from surviving a location loss."""
+    rows = (
+        db.query(ScheduledNotification)
+        .join(NotificationTemplate, NotificationTemplate.id == ScheduledNotification.template_id)
+        .filter(
+            ScheduledNotification.user_id == user_id,
+            ScheduledNotification.local_date == local_date.isoformat(),
+            ScheduledNotification.status.in_(_PENDING_SCHEDULE_STATUSES),
+        )
+        .all()
+    )
+    for row in rows:
+        template = db.get(NotificationTemplate, row.template_id)
+        if template is not None and _reminder_category(template) in {
+            "prayer_fardh",
+            "prayer_nafl",
+        }:
+            _cancel_pending_schedule(row)
 
 
 def _enqueue_filtered_schedules(db, schedules, user_id: int) -> None:
