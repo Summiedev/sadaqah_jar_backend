@@ -79,10 +79,27 @@ jobs:
             # Preserve the currently running containers and fail before any
             # application maintenance if the checkout is dirty.
             echo "== Repository preflight =="
+            repo_dir="$(pwd)"
+            # Git refuses repositories owned by a different Unix account
+            # before it can even report status. This is an explicit fixed
+            # release path, so trust only this directory for this deploy user.
+            git config --global --get-all safe.directory \
+              | grep -Fxq "$repo_dir" \
+              || git config --global --add safe.directory "$repo_dir"
+
+            if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+              echo "ERROR: the release directory is not a valid Git checkout."
+              exit 1
+            fi
+            if [ ! -w "$repo_dir" ] || [ ! -w "$repo_dir/.git" ]; then
+              echo "ERROR: the release user cannot write the Git checkout."
+              echo "Fix ownership for this directory, then retry."
+              exit 1
+            fi
             if ! git diff --quiet \
               || ! git diff --cached --quiet \
               || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-              echo "ERROR: the deployment checkout contains local changes."
+              echo "ERROR: the release checkout contains local changes."
               echo "Commit, stash, or remove them on the VPS before retrying."
               git status --short
               exit 1
